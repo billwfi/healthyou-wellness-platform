@@ -154,6 +154,44 @@ CREATE TABLE IF NOT EXISTS coach_availability (
   UNIQUE (coach_id, day_of_week, start_time)
 );
 
+-- ── Organization Contacts ────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS org_contacts (
+  id         SERIAL PRIMARY KEY,
+  org_id     INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name       TEXT NOT NULL,
+  title      TEXT,
+  email      TEXT,
+  phone      TEXT,
+  role       TEXT DEFAULT 'contact',  -- primary | billing | hr | contact
+  active     BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Organization Locations ────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS org_locations (
+  id            SERIAL PRIMARY KEY,
+  org_id        INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name          TEXT NOT NULL,
+  address       TEXT,
+  city          TEXT,
+  state         TEXT,
+  zip           TEXT,
+  phone         TEXT,
+  location_type TEXT DEFAULT 'office',  -- office | warehouse | remote | clinic
+  active        BOOLEAN DEFAULT true,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Departments ───────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS departments (
+  id          SERIAL PRIMARY KEY,
+  location_id INTEGER NOT NULL REFERENCES org_locations(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  code        TEXT,
+  active      BOOLEAN DEFAULT true,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ── Indexes ───────────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_participants_org        ON participants(org_id);
 CREATE INDEX IF NOT EXISTS idx_participants_coach      ON participants(assigned_coach_id);
@@ -167,3 +205,6 @@ CREATE INDEX IF NOT EXISTS idx_goals_participant       ON goals(participant_id);
 CREATE INDEX IF NOT EXISTS idx_events_org              ON screening_events(org_id);
 CREATE INDEX IF NOT EXISTS idx_events_date             ON screening_events(event_date);
 CREATE INDEX IF NOT EXISTS idx_availability_coach      ON coach_availability(coach_id);
+CREATE INDEX IF NOT EXISTS idx_contacts_org            ON org_contacts(org_id);
+CREATE INDEX IF NOT EXISTS idx_locations_org           ON org_locations(org_id);
+CREATE INDEX IF NOT EXISTS idx_departments_loc         ON departments(location_id);

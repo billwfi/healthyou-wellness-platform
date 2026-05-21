@@ -80,6 +80,7 @@ async function load() {
           <td>${esc(o.contact_name||'—')}${o.contact_email?`<br><span style="font-size:.8rem;color:var(--gray-400)">${esc(o.contact_email)}</span>`:''}</td>
           <td><span class="badge badge-${o.active?'active':'inactive'}">${o.active?'Active':'Inactive'}</span></td>
           <td><div class="actions">
+            <a href="/admin/organization.html?id=${o.id}" class="btn btn-primary btn-sm">Open</a>
             <button class="btn btn-ghost btn-sm" onclick="openModal(${o.id})">Edit</button>
             <button class="btn btn-ghost btn-sm" style="color:${o.active?'var(--red)':'var(--green)'};border-color:${o.active?'var(--red)':'var(--green)'};" onclick="toggle(${o.id},${!o.active})">${o.active?'Deactivate':'Activate'}</button>
           </div></td>

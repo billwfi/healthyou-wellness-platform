@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Organization — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <style>
+    .location-card {
+      background:#fff; border:1px solid var(--gray-200); border-radius:var(--radius);
+      margin-bottom:12px; overflow:hidden;
+    }
+    .location-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:14px 18px; cursor:pointer; gap:12px; user-select:none;
+    }
+    .location-header:hover { background:var(--gray-50); }
+    .location-chevron { font-size:.9rem; color:var(--gray-400); transition:transform .2s; }
+    .location-card.open .location-chevron { transform:rotate(90deg); }
+    .location-body { display:none; border-top:1px solid var(--gray-100); padding:16px 18px; }
+    .location-card.open .location-body { display:block; }
+    .dept-row {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:8px 0; border-bottom:1px solid var(--gray-100); font-size:.88rem;
+    }
+    .dept-row:last-child { border-bottom:none; }
+    .role-badge {
+      display:inline-block; padding:1px 8px; border-radius:99px; font-size:.72rem;
+      font-weight:600; text-transform:capitalize; background:var(--teal-light); color:var(--teal-dark);
+    }
+    .role-badge.primary  { background:var(--blue-light);   color:#1d4ed8; }
+    .role-badge.hr       { background:var(--purple-light);  color:#5b21b6; }
+    .role-badge.billing  { background:var(--amber-light);   color:#92400e; }
+  </style>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/logo-icon.svg" alt="">Health<span>you</span></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" onclick="netlifyIdentity.logout()" style="color:#fff;border-color:rgba(255,255,255,.5);">Log Out</button>
+  </div>
+</header>
+<nav class="subnav">
+  <a href="/admin/" class="subnav-item">Dashboard</a>
+  <a href="/admin/organizations.html" class="subnav-item active">Organizations</a>
+  <a href="/admin/participants.html" class="subnav-item">Participants</a>
+  <a href="/admin/coaches.html" class="subnav-item">Coaches</a>
+  <a href="/admin/events.html" class="subnav-item">Screening Events</a>
+</nav>
+
+<main class="container">
+  <div id="login-wall" class="login-wall"><h2>Admin Portal</h2><p>Sign in to continue.</p><button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button></div>
+  <div id="content" style="display:none;">
+
+    <a href="/admin/organizations.html" class="back-link">&#8592; Organizations</a>
+
+    <!-- Org header -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h1 class="page-title" id="org-name" style="margin-bottom:4px;"></h1>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <code style="font-size:.82rem;color:var(--gray-600);background:var(--gray-100);padding:2px 8px;border-radius:4px;" id="org-slug"></code>
+          <span id="org-status"></span>
+        </div>
+        <div style="font-size:.84rem;color:var(--gray-400);margin-top:6px;" id="org-contact-line"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="openOrgModal()">Edit Organization</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('contacts',this)">Contacts</button>
+      <button class="tab" onclick="switchTab('locations',this)">Locations</button>
+    </div>
+
+    <!-- Contacts tab -->
+    <div id="tab-contacts">
+      <div class="section-header" style="margin-bottom:14px;">
+        <h3>Contacts</h3>
+        <button class="btn btn-primary btn-sm" onclick="openContactModal()">+ Add Contact</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <table class="data-table">
+          <thead><tr><th>Name</th><th>Title / Role</th><th>Email</th><th>Phone</th><th style="width:100px;">Actions</th></tr></thead>
+          <tbody id="contacts-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Locations tab -->
+    <div id="tab-locations" style="display:none;">
+      <div class="section-header" style="margin-bottom:14px;">
+        <h3>Locations</h3>
+        <button class="btn btn-primary btn-sm" onclick="openLocationModal()">+ Add Location</button>
+      </div>
+      <div id="locations-list"><div class="empty">Loading…</div></div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Edit Org Modal -->
+<div id="org-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'org-modal')">
+  <div class="modal">
+    <div class="modal-title">Edit Organization</div>
+    <div class="form-grid full" style="gap:14px;">
+      <div class="form-group"><label>Organization Name *</label><input id="om-name" type="text"/></div>
+      <div class="form-group"><label>Slug *</label><input id="om-slug" type="text"/></div>
+      <div class="form-group"><label>Contact Name</label><input id="om-cname" type="text"/></div>
+      <div class="form-group"><label>Contact Email</label><input id="om-cemail" type="email"/></div>
+    </div>
+    <div id="om-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('org-modal')">Cancel</button>
+      <button class="btn btn-primary" id="om-btn" onclick="saveOrg()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Contact Modal -->
+<div id="contact-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'contact-modal')">
+  <div class="modal">
+    <div class="modal-title" id="cm-title">Add Contact</div>
+    <div class="form-grid" style="gap:14px;">
+      <div class="form-group span-2"><label>Full Name *</label><input id="cm-name" type="text"/></div>
+      <div class="form-group"><label>Title / Position</label><input id="cm-title-input" type="text" placeholder="e.g. HR Director"/></div>
+      <div class="form-group"><label>Role</label>
+        <select id="cm-role">
+          <option value="contact">General Contact</option>
+          <option value="primary">Primary Contact</option>
+          <option value="hr">HR</option>
+          <option value="billing">Billing</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Email</label><input id="cm-email" type="email"/></div>
+      <div class="form-group"><label>Phone</label><input id="cm-phone" type="tel"/></div>
+    </div>
+    <div id="cm-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('contact-modal')">Cancel</button>
+      <button class="btn btn-primary" id="cm-btn" onclick="saveContact()">Add Contact</button>
+    </div>
+  </div>
+</div>
+
+<!-- Location Modal -->
+<div id="location-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'location-modal')">
+  <div class="modal">
+    <div class="modal-title" id="lm-title">Add Location</div>
+    <div class="form-grid" style="gap:14px;">
+      <div class="form-group span-2"><label>Location Name *</label><input id="lm-name" type="text" placeholder="e.g. Main Office"/></div>
+      <div class="form-group span-2"><label>Address</label><input id="lm-address" type="text" placeholder="123 Main St"/></div>
+      <div class="form-group"><label>City</label><input id="lm-city" type="text"/></div>
+      <div class="form-group"><label>State</label><input id="lm-state" type="text" maxlength="2" placeholder="IL"/></div>
+      <div class="form-group"><label>ZIP</label><input id="lm-zip" type="text" maxlength="10"/></div>
+      <div class="form-group"><label>Phone</label><input id="lm-phone" type="tel"/></div>
+      <div class="form-group span-2"><label>Location Type</label>
+        <select id="lm-type">
+          <option value="office">Office</option>
+          <option value="clinic">Clinic</option>
+          <option value="warehouse">Warehouse</option>
+          <option value="remote">Remote</option>
+        </select>
+      </div>
+    </div>
+    <div id="lm-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('location-modal')">Cancel</button>
+      <button class="btn btn-primary" id="lm-btn" onclick="saveLocation()">Add Location</button>
+    </div>
+  </div>
+</div>
+
+<!-- Department Modal -->
+<div id="dept-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'dept-modal')">
+  <div class="modal">
+    <div class="modal-title" id="dm-title">Add Department</div>
+    <div class="form-grid" style="gap:14px;">
+      <div class="form-group span-2"><label>Department Name *</label><input id="dm-name" type="text" placeholder="e.g. Human Resources"/></div>
+      <div class="form-group span-2"><label>Code <span style="font-weight:400;color:var(--gray-400);">(optional)</span></label><input id="dm-code" type="text" placeholder="e.g. HR"/></div>
+    </div>
+    <div id="dm-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('dept-modal')">Cancel</button>
+      <button class="btn btn-primary" id="dm-btn" onclick="saveDept()">Add Department</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+const orgId = parseInt(new URLSearchParams(location.search).get('id'));
+let authToken=null, org=null, contacts=[], locations=[], deptsByLocation={};
+let editContactId=null, editLocationId=null, editDeptId=null, activeDeptLocationId=null;
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; });
+
+async function boot(user) {
+  if (!orgId) { location.href='/admin/organizations.html'; return; }
+  document.getElementById('login-wall').style.display='none';
+  document.getElementById('content').style.display='';
+  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+  const hdr={Authorization:'Bearer '+authToken};
+  [org, contacts, locations] = await Promise.all([
+    fetch('/api/organizations',{headers:hdr}).then(r=>r.json()).then(list=>list.find(o=>o.id===orgId)),
+    fetch(`/api/org-contacts?org_id=${orgId}`,{headers:hdr}).then(r=>r.json()),
+    fetch(`/api/org-locations?org_id=${orgId}`,{headers:hdr}).then(r=>r.json()),
+  ]);
+  renderOrgHeader();
+  renderContacts();
+  renderLocations();
+}
+
+function renderOrgHeader() {
+  document.title = (org?.name || 'Organization') + ' — HealYou Admin';
+  document.getElementById('org-name').textContent = org?.name || '';
+  document.getElementById('org-slug').textContent = org?.slug || '';
+  document.getElementById('org-status').innerHTML = `<span class="badge badge-${org?.active?'active':'inactive'}">${org?.active?'Active':'Inactive'}</span>`;
+  const parts = [];
+  if (org?.contact_name) parts.push(org.contact_name);
+  if (org?.contact_email) parts.push(org.contact_email);
+  document.getElementById('org-contact-line').textContent = parts.join(' · ');
+}
+
+// ── Contacts ──────────────────────────────────────────────────────────────────
+function renderContacts() {
+  const el = document.getElementById('contacts-tbody');
+  if (!contacts.length) { el.innerHTML='<tr><td colspan="5" class="empty">No contacts yet.</td></tr>'; return; }
+  el.innerHTML = contacts.map(c=>`<tr>
+    <td><strong>${esc(c.name)}</strong></td>
+    <td>${c.title?`<span style="font-size:.85rem;">${esc(c.title)}</span><br>`:''}
+        <span class="role-badge ${c.role}">${c.role.replace('_',' ')}</span></td>
+    <td>${c.email?`<a href="mailto:${esc(c.email)}" style="color:var(--teal);text-decoration:none;">${esc(c.email)}</a>`:'—'}</td>
+    <td style="font-size:.85rem;">${esc(c.phone||'—')}</td>
+    <td><div class="actions">
+      <button class="btn btn-ghost btn-sm" onclick="openContactModal(${c.id})">Edit</button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);" onclick="deleteContact(${c.id})">Del</button>
+    </div></td>
+  </tr>`).join('');
+}
+
+function openContactModal(id) {
+  editContactId=id||null;
+  document.getElementById('cm-title').textContent=id?'Edit Contact':'Add Contact';
+  document.getElementById('cm-btn').textContent=id?'Save Changes':'Add Contact';
+  document.getElementById('cm-err').style.display='none';
+  if(id){
+    const c=contacts.find(x=>x.id===id);
+    document.getElementById('cm-name').value=c.name;
+    document.getElementById('cm-title-input').value=c.title||'';
+    document.getElementById('cm-role').value=c.role||'contact';
+    document.getElementById('cm-email').value=c.email||'';
+    document.getElementById('cm-phone').value=c.phone||'';
+  } else {
+    ['cm-name','cm-title-input','cm-email','cm-phone'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('cm-role').value='contact';
+  }
+  document.getElementById('contact-modal').style.display='flex';
+  document.getElementById('cm-name').focus();
+}
+
+async function saveContact() {
+  const name=document.getElementById('cm-name').value.trim();
+  if(!name){ showErr('cm-err','Name required'); return; }
+  const btn=document.getElementById('cm-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const body={ name, title:document.getElementById('cm-title-input').value||null,
+      role:document.getElementById('cm-role').value,
+      email:document.getElementById('cm-email').value||null,
+      phone:document.getElementById('cm-phone').value||null };
+    if(editContactId){ body.id=editContactId; }
+    else { body.org_id=orgId; }
+    const r=await fetch('/api/org-contacts',{method:editContactId?'PUT':'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify(body)});
+    if(!r.ok){ showErr('cm-err',(await r.json()).error||'Save failed'); return; }
+    const c=await r.json();
+    if(editContactId){ const i=contacts.findIndex(x=>x.id===editContactId); if(i>=0) contacts[i]=c; }
+    else contacts.unshift(c);
+    renderContacts(); closeModal('contact-modal'); showToast(editContactId?'Contact updated':'Contact added');
+  } catch(e){ showErr('cm-err',e.message); }
+  finally{ btn.disabled=false; btn.textContent=editContactId?'Save Changes':'Add Contact'; }
+}
+
+async function deleteContact(id) {
+  if(!confirm('Delete this contact?')) return;
+  try {
+    await fetch(`/api/org-contacts?id=${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+authToken}});
+    contacts=contacts.filter(c=>c.id!==id); renderContacts(); showToast('Contact deleted');
+  } catch(e){ showToast('Error: '+e.message); }
+}
+
+// ── Locations ─────────────────────────────────────────────────────────────────
+function renderLocations() {
+  const el=document.getElementById('locations-list');
+  if(!locations.length){ el.innerHTML='<div class="empty">No locations yet.</div>'; return; }
+  el.innerHTML=locations.map(l=>`
+    <div class="location-card" id="loc-card-${l.id}">
+      <div class="location-header" onclick="toggleLocation(${l.id})">
+        <div style="flex:1;">
+          <div style="font-weight:600;">${esc(l.name)}
+            <span class="badge badge-${l.active?'active':'inactive'}" style="margin-left:6px;">${l.active?'Active':'Inactive'}</span>
+          </div>
+          <div style="font-size:.8rem;color:var(--gray-400);margin-top:3px;">
+            ${[l.address,l.city,l.state,l.zip].filter(Boolean).map(esc).join(', ') || 'No address'}
+            ${l.phone?' · '+esc(l.phone):''}
+            &nbsp;·&nbsp;<span style="text-transform:capitalize;">${l.location_type||'office'}</span>
+            &nbsp;·&nbsp;<strong>${l.department_count||0}</strong> dept${l.department_count!=1?'s':''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;" onclick="event.stopPropagation()">
+          <button class="btn btn-ghost btn-sm" onclick="openLocationModal(${l.id})">Edit</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);" onclick="deleteLocation(${l.id})">Del</button>
+        </div>
+        <span class="location-chevron">&#9654;</span>
+      </div>
+      <div class="location-body" id="loc-body-${l.id}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <span style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--teal);">Departments</span>
+          <button class="btn btn-primary btn-sm" onclick="openDeptModal(${l.id})">+ Add Department</button>
+        </div>
+        <div id="dept-list-${l.id}"><div style="font-size:.85rem;color:var(--gray-400);padding:8px 0;">Loading…</div></div>
+      </div>
+    </div>`).join('');
+}
+
+function toggleLocation(id) {
+  const card=document.getElementById('loc-card-'+id);
+  const isOpen=card.classList.contains('open');
+  card.classList.toggle('open');
+  if(!isOpen && !deptsByLocation[id]) loadDepts(id);
+}
+
+async function loadDepts(locationId) {
+  try {
+    const depts=await fetch(`/api/departments?location_id=${locationId}`,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+    deptsByLocation[locationId]=depts;
+    renderDepts(locationId);
+  } catch(e){ showToast('Error loading departments'); }
+}
+
+function renderDepts(locationId) {
+  const depts=deptsByLocation[locationId]||[];
+  const el=document.getElementById('dept-list-'+locationId);
+  if(!depts.length){ el.innerHTML='<div style="font-size:.85rem;color:var(--gray-400);padding:4px 0;">No departments yet.</div>'; return; }
+  el.innerHTML=depts.map(d=>`
+    <div class="dept-row">
+      <div>
+        <span style="font-weight:500;">${esc(d.name)}</span>
+        ${d.code?`<code style="margin-left:8px;font-size:.75rem;background:var(--gray-100);padding:1px 6px;border-radius:4px;">${esc(d.code)}</code>`:''}
+        ${!d.active?`<span class="badge badge-inactive" style="margin-left:6px;">Inactive</span>`:''}
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-ghost btn-sm" onclick="openDeptModal(${locationId},${d.id})">Edit</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);" onclick="deleteDept(${locationId},${d.id})">Del</button>
+      </div>
+    </div>`).join('');
+}
+
+function openLocationModal(id) {
+  editLocationId=id||null;
+  document.getElementById('lm-title').textContent=id?'Edit Location':'Add Location';
+  document.getElementById('lm-btn').textContent=id?'Save Changes':'Add Location';
+  document.getElementById('lm-err').style.display='none';
+  if(id){
+    const l=locations.find(x=>x.id===id);
+    document.getElementById('lm-name').value=l.name;
+    document.getElementById('lm-address').value=l.address||'';
+    document.getElementById('lm-city').value=l.city||'';
+    document.getElementById('lm-state').value=l.state||'';
+    document.getElementById('lm-zip').value=l.zip||'';
+    document.getElementById('lm-phone').value=l.phone||'';
+    document.getElementById('lm-type').value=l.location_type||'office';
+  } else {
+    ['lm-name','lm-address','lm-city','lm-state','lm-zip','lm-phone'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('lm-type').value='office';
+  }
+  document.getElementById('location-modal').style.display='flex';
+  document.getElementById('lm-name').focus();
+}
+
+async function saveLocation() {
+  const name=document.getElementById('lm-name').value.trim();
+  if(!name){ showErr('lm-err','Name required'); return; }
+  const btn=document.getElementById('lm-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const body={ name,
+      address:document.getElementById('lm-address').value||null,
+      city:document.getElementById('lm-city').value||null,
+      state:document.getElementById('lm-state').value||null,
+      zip:document.getElementById('lm-zip').value||null,
+      phone:document.getElementById('lm-phone').value||null,
+      location_type:document.getElementById('lm-type').value };
+    if(editLocationId){ body.id=editLocationId; }
+    else { body.org_id=orgId; }
+    const r=await fetch('/api/org-locations',{method:editLocationId?'PUT':'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify(body)});
+    if(!r.ok){ showErr('lm-err',(await r.json()).error||'Save failed'); return; }
+    const loc=await r.json();
+    if(editLocationId){ const i=locations.findIndex(x=>x.id===editLocationId); if(i>=0) locations[i]={...locations[i],...loc}; }
+    else locations.push({...loc, department_count:0});
+    renderLocations(); closeModal('location-modal'); showToast(editLocationId?'Location updated':'Location added');
+  } catch(e){ showErr('lm-err',e.message); }
+  finally{ btn.disabled=false; btn.textContent=editLocationId?'Save Changes':'Add Location'; }
+}
+
+async function deleteLocation(id) {
+  const loc=locations.find(x=>x.id===id);
+  if(!confirm(`Delete "${loc?.name}"? This will also delete all its departments.`)) return;
+  try {
+    await fetch(`/api/org-locations?id=${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+authToken}});
+    locations=locations.filter(l=>l.id!==id); delete deptsByLocation[id];
+    renderLocations(); showToast('Location deleted');
+  } catch(e){ showToast('Error: '+e.message); }
+}
+
+// ── Departments ───────────────────────────────────────────────────────────────
+function openDeptModal(locationId, deptId) {
+  activeDeptLocationId=locationId;
+  editDeptId=deptId||null;
+  document.getElementById('dm-title').textContent=deptId?'Edit Department':'Add Department';
+  document.getElementById('dm-btn').textContent=deptId?'Save Changes':'Add Department';
+  document.getElementById('dm-err').style.display='none';
+  if(deptId){
+    const d=(deptsByLocation[locationId]||[]).find(x=>x.id===deptId);
+    document.getElementById('dm-name').value=d?.name||'';
+    document.getElementById('dm-code').value=d?.code||'';
+  } else {
+    document.getElementById('dm-name').value='';
+    document.getElementById('dm-code').value='';
+  }
+  document.getElementById('dept-modal').style.display='flex';
+  document.getElementById('dm-name').focus();
+}
+
+async function saveDept() {
+  const name=document.getElementById('dm-name').value.trim();
+  if(!name){ showErr('dm-err','Department name required'); return; }
+  const btn=document.getElementById('dm-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const body={ name, code:document.getElementById('dm-code').value||null };
+    if(editDeptId){ body.id=editDeptId; }
+    else { body.location_id=activeDeptLocationId; }
+    const r=await fetch('/api/departments',{method:editDeptId?'PUT':'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify(body)});
+    if(!r.ok){ showErr('dm-err',(await r.json()).error||'Save failed'); return; }
+    const d=await r.json();
+    if(!deptsByLocation[activeDeptLocationId]) deptsByLocation[activeDeptLocationId]=[];
+    if(editDeptId){ const i=deptsByLocation[activeDeptLocationId].findIndex(x=>x.id===editDeptId); if(i>=0) deptsByLocation[activeDeptLocationId][i]=d; }
+    else deptsByLocation[activeDeptLocationId].push(d);
+    // Update dept count on location
+    const li=locations.findIndex(x=>x.id===activeDeptLocationId);
+    if(li>=0 && !editDeptId) locations[li].department_count=(parseInt(locations[li].department_count)||0)+1;
+    renderDepts(activeDeptLocationId);
+    // Refresh the location card header count
+    renderLocations();
+    // Re-open the card
+    const card=document.getElementById('loc-card-'+activeDeptLocationId);
+    if(card){ card.classList.add('open'); }
+    closeModal('dept-modal'); showToast(editDeptId?'Department updated':'Department added');
+  } catch(e){ showErr('dm-err',e.message); }
+  finally{ btn.disabled=false; btn.textContent=editDeptId?'Save Changes':'Add Department'; }
+}
+
+async function deleteDept(locationId, deptId) {
+  if(!confirm('Delete this department?')) return;
+  try {
+    await fetch(`/api/departments?id=${deptId}`,{method:'DELETE',headers:{Authorization:'Bearer '+authToken}});
+    deptsByLocation[locationId]=(deptsByLocation[locationId]||[]).filter(d=>d.id!==deptId);
+    const li=locations.findIndex(x=>x.id===locationId);
+    if(li>=0) locations[li].department_count=Math.max(0,(parseInt(locations[li].department_count)||1)-1);
+    renderDepts(locationId);
+    renderLocations();
+    const card=document.getElementById('loc-card-'+locationId);
+    if(card){ card.classList.add('open'); }
+    showToast('Department deleted');
+  } catch(e){ showToast('Error: '+e.message); }
+}
+
+// ── Edit Org ──────────────────────────────────────────────────────────────────
+function openOrgModal() {
+  document.getElementById('om-name').value=org?.name||'';
+  document.getElementById('om-slug').value=org?.slug||'';
+  document.getElementById('om-cname').value=org?.contact_name||'';
+  document.getElementById('om-cemail').value=org?.contact_email||'';
+  document.getElementById('om-err').style.display='none';
+  document.getElementById('org-modal').style.display='flex';
+}
+
+async function saveOrg() {
+  const name=document.getElementById('om-name').value.trim(), slug=document.getElementById('om-slug').value.trim();
+  if(!name||!slug){ showErr('om-err','Name and slug required'); return; }
+  const btn=document.getElementById('om-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const r=await fetch('/api/organizations',{method:'PUT',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+      body:JSON.stringify({id:orgId,name,slug,
+        contact_name:document.getElementById('om-cname').value||null,
+        contact_email:document.getElementById('om-cemail').value||null})});
+    if(!r.ok){ showErr('om-err',(await r.json()).error||'Save failed'); return; }
+    org={...org,...await r.json()}; renderOrgHeader();
+    closeModal('org-modal'); showToast('Organization updated');
+  } catch(e){ showErr('om-err',e.message); }
+  finally{ btn.disabled=false; btn.textContent='Save Changes'; }
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(tab, el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  ['contacts','locations'].forEach(t=>document.getElementById('tab-'+t).style.display=t===tab?'':'none');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function showErr(elId, m){ const e=document.getElementById(elId); e.textContent=m; e.style.display=''; }
+function closeModal(id){ document.getElementById(id).style.display='none'; }
+function closeOuter(e,id){ if(e.target===document.getElementById(id))closeModal(id); }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>
