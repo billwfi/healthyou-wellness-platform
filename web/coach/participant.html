@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Participant — HealYou Coach</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <style>
+    .session-split { display:grid; grid-template-columns:300px 1fr; gap:20px; align-items:start; }
+    @media(max-width:760px){ .session-split { grid-template-columns:1fr; } }
+    .session-list { background:#fff; border:1px solid var(--gray-200); border-radius:var(--radius); overflow:hidden; }
+    .session-item {
+      padding:12px 16px; border-bottom:1px solid var(--gray-100); cursor:pointer;
+      transition:background .12s; display:block;
+    }
+    .session-item:last-child { border-bottom:none; }
+    .session-item:hover { background:var(--gray-50); }
+    .session-item.active { background:var(--teal-bg); border-left:3px solid var(--teal); }
+    .session-item-date { font-size:.82rem; font-weight:600; color:var(--gray-800); }
+    .session-item-meta { font-size:.75rem; color:var(--gray-400); margin-top:2px; }
+    .notes-panel { background:#fff; border:1px solid var(--gray-200); border-radius:var(--radius); padding:24px; }
+    .notes-empty { text-align:center; padding:60px 20px; color:var(--gray-400); }
+    .bio-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; margin-bottom:20px; }
+    .bio-history-item { padding:12px 14px; border-bottom:1px solid var(--gray-100); display:flex; align-items:center; justify-content:space-between; }
+    .bio-history-item:last-child { border-bottom:none; }
+    .goal-card { background:#fff; border:1px solid var(--gray-200); border-radius:var(--radius); padding:16px; margin-bottom:10px; display:flex; align-items:flex-start; gap:12px; }
+    .goal-dot { width:12px; height:12px; border-radius:50%; margin-top:4px; flex-shrink:0; }
+    .goal-dot.active    { background:var(--teal); }
+    .goal-dot.achieved  { background:var(--green); }
+    .goal-dot.paused    { background:var(--amber); }
+    .goal-dot.abandoned { background:var(--red); }
+  </style>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/coach/"><img src="/assets/img/logo-icon.svg" alt="">Health<span>you</span></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <span style="font-size:.75rem;opacity:.6;padding:2px 8px;border:1px solid rgba(255,255,255,.4);border-radius:99px;">Coach</span>
+    <button class="btn btn-ghost btn-sm" id="logout-btn" style="display:none;color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+
+<main class="container">
+  <div id="login-wall" class="login-wall">
+    <h2>Coach Portal</h2>
+    <p>Sign in to view participant details.</p>
+    <button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button>
+  </div>
+
+  <div id="content" style="display:none;">
+    <a href="/coach/" class="back-link">&#8592; My Caseload</a>
+
+    <!-- Participant header -->
+    <div class="participant-header" id="p-header">
+      <div class="participant-avatar" id="p-avatar"></div>
+      <div class="participant-info" style="flex:1;">
+        <h1 id="p-name"></h1>
+        <div class="meta" id="p-meta"></div>
+      </div>
+      <div id="p-risk-badge"></div>
+    </div>
+
+    <!-- Risk strip -->
+    <div class="risk-strip" id="risk-strip" style="display:none;"></div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('sessions',this)">Sessions &amp; Notes</button>
+      <button class="tab" onclick="switchTab('biometrics',this)">Biometrics</button>
+      <button class="tab" onclick="switchTab('goals',this)">Goals</button>
+    </div>
+
+    <!-- Sessions & Notes -->
+    <div id="tab-sessions">
+      <div class="section-header" style="margin-bottom:14px;">
+        <h3>Coaching Sessions</h3>
+        <button class="btn btn-primary btn-sm" onclick="openSessionModal()">+ New Session</button>
+      </div>
+      <div class="session-split">
+        <div>
+          <div class="session-list" id="session-list"><div class="empty">No sessions yet.</div></div>
+        </div>
+        <div class="notes-panel" id="notes-panel">
+          <div class="notes-empty" id="notes-empty">
+            <div style="font-size:2rem;margin-bottom:12px;">📋</div>
+            <div>Select a session to view or edit notes.</div>
+          </div>
+          <div id="notes-form" style="display:none;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+              <div>
+                <div style="font-weight:600;font-size:.95rem;" id="nf-session-label"></div>
+                <div style="font-size:.8rem;color:var(--gray-400);margin-top:2px;" id="nf-session-meta"></div>
+              </div>
+              <select id="nf-status" class="btn btn-ghost btn-sm" style="padding:4px 8px;" onchange="patchStatus()">
+                <option value="scheduled">Scheduled</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="no_show">No-Show</option>
+              </select>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title">Stage of Change</div>
+              <div class="soc-grid" id="soc-grid">
+                <div class="soc-option" data-soc="precontemplation" onclick="setSoc(this)">
+                  <span class="soc-label">Precontemplation</span>
+                  <span class="soc-desc">Not yet aware</span>
+                </div>
+                <div class="soc-option" data-soc="contemplation" onclick="setSoc(this)">
+                  <span class="soc-label">Contemplation</span>
+                  <span class="soc-desc">Aware, not ready</span>
+                </div>
+                <div class="soc-option" data-soc="preparation" onclick="setSoc(this)">
+                  <span class="soc-label">Preparation</span>
+                  <span class="soc-desc">Getting ready</span>
+                </div>
+                <div class="soc-option" data-soc="action" onclick="setSoc(this)">
+                  <span class="soc-label">Action</span>
+                  <span class="soc-desc">Making changes</span>
+                </div>
+                <div class="soc-option" data-soc="maintenance" onclick="setSoc(this)">
+                  <span class="soc-label">Maintenance</span>
+                  <span class="soc-desc">Sustaining change</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title">Session Notes</div>
+              <div class="form-grid full" style="gap:12px;">
+                <div class="form-group">
+                  <label>Presenting Concern</label>
+                  <textarea id="nf-concern" rows="2" placeholder="What brought the client in today?"></textarea>
+                </div>
+                <div class="form-group">
+                  <label>Client Goals (as stated)</label>
+                  <textarea id="nf-goals" rows="2" placeholder="What does the client want to achieve?"></textarea>
+                </div>
+                <div class="form-group">
+                  <label>Motivational Factors</label>
+                  <textarea id="nf-motivators" rows="2" placeholder="What motivates this client?"></textarea>
+                </div>
+                <div class="form-group">
+                  <label>Barriers &amp; Challenges</label>
+                  <textarea id="nf-barriers" rows="2" placeholder="What obstacles are in the way?"></textarea>
+                </div>
+                <div class="form-group">
+                  <label>Action Steps</label>
+                  <textarea id="nf-actions" rows="3" placeholder="Agreed-upon action items for this session…"></textarea>
+                </div>
+                <div class="form-group">
+                  <label>Follow-up Plan</label>
+                  <textarea id="nf-followup" rows="2" placeholder="Plan for next contact or session…"></textarea>
+                </div>
+                <div class="form-group">
+                  <label>Additional Session Notes</label>
+                  <textarea id="nf-notes" rows="3" placeholder="Any other observations or notes…"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="save-bar">
+              <span id="notes-saved-msg" style="font-size:.82rem;color:var(--teal);display:none;">Saved</span>
+              <button class="btn btn-primary" id="save-notes-btn" onclick="saveNotes()">Save Notes</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Biometrics -->
+    <div id="tab-biometrics" style="display:none;">
+      <div id="bio-content"><div class="empty">No biometric data on file.</div></div>
+    </div>
+
+    <!-- Goals -->
+    <div id="tab-goals" style="display:none;">
+      <div class="section-header" style="margin-bottom:14px;">
+        <h3>Health Goals</h3>
+        <button class="btn btn-primary btn-sm" onclick="openGoalModal()">+ Add Goal</button>
+      </div>
+      <div id="goal-list"><div class="empty">No goals set yet.</div></div>
+    </div>
+  </div>
+</main>
+
+<!-- New Session Modal -->
+<div id="session-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'session-modal')">
+  <div class="modal">
+    <div class="modal-title">New Coaching Session</div>
+    <div class="form-grid full" style="gap:14px;">
+      <div class="form-group">
+        <label>Date &amp; Time *</label>
+        <input id="sm-date" type="datetime-local"/>
+      </div>
+      <div class="form-group">
+        <label>Session Type</label>
+        <select id="sm-type">
+          <option value="initial">Initial</option>
+          <option value="follow_up" selected>Follow-up</option>
+          <option value="goal_review">Goal Review</option>
+          <option value="crisis">Crisis</option>
+          <option value="final">Final</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Duration (minutes)</label>
+        <input id="sm-dur" type="number" value="60" min="15" step="15"/>
+      </div>
+      <div class="form-group">
+        <label>Intake Notes</label>
+        <textarea id="sm-intake" rows="2" placeholder="Pre-session notes…"></textarea>
+      </div>
+    </div>
+    <div id="sm-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('session-modal')">Cancel</button>
+      <button class="btn btn-primary" id="sm-btn" onclick="saveSession()">Schedule Session</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Goal Modal -->
+<div id="goal-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'goal-modal')">
+  <div class="modal">
+    <div class="modal-title" id="gm-title">Add Goal</div>
+    <div class="form-grid full" style="gap:14px;">
+      <div class="form-group"><label>Goal Title *</label><input id="gm-title-input" type="text" placeholder="e.g. Walk 30 min daily"/></div>
+      <div class="form-group"><label>Category</label>
+        <select id="gm-cat">
+          <option value="nutrition">Nutrition</option>
+          <option value="fitness">Fitness</option>
+          <option value="weight">Weight</option>
+          <option value="stress">Stress Management</option>
+          <option value="sleep">Sleep</option>
+          <option value="smoking">Smoking</option>
+          <option value="alcohol">Alcohol</option>
+          <option value="mental_health">Mental Health</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Target Date</label><input id="gm-date" type="date"/></div>
+      <div class="form-group span-2"><label>Description</label><textarea id="gm-desc" rows="2"></textarea></div>
+    </div>
+    <div id="gm-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('goal-modal')">Cancel</button>
+      <button class="btn btn-primary" id="gm-btn" onclick="saveGoal()">Add Goal</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, participant=null, sessions=[], goals=[], selectedSession=null, currentTab='sessions', editGoalId=null;
+const pid = new URLSearchParams(location.search).get('id');
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; document.getElementById('logout-btn').style.display='none'; });
+
+async function boot(user) {
+  if (!pid) { location.href='/coach/'; return; }
+  document.getElementById('login-wall').style.display='none';
+  document.getElementById('content').style.display='';
+  document.getElementById('logout-btn').style.display='';
+  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+
+  const hdr={Authorization:'Bearer '+authToken};
+  [participant, sessions, goals] = await Promise.all([
+    fetch(`/api/participants?id=${pid}`,{headers:hdr}).then(r=>r.json()),
+    fetch(`/api/sessions?participant_id=${pid}`,{headers:hdr}).then(r=>r.json()),
+    fetch(`/api/goals?participant_id=${pid}`,{headers:hdr}).then(r=>r.json()),
+  ]);
+
+  renderHeader();
+  renderSessions();
+  renderBiometrics();
+  renderGoals();
+}
+
+function renderHeader() {
+  const p=participant;
+  const initials=((p.first_name||'')[0]+(p.last_name||'')[0]).toUpperCase();
+  document.getElementById('p-avatar').textContent=initials;
+  document.getElementById('p-name').textContent=p.first_name+' '+p.last_name;
+  const metaParts=[];
+  if(p.email) metaParts.push(p.email);
+  if(p.org_name) metaParts.push(p.org_name);
+  if(p.coach_name) metaParts.push('Coach: '+p.coach_name);
+  if(p.department) metaParts.push(p.department);
+  if(p.date_of_birth) metaParts.push('DOB: '+fmtDate(p.date_of_birth));
+  document.getElementById('p-meta').textContent=metaParts.join(' · ');
+
+  // Latest biometrics for risk strip
+  const bio=p.biometrics?.[0];
+  if(bio && bio.overall_risk) {
+    document.getElementById('p-risk-badge').innerHTML=`<span class="badge badge-${bio.overall_risk}" style="font-size:.82rem;">Overall Risk: ${bio.overall_risk}</span>`;
+    const strip=document.getElementById('risk-strip');
+    strip.style.display='flex';
+    const items=[
+      {label:'BP',value:bio.systolic_bp?`${bio.systolic_bp}/${bio.diastolic_bp}`:'—',risk:bio.bp_risk},
+      {label:'Cholesterol',value:bio.total_cholesterol?bio.total_cholesterol+' mg/dL':'—',risk:bio.cholesterol_risk},
+      {label:'Glucose',value:bio.blood_glucose?bio.blood_glucose+' mg/dL':'—',risk:bio.glucose_risk},
+      {label:'BMI',value:bio.bmi?Number(bio.bmi).toFixed(1):'—',risk:bio.bmi_category==='obese'?'high':bio.bmi_category==='overweight'?'moderate':'normal'},
+      {label:'Weight',value:bio.weight_lbs?bio.weight_lbs+' lbs':'—',risk:null},
+    ];
+    strip.innerHTML=items.map(i=>`<div class="risk-item">
+      <div class="risk-item-value">${esc(String(i.value))}</div>
+      <div class="risk-item-label">${i.label}${i.risk?` <span class="badge badge-${i.risk}" style="font-size:.62rem;padding:1px 5px;">${i.risk}</span>`:''}</div>
+    </div>`).join('');
+  }
+}
+
+function renderSessions() {
+  const el=document.getElementById('session-list');
+  if(!sessions.length){ el.innerHTML='<div class="empty" style="padding:20px;">No sessions yet.</div>'; return; }
+  el.innerHTML=sessions.map(s=>`
+    <div class="session-item${selectedSession?.id===s.id?' active':''}" onclick="selectSession(${s.id})">
+      <div class="session-item-date">${fmtDt(s.scheduled_at)}</div>
+      <div class="session-item-meta">
+        <span class="badge badge-${s.status}" style="font-size:.67rem;">${s.status.replace('_',' ')}</span>
+        &nbsp;${s.session_type.replace('_',' ')}
+        ${s.stage_of_change?`&nbsp;·&nbsp;${s.stage_of_change}`:''}
+      </div>
+    </div>`).join('');
+}
+
+async function selectSession(id) {
+  selectedSession=sessions.find(s=>s.id===id);
+  renderSessions();
+
+  const hdr={Authorization:'Bearer '+authToken};
+  const notes=await fetch(`/api/notes?session_id=${id}`,{headers:hdr}).then(r=>r.json());
+
+  document.getElementById('notes-empty').style.display='none';
+  document.getElementById('notes-form').style.display='';
+
+  document.getElementById('nf-session-label').textContent=fmtDt(selectedSession.scheduled_at)+' — '+selectedSession.session_type.replace('_',' ');
+  document.getElementById('nf-session-meta').textContent=`${selectedSession.duration_minutes} min`;
+  document.getElementById('nf-status').value=selectedSession.status;
+
+  // SOC
+  document.querySelectorAll('.soc-option').forEach(o=>o.classList.remove('selected'));
+  if(notes?.stage_of_change){
+    const el=document.querySelector(`.soc-option[data-soc="${notes.stage_of_change}"]`);
+    if(el) el.classList.add('selected');
+  }
+
+  document.getElementById('nf-concern').value=notes?.presenting_concern||'';
+  document.getElementById('nf-goals').value=notes?.client_goals||'';
+  document.getElementById('nf-motivators').value=notes?.motivational_factors||'';
+  document.getElementById('nf-barriers').value=notes?.barriers||'';
+  document.getElementById('nf-actions').value=notes?.action_steps||'';
+  document.getElementById('nf-followup').value=notes?.follow_up_plan||'';
+  document.getElementById('nf-notes').value=notes?.session_notes||'';
+  document.getElementById('notes-saved-msg').style.display='none';
+}
+
+function setSoc(el) {
+  document.querySelectorAll('.soc-option').forEach(o=>o.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+async function saveNotes() {
+  if(!selectedSession) return;
+  const soc=document.querySelector('.soc-option.selected')?.dataset.soc||null;
+  const btn=document.getElementById('save-notes-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const r=await fetch('/api/notes',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({
+      session_id:selectedSession.id,
+      stage_of_change:soc,
+      presenting_concern:document.getElementById('nf-concern').value||null,
+      client_goals:document.getElementById('nf-goals').value||null,
+      motivational_factors:document.getElementById('nf-motivators').value||null,
+      barriers:document.getElementById('nf-barriers').value||null,
+      action_steps:document.getElementById('nf-actions').value||null,
+      follow_up_plan:document.getElementById('nf-followup').value||null,
+      session_notes:document.getElementById('nf-notes').value||null,
+    })});
+    if(!r.ok) throw new Error((await r.json()).error||'Save failed');
+    // Update session in memory for SOC display
+    const idx=sessions.findIndex(s=>s.id===selectedSession.id);
+    if(idx>=0) sessions[idx].stage_of_change=soc;
+    renderSessions();
+    const msg=document.getElementById('notes-saved-msg'); msg.style.display=''; setTimeout(()=>msg.style.display='none',3000);
+  } catch(e){ showToast('Error: '+e.message); }
+  finally{ btn.disabled=false; btn.textContent='Save Notes'; }
+}
+
+async function patchStatus() {
+  if(!selectedSession) return;
+  const status=document.getElementById('nf-status').value;
+  try {
+    await fetch('/api/sessions',{method:'PATCH',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({id:selectedSession.id,status})});
+    const idx=sessions.findIndex(s=>s.id===selectedSession.id);
+    if(idx>=0){ sessions[idx].status=status; selectedSession.status=status; }
+    renderSessions();
+    showToast('Status updated');
+  } catch(e){ showToast('Error: '+e.message); }
+}
+
+function renderBiometrics() {
+  const bio=participant.biometrics;
+  if(!bio||!bio.length){ document.getElementById('bio-content').innerHTML='<div class="empty">No biometric data on file.</div>'; return; }
+  const latest=bio[0];
+  const tiles=[
+    {label:'Height',value:latest.height_in?`${Math.floor(latest.height_in/12)}\'${latest.height_in%12}"`:null,risk:null},
+    {label:'Weight',value:latest.weight_lbs?latest.weight_lbs+' lbs':null,risk:null},
+    {label:'BMI',value:latest.bmi?Number(latest.bmi).toFixed(1):null,risk:riskClass(latest.bmi_category)},
+    {label:'Waist',value:latest.waist_circumference_in?latest.waist_circumference_in+'"':null,risk:null},
+    {label:'Blood Pressure',value:latest.systolic_bp?`${latest.systolic_bp}/${latest.diastolic_bp}`:null,risk:riskClass(latest.bp_risk)},
+    {label:'Heart Rate',value:latest.heart_rate?latest.heart_rate+' bpm':null,risk:null},
+    {label:'Total Cholesterol',value:latest.total_cholesterol?latest.total_cholesterol+' mg/dL':null,risk:riskClass(latest.cholesterol_risk)},
+    {label:'HDL',value:latest.hdl_cholesterol?latest.hdl_cholesterol+' mg/dL':null,risk:null},
+    {label:'LDL',value:latest.ldl_cholesterol?latest.ldl_cholesterol+' mg/dL':null,risk:null},
+    {label:'Triglycerides',value:latest.triglycerides?latest.triglycerides+' mg/dL':null,risk:null},
+    {label:'Blood Glucose',value:latest.blood_glucose?latest.blood_glucose+' mg/dL':null,risk:riskClass(latest.glucose_risk)},
+    {label:'HbA1c',value:latest.hba1c?latest.hba1c+'%':null,risk:null},
+  ].filter(t=>t.value);
+
+  const historyRows=bio.length>1?bio.slice(1).map(b=>`
+    <div class="bio-history-item">
+      <div>
+        <div style="font-size:.85rem;font-weight:500;">${fmtDate(b.screened_at)}</div>
+        <div style="font-size:.75rem;color:var(--gray-400);">${b.weight_lbs?b.weight_lbs+' lbs':''}${b.bmi?' · BMI '+Number(b.bmi).toFixed(1):''}${b.systolic_bp?' · BP '+b.systolic_bp+'/'+b.diastolic_bp:''}</div>
+      </div>
+      ${b.overall_risk?`<span class="badge badge-${b.overall_risk}">${b.overall_risk}</span>`:''}
+    </div>`).join(''):'';
+
+  document.getElementById('bio-content').innerHTML=`
+    <div class="card" style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:0;">Latest Results</div>
+        <span style="font-size:.8rem;color:var(--gray-400);">${fmtDate(latest.screened_at)}</span>
+      </div>
+      <div class="bio-row">
+        ${tiles.map(t=>`<div class="bio-tile${t.risk?' '+t.risk:''}">
+          <div class="bio-tile-value">${esc(t.value)}</div>
+          <div class="bio-tile-label">${t.label}</div>
+        </div>`).join('')}
+      </div>
+      ${latest.notes?`<div style="margin-top:8px;font-size:.82rem;color:var(--gray-600);padding:10px;background:var(--gray-50);border-radius:6px;">${esc(latest.notes)}</div>`:''}
+    </div>
+    ${bio.length>1?`<div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:14px 16px;font-weight:600;font-size:.9rem;border-bottom:1px solid var(--gray-100);">Screening History</div>
+      ${historyRows}
+    </div>`:''}`;
+}
+
+function riskClass(risk) {
+  if(!risk) return null;
+  if(['high_1','high_2','crisis','high','very_high','diabetes','obese'].includes(risk)) return 'risk-high';
+  if(['elevated','borderline','prediabetes','overweight','moderate'].includes(risk)) return 'risk-moderate';
+  return 'risk-normal';
+}
+
+function renderGoals() {
+  if(!goals.length){ document.getElementById('goal-list').innerHTML='<div class="empty">No goals set yet.</div>'; return; }
+  const statusColors={active:'active',achieved:'achieved',paused:'paused',abandoned:'abandoned'};
+  document.getElementById('goal-list').innerHTML=goals.map(g=>`
+    <div class="goal-card">
+      <div class="goal-dot ${statusColors[g.status]||'active'}"></div>
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:.9rem;">${esc(g.title)}</div>
+        ${g.description?`<div style="font-size:.8rem;color:var(--gray-600);margin-top:2px;">${esc(g.description)}</div>`:''}
+        <div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="badge badge-${g.status==='active'?'active':g.status==='achieved'?'achieved':'inactive'}">${g.status}</span>
+          <span style="font-size:.75rem;color:var(--gray-400);">${g.category}</span>
+          ${g.target_date?`<span style="font-size:.75rem;color:var(--gray-400);">Target: ${fmtDate(g.target_date)}</span>`:''}
+        </div>
+        ${g.progress_notes?`<div style="margin-top:8px;font-size:.8rem;color:var(--gray-600);padding:8px;background:var(--gray-50);border-radius:6px;">${esc(g.progress_notes)}</div>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+        <button class="btn btn-ghost btn-sm" onclick="openGoalModal(${g.id})">Edit</button>
+        ${g.status!=='achieved'?`<button class="btn btn-sm" style="background:var(--green-light);color:#065f46;border:none;" onclick="markAchieved(${g.id})">✓ Done</button>`:''}
+      </div>
+    </div>`).join('');
+}
+
+function switchTab(tab,el) {
+  currentTab=tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  ['sessions','biometrics','goals'].forEach(t=>document.getElementById('tab-'+t).style.display=t===tab?'':'none');
+}
+
+// Session modal
+function openSessionModal() {
+  const now=new Date(); now.setMinutes(0,0,0);
+  now.setDate(now.getDate()+1);
+  document.getElementById('sm-date').value=now.toISOString().slice(0,16);
+  document.getElementById('sm-err').style.display='none';
+  document.getElementById('session-modal').style.display='flex';
+}
+
+async function saveSession() {
+  const dt=document.getElementById('sm-date').value;
+  if(!dt){ showSmErr('Date and time required'); return; }
+  const btn=document.getElementById('sm-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const r=await fetch('/api/sessions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({
+      participant_id:parseInt(pid),
+      scheduled_at:dt,
+      session_type:document.getElementById('sm-type').value,
+      duration_minutes:parseInt(document.getElementById('sm-dur').value)||60,
+      intake_notes:document.getElementById('sm-intake').value||null,
+    })});
+    if(!r.ok) throw new Error((await r.json()).error||'Failed');
+    const s=await r.json();
+    sessions.unshift({...s,stage_of_change:null,status:'scheduled'});
+    renderSessions();
+    closeModal('session-modal');
+    showToast('Session scheduled');
+  } catch(e){ showSmErr(e.message); }
+  finally{ btn.disabled=false; btn.textContent='Schedule Session'; }
+}
+function showSmErr(m){ const e=document.getElementById('sm-err'); e.textContent=m; e.style.display=''; }
+
+// Goal modal
+function openGoalModal(id) {
+  editGoalId=id||null;
+  document.getElementById('gm-title').textContent=id?'Edit Goal':'Add Goal';
+  document.getElementById('gm-btn').textContent=id?'Save Changes':'Add Goal';
+  document.getElementById('gm-err').style.display='none';
+  if(id){
+    const g=goals.find(x=>x.id===id);
+    document.getElementById('gm-title-input').value=g.title;
+    document.getElementById('gm-cat').value=g.category||'other';
+    document.getElementById('gm-date').value=g.target_date?.split('T')[0]||'';
+    document.getElementById('gm-desc').value=g.description||'';
+  } else {
+    document.getElementById('gm-title-input').value='';
+    document.getElementById('gm-cat').value='other';
+    document.getElementById('gm-date').value='';
+    document.getElementById('gm-desc').value='';
+  }
+  document.getElementById('goal-modal').style.display='flex';
+}
+
+async function saveGoal() {
+  const title=document.getElementById('gm-title-input').value.trim();
+  if(!title){ showGmErr('Goal title required'); return; }
+  const btn=document.getElementById('gm-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const body={
+      title,
+      category:document.getElementById('gm-cat').value,
+      target_date:document.getElementById('gm-date').value||null,
+      description:document.getElementById('gm-desc').value||null,
+    };
+    let r;
+    if(editGoalId){
+      body.id=editGoalId;
+      r=await fetch('/api/goals',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify(body)});
+    } else {
+      body.participant_id=parseInt(pid);
+      r=await fetch('/api/goals',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify(body)});
+    }
+    if(!r.ok) throw new Error((await r.json()).error||'Failed');
+    const g=await r.json();
+    if(editGoalId){ const idx=goals.findIndex(x=>x.id===editGoalId); if(idx>=0) goals[idx]=g; }
+    else goals.unshift(g);
+    renderGoals();
+    closeModal('goal-modal');
+    showToast(editGoalId?'Goal updated':'Goal added');
+  } catch(e){ showGmErr(e.message); }
+  finally{ btn.disabled=false; btn.textContent=editGoalId?'Save Changes':'Add Goal'; }
+}
+
+async function markAchieved(id) {
+  try {
+    const r=await fetch('/api/goals',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({id,status:'achieved'})});
+    const g=await r.json();
+    const idx=goals.findIndex(x=>x.id===id); if(idx>=0) goals[idx]=g;
+    renderGoals(); showToast('Goal marked achieved!');
+  } catch(e){ showToast('Error: '+e.message); }
+}
+
+function showGmErr(m){ const e=document.getElementById('gm-err'); e.textContent=m; e.style.display=''; }
+function closeModal(id){ document.getElementById(id).style.display='none'; }
+function closeOuter(e,id){ if(e.target===document.getElementById(id))closeModal(id); }
+function fmtDt(iso){ return new Date(iso).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }
+function fmtDate(d){ return d?new Date(d.includes('T')?d:d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''; }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>

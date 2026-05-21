@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Coach Portal — HealYou Wellness</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/coach/"><img src="/assets/img/logo-icon.svg" alt="">Health<span>you</span></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <span style="font-size:.75rem;opacity:.6;padding:2px 8px;border:1px solid rgba(255,255,255,.4);border-radius:99px;">Coach</span>
+    <a href="/admin/" class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);">Admin</a>
+    <button class="btn btn-ghost btn-sm" id="logout-btn" style="display:none;color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+
+<main class="container">
+  <div id="login-wall" class="login-wall">
+    <h2>Coach Portal</h2>
+    <p>Sign in to view your caseload and manage sessions.</p>
+    <button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button>
+    <div class="demo-hint">
+      <div class="demo-hint-label">Demo Access</div>
+      <div class="demo-hint-row"><strong>Email:</strong><code>demo@healthyou.com</code></div>
+      <div class="demo-hint-row"><strong>Password:</strong><code>Demo1234!</code></div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:10px;width:100%;" onclick="netlifyIdentity.open()">Sign In as Demo Coach</button>
+    </div>
+  </div>
+
+  <div id="content" style="display:none;">
+    <h1 class="page-title">My Caseload</h1>
+    <p class="page-subtitle" id="subtitle"></p>
+
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+      <div class="search-bar" style="flex:1;min-width:220px;"><input id="search" type="text" placeholder="Search participants…" oninput="filter()"/></div>
+      <div class="tabs" style="margin-bottom:0;border:none;gap:4px;">
+        <button class="tab active" onclick="switchTab('all',this)">All</button>
+        <button class="tab" onclick="switchTab('upcoming',this)">Upcoming Session</button>
+        <button class="tab" onclick="switchTab('recent',this)">Recent</button>
+      </div>
+    </div>
+
+    <div id="participant-list"></div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, coachId=null, sessions=[], participants=[], currentTab='all';
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; document.getElementById('logout-btn').style.display='none'; });
+
+async function boot(user) {
+  document.getElementById('login-wall').style.display='none';
+  document.getElementById('content').style.display='';
+  document.getElementById('logout-btn').style.display='';
+  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+
+  const hdr={Authorization:'Bearer '+authToken};
+  // Get this coach's sessions
+  const coachesResp=await fetch('/api/coaches?admin=true',{headers:hdr}).then(r=>r.json());
+  const me=coachesResp.find(c=>c.email===user.email);
+  coachId=me?.id||null;
+  document.getElementById('subtitle').textContent=me?`Welcome back, ${me.name}`:'';
+
+  if(coachId) {
+    [sessions, participants] = await Promise.all([
+      fetch(`/api/sessions?coach_id=${coachId}`,{headers:hdr}).then(r=>r.json()),
+      fetch(`/api/participants?coach_id=${coachId}`,{headers:hdr}).then(r=>r.json()),
+    ]);
+  } else {
+    [sessions, participants] = await Promise.all([
+      fetch('/api/sessions',{headers:hdr}).then(r=>r.json()),
+      fetch('/api/participants',{headers:hdr}).then(r=>r.json()),
+    ]);
+  }
+  renderList();
+}
+
+function switchTab(tab,el) {
+  currentTab=tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderList();
+}
+
+function filter(){ renderList(); }
+
+function renderList() {
+  const q=document.getElementById('search').value.toLowerCase();
+  const now=new Date();
+
+  let rows=participants.filter(p=>{
+    if(q){const n=(p.first_name+' '+p.last_name+' '+p.email).toLowerCase(); if(!n.includes(q)) return false;}
+    return true;
+  });
+
+  if(currentTab==='upcoming') {
+    const upcoming=new Set(sessions.filter(s=>new Date(s.scheduled_at)>=now&&s.status==='scheduled').map(s=>s.participant_id));
+    rows=rows.filter(p=>upcoming.has(p.id));
+  } else if(currentTab==='recent') {
+    const recent=new Set(sessions.filter(s=>new Date(s.scheduled_at)<now).map(s=>s.participant_id));
+    rows=rows.filter(p=>recent.has(p.id));
+  }
+
+  const el=document.getElementById('participant-list');
+  if(!rows.length){ el.innerHTML='<div class="empty">No participants found.</div>'; return; }
+
+  el.innerHTML=rows.map(p=>{
+    const pSessions=sessions.filter(s=>s.participant_id===p.id);
+    const next=pSessions.filter(s=>new Date(s.scheduled_at)>=now&&s.status==='scheduled').sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at))[0];
+    const total=pSessions.length;
+    return `<a href="/coach/participant.html?id=${p.id}" class="appt-row" style="display:grid;grid-template-columns:1fr auto auto;gap:12px;padding:14px 18px;text-decoration:none;color:inherit;">
+      <div>
+        <div style="font-weight:600;font-size:.95rem;">${esc(p.first_name)} ${esc(p.last_name)}</div>
+        <div style="font-size:.82rem;color:var(--gray-400);margin-top:2px;">${esc(p.email)}${p.org_name?' &bull; '+esc(p.org_name):''}</div>
+      </div>
+      <div style="text-align:right;">
+        ${next?`<div style="font-size:.8rem;font-weight:500;color:var(--teal);">${fmtDt(next.scheduled_at)}</div><div style="font-size:.74rem;color:var(--gray-400);">Next session</div>`
+               :`<div style="font-size:.8rem;color:var(--gray-400);">${total} session${total!==1?'s':''}</div>`}
+      </div>
+      <span style="color:var(--gray-400);align-self:center;">&#8250;</span>
+    </a>`;
+  }).join('');
+}
+
+function fmtDt(iso){ return new Date(iso).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>

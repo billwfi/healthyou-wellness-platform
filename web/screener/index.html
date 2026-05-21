@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Screener Portal — HealYou</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <style>
+    .event-card {
+      background:#fff; border:2px solid var(--gray-200); border-radius:var(--radius);
+      padding:20px 24px; margin-bottom:12px; cursor:pointer; transition:border-color .15s;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .event-card:hover  { border-color:var(--teal); }
+    .event-card.active { border-color:var(--teal); background:var(--teal-bg); }
+    .checkin-row {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 16px; border-bottom:1px solid var(--gray-100); gap:12px;
+    }
+    .checkin-row:last-child { border-bottom:none; }
+    .checkin-row:hover { background:var(--gray-50); }
+  </style>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/screener/"><img src="/assets/img/logo-icon.svg" alt="">Health<span>you</span></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <span style="font-size:.75rem;opacity:.6;padding:2px 8px;border:1px solid rgba(255,255,255,.4);border-radius:99px;">Screener</span>
+    <button class="btn btn-ghost btn-sm" id="logout-btn" style="display:none;color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+
+<main class="container">
+  <div id="login-wall" class="login-wall">
+    <h2>Screener Portal</h2>
+    <p>Sign in to access biometric screening tools.</p>
+    <button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button>
+    <div class="demo-hint">
+      <div class="demo-hint-label">Demo Access</div>
+      <div class="demo-hint-row"><strong>Email:</strong><code>demo@healthyou.com</code></div>
+      <div class="demo-hint-row"><strong>Password:</strong><code>Demo1234!</code></div>
+    </div>
+  </div>
+
+  <div id="content" style="display:none;">
+    <!-- Step 1: Event selection -->
+    <div id="step-event">
+      <h1 class="page-title">Select Screening Event</h1>
+      <p class="page-subtitle">Choose the event you are screening for today.</p>
+      <div id="event-list"><div class="empty">Loading events…</div></div>
+      <div style="margin-top:16px;text-align:center;">
+        <button class="btn btn-ghost btn-sm" onclick="showWalkIn()">Or enter walk-in screening (no event)</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Participant search -->
+    <div id="step-participants" style="display:none;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+        <button class="btn btn-ghost btn-sm" onclick="backToEvents()">&#8592; Change Event</button>
+        <div>
+          <h1 class="page-title" style="margin-bottom:0;" id="event-label">Event</h1>
+          <div style="font-size:.82rem;color:var(--gray-400);" id="event-date-label"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+        <div class="search-bar" style="flex:1;min-width:240px;">
+          <input id="search" type="text" placeholder="Search by name or email…" oninput="searchParticipants()"/>
+        </div>
+        <button class="btn btn-primary" onclick="openAddParticipant()">+ Add Walk-in</button>
+        <a id="screen-link" href="#" class="btn btn-primary" style="display:none;">Screen Selected →</a>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div id="participant-results"><div class="empty">Search for a participant above, or add a walk-in.</div></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Add Walk-in Participant Modal -->
+<div id="walkin-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event)">
+  <div class="modal modal-lg">
+    <div class="modal-title">Walk-in Participant</div>
+    <div class="form-grid cols-3">
+      <div class="form-group"><label>First Name *</label><input id="wf-fname" type="text"/></div>
+      <div class="form-group"><label>Last Name *</label><input id="wf-lname" type="text"/></div>
+      <div class="form-group"><label>Email *</label><input id="wf-email" type="email"/></div>
+      <div class="form-group"><label>Phone</label><input id="wf-phone" type="tel"/></div>
+      <div class="form-group"><label>Date of Birth</label><input id="wf-dob" type="date"/></div>
+      <div class="form-group"><label>Gender</label>
+        <select id="wf-gender"><option value="">— select —</option><option value="male">Male</option><option value="female">Female</option><option value="non_binary">Non-binary</option><option value="prefer_not">Prefer not to say</option></select>
+      </div>
+    </div>
+    <div id="wf-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeWalkin()">Cancel</button>
+      <button class="btn btn-primary" id="wf-btn" onclick="saveWalkin()">Add &amp; Screen →</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, selectedEvent=null, searchResults=[], selectedParticipant=null;
+const preselectedEventId = new URLSearchParams(location.search).get('event');
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; document.getElementById('logout-btn').style.display='none'; });
+
+async function boot(user) {
+  document.getElementById('login-wall').style.display='none';
+  document.getElementById('content').style.display='';
+  document.getElementById('logout-btn').style.display='';
+  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+  await loadEvents();
+}
+
+async function loadEvents() {
+  const hdr={Authorization:'Bearer '+authToken};
+  try {
+    const events=await fetch('/api/events',{headers:hdr}).then(r=>r.json());
+    const active=events.filter(e=>e.status==='scheduled'||e.status==='in_progress');
+    const el=document.getElementById('event-list');
+    if(!active.length){
+      el.innerHTML='<div class="empty">No active screening events.<br><small>Create one in the Admin portal.</small></div>';
+    } else {
+      el.innerHTML=active.map(e=>`
+        <div class="event-card${preselectedEventId==e.id?' active':''}" onclick="selectEvent(${e.id},'${esc(e.name)}','${e.event_date}')">
+          <div>
+            <div style="font-weight:600;">${esc(e.name)}</div>
+            <div style="font-size:.82rem;color:var(--gray-400);margin-top:3px;">
+              ${fmtDate(e.event_date)}${e.location?' · '+esc(e.location):''}
+              ${e.org_name?' · '+esc(e.org_name):''}
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <span class="badge badge-${e.event_type}">${e.event_type.replace('_',' ')}</span>
+            <div style="font-size:.75rem;color:var(--gray-400);margin-top:4px;">${e.screened_count} screened</div>
+          </div>
+        </div>`).join('');
+    }
+    if(preselectedEventId){
+      const ev=active.find(e=>e.id==preselectedEventId);
+      if(ev) selectEvent(ev.id, ev.name, ev.event_date);
+    }
+  } catch(e){ showToast('Error loading events: '+e.message); }
+}
+
+function selectEvent(id, name, date) {
+  selectedEvent={id, name, date};
+  document.getElementById('event-label').textContent=name;
+  document.getElementById('event-date-label').textContent=fmtDate(date);
+  document.getElementById('step-event').style.display='none';
+  document.getElementById('step-participants').style.display='';
+  document.getElementById('search').focus();
+}
+
+function showWalkIn() {
+  selectedEvent=null;
+  document.getElementById('event-label').textContent='Walk-in (No Event)';
+  document.getElementById('event-date-label').textContent='';
+  document.getElementById('step-event').style.display='none';
+  document.getElementById('step-participants').style.display='';
+}
+
+function backToEvents() {
+  document.getElementById('step-event').style.display='';
+  document.getElementById('step-participants').style.display='none';
+  selectedParticipant=null;
+  document.getElementById('screen-link').style.display='none';
+  document.getElementById('search').value='';
+  document.getElementById('participant-results').innerHTML='<div class="empty">Search for a participant above, or add a walk-in.</div>';
+}
+
+let searchTimer;
+function searchParticipants() {
+  clearTimeout(searchTimer);
+  searchTimer=setTimeout(doSearch, 280);
+}
+
+async function doSearch() {
+  const q=document.getElementById('search').value.trim();
+  if(q.length<2){ document.getElementById('participant-results').innerHTML='<div class="empty">Type at least 2 characters to search.</div>'; return; }
+  const hdr={Authorization:'Bearer '+authToken};
+  try {
+    const results=await fetch(`/api/participants?search=${encodeURIComponent(q)}`,{headers:hdr}).then(r=>r.json());
+    searchResults=results;
+    if(!results.length){
+      document.getElementById('participant-results').innerHTML=`<div class="empty">No participants found for "${esc(q)}".<br><button class="btn btn-ghost btn-sm" style="margin-top:8px;" onclick="openAddParticipant()">Add as Walk-in</button></div>`;
+      return;
+    }
+    document.getElementById('participant-results').innerHTML=results.map(p=>`
+      <div class="checkin-row" onclick="selectParticipant(${p.id},'${esc(p.first_name)}','${esc(p.last_name)}')">
+        <div>
+          <div style="font-weight:600;font-size:.9rem;">${esc(p.first_name)} ${esc(p.last_name)}</div>
+          <div style="font-size:.78rem;color:var(--gray-400);">${esc(p.email)}${p.org_name?' · '+esc(p.org_name):''}</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();goScreen(${p.id})">Screen →</button>
+      </div>`).join('');
+  } catch(e){ showToast('Search error: '+e.message); }
+}
+
+function selectParticipant(id) {
+  selectedParticipant=id;
+  const link=document.getElementById('screen-link');
+  link.href=buildScreenUrl(id);
+  link.style.display='';
+}
+
+function goScreen(id) {
+  location.href=buildScreenUrl(id);
+}
+
+function buildScreenUrl(pid) {
+  let url=`/screener/entry.html?participant_id=${pid}`;
+  if(selectedEvent) url+=`&event_id=${selectedEvent.id}`;
+  return url;
+}
+
+function openAddParticipant() {
+  ['wf-fname','wf-lname','wf-email','wf-phone','wf-dob'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('wf-gender').value='';
+  document.getElementById('wf-err').style.display='none';
+  document.getElementById('walkin-modal').style.display='flex';
+}
+
+async function saveWalkin() {
+  const fname=document.getElementById('wf-fname').value.trim(), lname=document.getElementById('wf-lname').value.trim(), email=document.getElementById('wf-email').value.trim();
+  if(!fname||!lname||!email){ showWfErr('First name, last name, and email required'); return; }
+  const btn=document.getElementById('wf-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const r=await fetch('/api/participants',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({
+      first_name:fname, last_name:lname, email,
+      phone:document.getElementById('wf-phone').value||null,
+      date_of_birth:document.getElementById('wf-dob').value||null,
+      gender:document.getElementById('wf-gender').value||null,
+    })});
+    if(!r.ok){ const d=await r.json(); showWfErr(d.error||'Save failed'); return; }
+    const p=await r.json();
+    closeWalkin();
+    showToast(`${fname} added — opening screening form`);
+    setTimeout(()=>{ location.href=buildScreenUrl(p.id); },800);
+  } catch(e){ showWfErr(e.message); }
+  finally{ btn.disabled=false; btn.textContent='Add & Screen →'; }
+}
+
+function showWfErr(m){ const e=document.getElementById('wf-err'); e.textContent=m; e.style.display=''; }
+function closeWalkin(){ document.getElementById('walkin-modal').style.display='none'; }
+function closeOuter(e){ if(e.target===document.getElementById('walkin-modal'))closeWalkin(); }
+function fmtDate(d){ return d?new Date(d.includes('T')?d:d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''; }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>

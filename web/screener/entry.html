@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Biometric Entry — HealYou Screener</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <style>
+    .result-preview {
+      background:var(--teal-bg); border:1px solid var(--teal-light); border-radius:var(--radius);
+      padding:16px; margin-top:12px; display:none;
+    }
+    .result-preview-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-top:10px; }
+    .result-tile { text-align:center; padding:10px; background:#fff; border-radius:6px; border:1px solid var(--teal-light); }
+    .result-tile-val { font-size:1.2rem; font-weight:700; color:var(--gray-800); }
+    .result-tile-label { font-size:.7rem; color:var(--gray-400); margin-top:2px; }
+  </style>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/screener/"><img src="/assets/img/logo-icon.svg" alt="">Health<span>you</span></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <span style="font-size:.75rem;opacity:.6;padding:2px 8px;border:1px solid rgba(255,255,255,.4);border-radius:99px;">Screener</span>
+    <button class="btn btn-ghost btn-sm" id="logout-btn" style="display:none;color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+
+<main class="container" style="max-width:780px;">
+  <div id="login-wall" class="login-wall">
+    <h2>Screener Portal</h2>
+    <p>Sign in to enter biometric data.</p>
+    <button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button>
+  </div>
+
+  <div id="content" style="display:none;">
+    <a href="/screener/" class="back-link" id="back-link">&#8592; Back to Check-in</a>
+
+    <div class="participant-header" id="p-header" style="margin-bottom:20px;">
+      <div class="participant-avatar" id="p-avatar"></div>
+      <div class="participant-info">
+        <h1 id="p-name" style="font-size:1.2rem;"></h1>
+        <div class="meta" id="p-meta"></div>
+      </div>
+    </div>
+
+    <form onsubmit="submitForm(event)">
+      <!-- Anthropometrics -->
+      <div class="card">
+        <div class="form-section-title" style="margin-bottom:16px;">Anthropometrics</div>
+        <div class="form-grid cols-3">
+          <div class="form-group">
+            <label>Height (inches)</label>
+            <input id="f-height" type="number" step="0.5" min="36" max="96" placeholder="e.g. 67" oninput="calcBmi()"/>
+          </div>
+          <div class="form-group">
+            <label>Weight (lbs)</label>
+            <input id="f-weight" type="number" step="0.5" min="50" max="600" placeholder="e.g. 165" oninput="calcBmi()"/>
+          </div>
+          <div class="form-group">
+            <label>BMI <span style="font-size:.75rem;color:var(--teal);">(auto-calculated)</span></label>
+            <input id="f-bmi" type="text" readonly placeholder="—" style="background:var(--gray-100);cursor:default;"/>
+          </div>
+          <div class="form-group">
+            <label>Waist Circumference (in)</label>
+            <input id="f-waist" type="number" step="0.5" min="18" max="80" placeholder="e.g. 34"/>
+          </div>
+          <div class="form-group">
+            <label>Body Fat %</label>
+            <input id="f-bfpct" type="number" step="0.1" min="2" max="60" placeholder="e.g. 22"/>
+          </div>
+        </div>
+        <div id="bmi-preview" class="result-preview">
+          <div style="font-size:.82rem;font-weight:600;color:var(--teal);">Calculated BMI</div>
+          <div id="bmi-result" style="font-size:1.8rem;font-weight:700;margin-top:6px;color:var(--gray-800);"></div>
+          <div id="bmi-category" style="font-size:.82rem;margin-top:4px;"></div>
+        </div>
+      </div>
+
+      <!-- Blood Pressure & Vitals -->
+      <div class="card">
+        <div class="form-section-title" style="margin-bottom:16px;">Blood Pressure &amp; Vitals</div>
+        <div class="form-grid cols-3">
+          <div class="form-group">
+            <label>Systolic BP (mmHg)</label>
+            <input id="f-sys" type="number" min="60" max="250" placeholder="e.g. 120" oninput="checkBp()"/>
+          </div>
+          <div class="form-group">
+            <label>Diastolic BP (mmHg)</label>
+            <input id="f-dia" type="number" min="40" max="150" placeholder="e.g. 80" oninput="checkBp()"/>
+          </div>
+          <div class="form-group">
+            <label>Heart Rate (bpm)</label>
+            <input id="f-hr" type="number" min="30" max="220" placeholder="e.g. 72"/>
+          </div>
+        </div>
+        <div id="bp-preview" class="result-preview">
+          <div style="font-size:.82rem;font-weight:600;color:var(--teal);">BP Classification</div>
+          <div id="bp-result" style="font-size:.95rem;margin-top:6px;font-weight:600;"></div>
+        </div>
+      </div>
+
+      <!-- Cholesterol -->
+      <div class="card">
+        <div class="form-section-title" style="margin-bottom:16px;">Cholesterol Panel</div>
+        <div class="form-grid cols-3">
+          <div class="form-group">
+            <label>Total Cholesterol (mg/dL)</label>
+            <input id="f-tchol" type="number" min="50" max="500" placeholder="e.g. 195"/>
+          </div>
+          <div class="form-group">
+            <label>HDL (mg/dL)</label>
+            <input id="f-hdl" type="number" min="10" max="200" placeholder="e.g. 55"/>
+          </div>
+          <div class="form-group">
+            <label>LDL (mg/dL)</label>
+            <input id="f-ldl" type="number" min="10" max="400" placeholder="e.g. 120"/>
+          </div>
+          <div class="form-group">
+            <label>Triglycerides (mg/dL)</label>
+            <input id="f-trig" type="number" min="20" max="2000" placeholder="e.g. 130"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Blood Glucose -->
+      <div class="card">
+        <div class="form-section-title" style="margin-bottom:16px;">Blood Glucose</div>
+        <div class="form-grid cols-3">
+          <div class="form-group">
+            <label>Fasting Blood Glucose (mg/dL)</label>
+            <input id="f-glucose" type="number" min="40" max="600" placeholder="e.g. 95"/>
+          </div>
+          <div class="form-group">
+            <label>HbA1c (%)</label>
+            <input id="f-hba1c" type="number" step="0.1" min="3" max="20" placeholder="e.g. 5.6"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="card">
+        <div class="form-section-title" style="margin-bottom:12px;">Screener Notes</div>
+        <div class="form-group">
+          <textarea id="f-notes" rows="2" placeholder="Any observations or flags for the coach…"></textarea>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-bottom:40px;">
+        <a href="/screener/" class="btn btn-ghost">Cancel</a>
+        <button type="submit" class="btn btn-primary" id="submit-btn">Save &amp; Print Results</button>
+      </div>
+    </form>
+
+    <!-- Results panel (shown after save) -->
+    <div id="results-panel" style="display:none;">
+      <div class="card" style="border-color:var(--teal);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <h2 style="font-size:1.1rem;">Screening Complete</h2>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm" onclick="window.print()">Print</button>
+            <a href="/screener/" class="btn btn-primary btn-sm">Screen Next →</a>
+          </div>
+        </div>
+        <div id="results-summary"></div>
+      </div>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, participantId=null, eventId=null;
+const qs=new URLSearchParams(location.search);
+participantId=qs.get('participant_id');
+eventId=qs.get('event_id');
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; document.getElementById('logout-btn').style.display='none'; });
+
+async function boot(user) {
+  if(!participantId){ location.href='/screener/'; return; }
+  document.getElementById('login-wall').style.display='none';
+  document.getElementById('content').style.display='';
+  document.getElementById('logout-btn').style.display='';
+  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+
+  if(eventId){
+    const link=document.getElementById('back-link');
+    link.href=`/screener/?event=${eventId}`;
+  }
+
+  const hdr={Authorization:'Bearer '+authToken};
+  try {
+    const p=await fetch(`/api/participants?id=${participantId}`,{headers:hdr}).then(r=>r.json());
+    const initials=((p.first_name||'')[0]+(p.last_name||'')[0]).toUpperCase();
+    document.getElementById('p-avatar').textContent=initials;
+    document.getElementById('p-name').textContent=p.first_name+' '+p.last_name;
+    const meta=[];
+    if(p.date_of_birth) meta.push('DOB: '+fmtDate(p.date_of_birth));
+    if(p.gender) meta.push(p.gender.replace('_',' '));
+    if(p.org_name) meta.push(p.org_name);
+    document.getElementById('p-meta').textContent=meta.join(' · ');
+
+    // Pre-fill height/weight from last screening if available
+    if(p.biometrics?.[0]){
+      const last=p.biometrics[0];
+      if(last.height_in) document.getElementById('f-height').value=last.height_in;
+      if(last.weight_lbs) document.getElementById('f-weight').value=last.weight_lbs;
+      calcBmi();
+    }
+  } catch(e){ showToast('Error loading participant'); }
+}
+
+function calcBmi() {
+  const h=parseFloat(document.getElementById('f-height').value);
+  const w=parseFloat(document.getElementById('f-weight').value);
+  if(h>0 && w>0){
+    const bmi=703*w/(h*h);
+    document.getElementById('f-bmi').value=bmi.toFixed(1);
+    const preview=document.getElementById('bmi-preview');
+    preview.style.display='';
+    document.getElementById('bmi-result').textContent=bmi.toFixed(1);
+    const cat=bmi<18.5?'Underweight':bmi<25?'Normal weight':bmi<30?'Overweight':'Obese';
+    const color=bmi>=30?'var(--red)':bmi>=25?'var(--amber)':'var(--green)';
+    document.getElementById('bmi-category').innerHTML=`<span style="color:${color};font-weight:600;">${cat}</span>`;
+  } else {
+    document.getElementById('f-bmi').value='';
+    document.getElementById('bmi-preview').style.display='none';
+  }
+}
+
+function checkBp() {
+  const sys=parseInt(document.getElementById('f-sys').value);
+  const dia=parseInt(document.getElementById('f-dia').value);
+  if(sys>0 && dia>0){
+    const preview=document.getElementById('bp-preview');
+    preview.style.display='';
+    let label, color;
+    if(sys>=180||dia>=120){ label='Hypertensive Crisis — Refer immediately'; color='var(--red)'; }
+    else if(sys>=140||dia>=90){ label='Stage 2 Hypertension'; color='var(--red)'; }
+    else if(sys>=130||dia>=80){ label='Stage 1 Hypertension'; color='var(--amber)'; }
+    else if(sys>=120){ label='Elevated'; color='var(--amber)'; }
+    else { label='Normal'; color='var(--green)'; }
+    document.getElementById('bp-result').innerHTML=`<span style="color:${color};">${label}</span>`;
+    preview.style.borderColor=color==='var(--red)'?'#fca5a5':color==='var(--amber)'?'#fcd34d':'var(--teal-light)';
+    preview.style.background=color==='var(--red)'?'var(--red-light)':color==='var(--amber)'?'var(--amber-light)':'var(--teal-bg)';
+  } else {
+    document.getElementById('bp-preview').style.display='none';
+  }
+}
+
+async function submitForm(e) {
+  e.preventDefault();
+  const btn=document.getElementById('submit-btn'); btn.disabled=true; btn.textContent='Saving…';
+  const body={
+    participant_id:parseInt(participantId),
+    event_id:eventId?parseInt(eventId):null,
+    height_in:parseFloat(document.getElementById('f-height').value)||null,
+    weight_lbs:parseFloat(document.getElementById('f-weight').value)||null,
+    waist_circumference_in:parseFloat(document.getElementById('f-waist').value)||null,
+    body_fat_pct:parseFloat(document.getElementById('f-bfpct').value)||null,
+    systolic_bp:parseInt(document.getElementById('f-sys').value)||null,
+    diastolic_bp:parseInt(document.getElementById('f-dia').value)||null,
+    heart_rate:parseInt(document.getElementById('f-hr').value)||null,
+    total_cholesterol:parseInt(document.getElementById('f-tchol').value)||null,
+    hdl_cholesterol:parseInt(document.getElementById('f-hdl').value)||null,
+    ldl_cholesterol:parseInt(document.getElementById('f-ldl').value)||null,
+    triglycerides:parseInt(document.getElementById('f-trig').value)||null,
+    blood_glucose:parseInt(document.getElementById('f-glucose').value)||null,
+    hba1c:parseFloat(document.getElementById('f-hba1c').value)||null,
+    notes:document.getElementById('f-notes').value||null,
+    screened_at:new Date().toISOString(),
+  };
+  try {
+    const r=await fetch('/api/biometrics',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify(body)});
+    if(!r.ok) throw new Error((await r.json()).error||'Save failed');
+    const result=await r.json();
+    showResults(result);
+    showToast('Biometrics saved');
+    document.querySelector('form').style.display='none';
+    document.getElementById('results-panel').style.display='';
+  } catch(e){ showToast('Error: '+e.message); btn.disabled=false; btn.textContent='Save & Print Results'; }
+}
+
+function showResults(r) {
+  const tiles=[];
+  if(r.weight_lbs) tiles.push({label:'Weight',val:r.weight_lbs+' lbs',risk:null});
+  if(r.bmi) tiles.push({label:'BMI',val:Number(r.bmi).toFixed(1),risk:r.bmi_category});
+  if(r.systolic_bp) tiles.push({label:'Blood Pressure',val:`${r.systolic_bp}/${r.diastolic_bp}`,risk:r.bp_risk});
+  if(r.heart_rate) tiles.push({label:'Heart Rate',val:r.heart_rate+' bpm',risk:null});
+  if(r.total_cholesterol) tiles.push({label:'Total Chol.',val:r.total_cholesterol+' mg/dL',risk:r.cholesterol_risk});
+  if(r.hdl_cholesterol) tiles.push({label:'HDL',val:r.hdl_cholesterol+' mg/dL',risk:null});
+  if(r.blood_glucose) tiles.push({label:'Glucose',val:r.blood_glucose+' mg/dL',risk:r.glucose_risk});
+  if(r.hba1c) tiles.push({label:'HbA1c',val:r.hba1c+'%',risk:null});
+
+  const riskColor={high:'var(--red)',crisis:'var(--red)',high_1:'var(--amber)',high_2:'var(--red)',elevated:'var(--amber)',borderline:'var(--amber)',very_high:'var(--red)',prediabetes:'var(--amber)',diabetes:'var(--red)',obese:'var(--red)',overweight:'var(--amber)',normal:'var(--green)',low:'var(--green)'};
+  const overallColor={high:'#ef4444',moderate:'#f59e0b',low:'#10b981'}[r.overall_risk]||'#6b7280';
+
+  document.getElementById('results-summary').innerHTML=`
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;">Overall Risk</div>
+      <div style="font-size:2rem;font-weight:800;color:${overallColor};text-transform:capitalize;">${r.overall_risk||'—'}</div>
+    </div>
+    <div class="result-preview-grid">
+      ${tiles.map(t=>`<div class="result-tile" style="${t.risk&&riskColor[t.risk]?'border-color:'+riskColor[t.risk]+';':''} ">
+        <div class="result-tile-val" style="${t.risk&&riskColor[t.risk]?'color:'+riskColor[t.risk]+';':''}">${esc(String(t.val))}</div>
+        <div class="result-tile-label">${t.label}</div>
+      </div>`).join('')}
+    </div>
+    ${r.bp_risk==='crisis'?`<div style="margin-top:16px;padding:12px;background:var(--red-light);border:1px solid #fca5a5;border-radius:6px;font-size:.85rem;font-weight:600;color:#991b1b;">⚠️ Hypertensive Crisis — Refer to emergency care immediately.</div>`:''}
+    ${r.overall_risk==='high'&&r.bp_risk!=='crisis'?`<div style="margin-top:12px;padding:10px;background:var(--amber-light);border:1px solid #fcd34d;border-radius:6px;font-size:.82rem;color:#92400e;">High risk identified — recommend physician follow-up within 1–2 weeks.</div>`:''}
+  `;
+}
+
+function fmtDate(d){ return d?new Date(d.includes('T')?d:d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''; }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>

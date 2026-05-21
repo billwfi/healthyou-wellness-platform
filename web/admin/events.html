@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Screening Events — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/logo-icon.svg" alt="">Health<span>you</span></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+<nav class="subnav">
+  <a href="/admin/" class="subnav-item">Dashboard</a>
+  <a href="/admin/organizations.html" class="subnav-item">Organizations</a>
+  <a href="/admin/participants.html" class="subnav-item">Participants</a>
+  <a href="/admin/coaches.html" class="subnav-item">Coaches</a>
+  <a href="/admin/events.html" class="subnav-item active">Screening Events</a>
+</nav>
+<main class="container">
+  <div id="login-wall" class="login-wall"><h2>Admin Portal</h2><p>Sign in to continue.</p><button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button></div>
+  <div id="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div><h1 class="page-title" style="margin-bottom:2px;">Screening Events</h1><p style="color:var(--gray-400);font-size:.88rem;">Schedule and manage biometric screening events.</p></div>
+      <div style="display:flex;gap:8px;">
+        <a href="/screener/" class="btn btn-ghost">Open Screener Portal →</a>
+        <button class="btn btn-primary" onclick="openModal()">+ New Event</button>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table class="data-table">
+        <thead><tr><th>Event</th><th>Date</th><th>Organization</th><th>Type</th><th>Screened</th><th>Status</th><th style="width:120px;">Actions</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+<div id="modal-backdrop" class="modal-backdrop" style="display:none;" onclick="closeOuter(event)">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">New Screening Event</div>
+    <div class="form-grid full">
+      <div class="form-group"><label>Event Name *</label><input id="f-name" type="text" placeholder="Q1 Wellness Screening"/></div>
+      <div class="form-group"><label>Event Date *</label><input id="f-date" type="date"/></div>
+      <div class="form-group"><label>Organization</label><select id="f-org"><option value="">— none —</option></select></div>
+      <div class="form-group"><label>Type</label>
+        <select id="f-type"><option value="onsite">On-site</option><option value="virtual">Virtual</option><option value="self_reported">Self-Reported</option></select>
+      </div>
+      <div class="form-group span-2"><label>Location</label><input id="f-loc" type="text" placeholder="Building A, Room 101"/></div>
+      <div class="form-group span-2"><label>Notes</label><textarea id="f-notes" rows="2"></textarea></div>
+    </div>
+    <div id="modal-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="save-btn" onclick="save()">Create Event</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, events=[], orgs=[], editId=null;
+const STATUS_OPTS=['scheduled','in_progress','completed','cancelled'];
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; });
+
+async function boot(u){
+  document.getElementById('login-wall').style.display='none'; document.getElementById('content').style.display='';
+  document.getElementById('header-name').textContent=u.user_metadata?.full_name||u.email;
+  orgs=await fetch('/api/organizations',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+  const sel=document.getElementById('f-org'); orgs.forEach(o=>sel.add(new Option(o.name,o.id)));
+  load();
+}
+
+async function load(){
+  try {
+    events=await fetch('/api/events',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+    document.getElementById('tbody').innerHTML=!events.length
+      ?'<tr><td colspan="7" class="empty">No events yet.</td></tr>'
+      :events.map(e=>`<tr>
+          <td><strong>${esc(e.name)}</strong>${e.location?`<br><span style="font-size:.78rem;color:var(--gray-400)">${esc(e.location)}</span>`:''}</td>
+          <td>${fmtDate(e.event_date)}</td>
+          <td>${esc(e.org_name||'—')}</td>
+          <td><span class="badge badge-${e.event_type}">${e.event_type.replace('_',' ')}</span></td>
+          <td style="text-align:center;font-weight:600">${e.screened_count}</td>
+          <td>
+            <select onchange="updateStatus(${e.id},this.value)" class="btn btn-ghost btn-sm" style="padding:3px 8px;">
+              ${STATUS_OPTS.map(s=>`<option value="${s}"${s===e.status?' selected':''}>${s.replace('_',' ')}</option>`).join('')}
+            </select>
+          </td>
+          <td><div class="actions">
+            <button class="btn btn-ghost btn-sm" onclick="openModal(${e.id})">Edit</button>
+            <a href="/screener/?event=${e.id}" class="btn btn-ghost btn-sm">Screen</a>
+          </div></td>
+        </tr>`).join('');
+  } catch(e){ showToast('Error: '+e.message); }
+}
+
+function openModal(id){
+  editId=id||null;
+  document.getElementById('modal-err').style.display='none';
+  document.getElementById('modal-title').textContent=id?'Edit Event':'New Screening Event';
+  document.getElementById('save-btn').textContent=id?'Save Changes':'Create Event';
+  if(id){ const ev=events.find(x=>x.id===id);
+    document.getElementById('f-name').value=ev.name; document.getElementById('f-date').value=ev.event_date?.split('T')[0]||ev.event_date;
+    document.getElementById('f-org').value=ev.org_id||''; document.getElementById('f-type').value=ev.event_type;
+    document.getElementById('f-loc').value=ev.location||''; document.getElementById('f-notes').value=ev.notes||'';
+  } else { ['f-name','f-date','f-loc','f-notes'].forEach(i=>document.getElementById(i).value=''); document.getElementById('f-org').value=''; document.getElementById('f-type').value='onsite'; }
+  document.getElementById('modal-backdrop').style.display='flex';
+}
+function closeModal(){ document.getElementById('modal-backdrop').style.display='none'; }
+function closeOuter(e){ if(e.target===document.getElementById('modal-backdrop'))closeModal(); }
+
+async function save(){
+  const name=document.getElementById('f-name').value.trim(), date=document.getElementById('f-date').value;
+  if(!name||!date){ showErr('Name and date are required.'); return; }
+  const btn=document.getElementById('save-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const body={name,event_date:date,org_id:document.getElementById('f-org').value||null,event_type:document.getElementById('f-type').value,location:document.getElementById('f-loc').value||null,notes:document.getElementById('f-notes').value||null};
+    if(editId) body.id=editId;
+    const r=await fetch('/api/events',{method:editId?'PUT':'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify(body)});
+    if(!r.ok){ showErr((await r.json()).error||'Save failed'); return; }
+    closeModal(); showToast(editId?'Event updated':'Event created'); load();
+  } catch(e){ showErr(e.message); } finally{ btn.disabled=false; }
+}
+
+async function updateStatus(id,status){
+  try { await fetch('/api/events',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({id,status})}); showToast('Status updated'); }
+  catch(e){ showToast('Error: '+e.message); }
+}
+
+function fmtDate(d){ return d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'; }
+function showErr(m){ const e=document.getElementById('modal-err'); e.textContent=m; e.style.display=''; }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>

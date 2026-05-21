@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Organizations — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/logo-icon.svg" alt="">Health<span>you</span></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+<nav class="subnav">
+  <a href="/admin/" class="subnav-item">Dashboard</a>
+  <a href="/admin/organizations.html" class="subnav-item active">Organizations</a>
+  <a href="/admin/participants.html" class="subnav-item">Participants</a>
+  <a href="/admin/coaches.html" class="subnav-item">Coaches</a>
+  <a href="/admin/events.html" class="subnav-item">Screening Events</a>
+</nav>
+<main class="container">
+  <div id="login-wall" class="login-wall"><h2>Admin Portal</h2><p>Sign in to continue.</p><button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button></div>
+  <div id="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div><h1 class="page-title" style="margin-bottom:2px;">Organizations</h1><p style="color:var(--gray-400);font-size:.88rem;">Manage employer and client organizations.</p></div>
+      <button class="btn btn-primary" onclick="openModal()">+ Add Organization</button>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Slug</th><th>Contact</th><th>Status</th><th style="width:120px;">Actions</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<div id="modal-backdrop" class="modal-backdrop" style="display:none;" onclick="closeOuter(event)">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Add Organization</div>
+    <div class="form-grid full">
+      <div class="form-group"><label>Organization Name *</label><input id="f-name" type="text" placeholder="Acme Corp"/></div>
+      <div class="form-group"><label>Slug * (URL-safe ID)</label><input id="f-slug" type="text" placeholder="acme-corp"/></div>
+      <div class="form-group"><label>Contact Name</label><input id="f-cname" type="text"/></div>
+      <div class="form-group"><label>Contact Email</label><input id="f-cemail" type="email"/></div>
+    </div>
+    <div id="modal-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="save-btn" onclick="save()">Add Organization</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, orgs=[], editId=null;
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; });
+
+async function boot(user) {
+  document.getElementById('login-wall').style.display='none';
+  document.getElementById('content').style.display='';
+  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+  load();
+}
+
+async function load() {
+  try {
+    const r=await fetch('/api/organizations',{headers:{Authorization:'Bearer '+authToken}});
+    orgs=await r.json();
+    document.getElementById('tbody').innerHTML=!orgs.length
+      ?'<tr><td colspan="5" class="empty">No organizations yet.</td></tr>'
+      :orgs.map(o=>`<tr>
+          <td><strong>${esc(o.name)}</strong></td>
+          <td style="color:var(--gray-600);font-family:monospace;font-size:.85rem;">${esc(o.slug)}</td>
+          <td>${esc(o.contact_name||'—')}${o.contact_email?`<br><span style="font-size:.8rem;color:var(--gray-400)">${esc(o.contact_email)}</span>`:''}</td>
+          <td><span class="badge badge-${o.active?'active':'inactive'}">${o.active?'Active':'Inactive'}</span></td>
+          <td><div class="actions">
+            <button class="btn btn-ghost btn-sm" onclick="openModal(${o.id})">Edit</button>
+            <button class="btn btn-ghost btn-sm" style="color:${o.active?'var(--red)':'var(--green)'};border-color:${o.active?'var(--red)':'var(--green)'};" onclick="toggle(${o.id},${!o.active})">${o.active?'Deactivate':'Activate'}</button>
+          </div></td>
+        </tr>`).join('');
+  } catch(e){ showToast('Error: '+e.message); }
+}
+
+function openModal(id) {
+  editId=id||null;
+  document.getElementById('modal-err').style.display='none';
+  document.getElementById('modal-title').textContent=id?'Edit Organization':'Add Organization';
+  document.getElementById('save-btn').textContent=id?'Save Changes':'Add Organization';
+  if(id){ const o=orgs.find(x=>x.id===id);
+    document.getElementById('f-name').value=o.name; document.getElementById('f-slug').value=o.slug;
+    document.getElementById('f-cname').value=o.contact_name||''; document.getElementById('f-cemail').value=o.contact_email||'';
+  } else { ['f-name','f-slug','f-cname','f-cemail'].forEach(i=>document.getElementById(i).value=''); }
+  document.getElementById('modal-backdrop').style.display='flex';
+}
+function closeModal(){ document.getElementById('modal-backdrop').style.display='none'; }
+function closeOuter(e){ if(e.target===document.getElementById('modal-backdrop'))closeModal(); }
+
+async function save() {
+  const name=document.getElementById('f-name').value.trim(), slug=document.getElementById('f-slug').value.trim();
+  if(!name||!slug){ showErr('Name and slug are required.'); return; }
+  const btn=document.getElementById('save-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const body={ name, slug, contact_name:document.getElementById('f-cname').value||null, contact_email:document.getElementById('f-cemail').value||null };
+    if(editId) body.id=editId;
+    const r=await fetch('/api/organizations',{ method:editId?'PUT':'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken}, body:JSON.stringify(body) });
+    if(!r.ok){ showErr((await r.json()).error||'Save failed'); return; }
+    closeModal(); showToast(editId?'Updated':'Added'); load();
+  } catch(e){ showErr(e.message); }
+  finally{ btn.disabled=false; btn.textContent=editId?'Save Changes':'Add Organization'; }
+}
+
+async function toggle(id, active) {
+  try {
+    const r=await fetch('/api/organizations',{ method:'PUT', headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken}, body:JSON.stringify({id,active}) });
+    if(!r.ok) throw new Error((await r.json()).error);
+    showToast(active?'Activated':'Deactivated'); load();
+  } catch(e){ showToast('Error: '+e.message); }
+}
+
+function showErr(m){ const e=document.getElementById('modal-err'); e.textContent=m; e.style.display=''; }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>

@@ -1,0 +1,53 @@
+[build]
+  publish = "web"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/admin"
+  to = "/admin/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin/*"
+  to = "/admin/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/coach"
+  to = "/coach/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/coach/*"
+  to = "/coach/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/screener"
+  to = "/screener/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/screener/*"
+  to = "/screener/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/participant"
+  to = "/participant/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/participant/*"
+  to = "/participant/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/"
+  to = "/admin/index.html"
+  status = 302

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Coaches — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/logo-icon.svg" alt="">Health<span>you</span></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+<nav class="subnav">
+  <a href="/admin/" class="subnav-item">Dashboard</a>
+  <a href="/admin/organizations.html" class="subnav-item">Organizations</a>
+  <a href="/admin/participants.html" class="subnav-item">Participants</a>
+  <a href="/admin/coaches.html" class="subnav-item active">Coaches</a>
+  <a href="/admin/events.html" class="subnav-item">Screening Events</a>
+</nav>
+<main class="container">
+  <div id="login-wall" class="login-wall"><h2>Admin Portal</h2><p>Sign in to continue.</p><button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button></div>
+  <div id="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div><h1 class="page-title" style="margin-bottom:2px;">Coaches</h1><p style="color:var(--gray-400);font-size:.88rem;">Manage coaching staff and screeners.</p></div>
+      <button class="btn btn-primary" onclick="openModal()">+ Add Coach</button>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table class="data-table">
+        <thead><tr><th>Coach</th><th>Email</th><th>Specialty</th><th>Status</th><th style="width:160px;">Actions</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+<div id="modal-backdrop" class="modal-backdrop" style="display:none;" onclick="closeOuter(event)">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Add Coach</div>
+    <div class="form-grid full">
+      <div class="form-group"><label>Full Name *</label><input id="f-name" type="text" placeholder="e.g. Sarah Johnson"/></div>
+      <div class="form-group"><label>Email *</label><input id="f-email" type="email" placeholder="coach@healthyou.com"/></div>
+      <div class="form-group"><label>Specialty</label><input id="f-spec" type="text" placeholder="Nutrition, Fitness, Stress Management…"/></div>
+      <div class="form-group"><label>Bio</label><textarea id="f-bio" rows="3" placeholder="Certified health coach specializing in…"></textarea></div>
+    </div>
+    <div id="modal-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="save-btn" onclick="save()">Add Coach</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, coaches=[], editId=null;
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; });
+
+async function boot(u){ document.getElementById('login-wall').style.display='none'; document.getElementById('content').style.display=''; document.getElementById('header-name').textContent=u.user_metadata?.full_name||u.email; load(); }
+
+async function load() {
+  try {
+    coaches=await fetch('/api/coaches?admin=true',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+    document.getElementById('tbody').innerHTML=!coaches.length
+      ?'<tr><td colspan="5" class="empty">No coaches yet.</td></tr>'
+      :coaches.map(c=>`<tr>
+          <td><div style="font-weight:600">${esc(c.name)}</div>${c.bio?`<div style="font-size:.78rem;color:var(--gray-400)">${esc(c.bio.slice(0,50))}…</div>`:''}</td>
+          <td style="color:var(--gray-600)">${esc(c.email)}</td>
+          <td>${esc(c.specialty||'—')}</td>
+          <td><span class="badge badge-${c.active?'active':'inactive'}">${c.active?'Active':'Inactive'}</span></td>
+          <td><div class="actions">
+            <button class="btn btn-ghost btn-sm" onclick="openModal(${c.id})">Edit</button>
+            <button class="btn btn-ghost btn-sm" style="color:${c.active?'var(--red)':'var(--green)'};border-color:${c.active?'var(--red)':'var(--green)'};" onclick="toggle(${c.id},${!c.active})">${c.active?'Deactivate':'Activate'}</button>
+          </div></td>
+        </tr>`).join('');
+  } catch(e){ showToast('Error: '+e.message); }
+}
+
+function openModal(id){
+  editId=id||null;
+  document.getElementById('modal-err').style.display='none';
+  document.getElementById('modal-title').textContent=id?'Edit Coach':'Add Coach';
+  document.getElementById('save-btn').textContent=id?'Save Changes':'Add Coach';
+  if(id){ const c=coaches.find(x=>x.id===id); document.getElementById('f-name').value=c.name; document.getElementById('f-email').value=c.email; document.getElementById('f-spec').value=c.specialty||''; document.getElementById('f-bio').value=c.bio||''; }
+  else { ['f-name','f-email','f-spec','f-bio'].forEach(i=>document.getElementById(i).value=''); }
+  document.getElementById('modal-backdrop').style.display='flex'; document.getElementById('f-name').focus();
+}
+function closeModal(){ document.getElementById('modal-backdrop').style.display='none'; }
+function closeOuter(e){ if(e.target===document.getElementById('modal-backdrop'))closeModal(); }
+
+async function save(){
+  const name=document.getElementById('f-name').value.trim(), email=document.getElementById('f-email').value.trim();
+  if(!name||!email){ showErr('Name and email required.'); return; }
+  const btn=document.getElementById('save-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const body={name,email,specialty:document.getElementById('f-spec').value||null,bio:document.getElementById('f-bio').value||null};
+    if(editId) body.id=editId;
+    const r=await fetch('/api/coaches',{method:editId?'PUT':'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify(body)});
+    if(!r.ok){ showErr((await r.json()).error||'Save failed'); return; }
+    closeModal(); showToast(editId?'Coach updated':'Coach added'); load();
+  } catch(e){ showErr(e.message); } finally{ btn.disabled=false; btn.textContent=editId?'Save Changes':'Add Coach'; }
+}
+
+async function toggle(id,active){
+  try {
+    await fetch('/api/coaches',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({id,active})});
+    showToast(active?'Activated':'Deactivated'); load();
+  } catch(e){ showToast('Error: '+e.message); }
+}
+function showErr(m){ const e=document.getElementById('modal-err'); e.textContent=m; e.style.display=''; }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>

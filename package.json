@@ -1,0 +1,9 @@
+{
+  "name": "healthyou-wellness-platform",
+  "version": "1.0.0",
+  "description": "HealYou Wellness Platform — Health Coaching & Biometric Screening",
+  "private": true,
+  "dependencies": {
+    "pg": "^8.13.3"
+  }
+}

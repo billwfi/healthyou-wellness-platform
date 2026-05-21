@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Participants — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/logo-icon.svg" alt="">Health<span>you</span></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <span style="font-size:.75rem;opacity:.6;padding:2px 8px;border:1px solid rgba(255,255,255,.4);border-radius:99px;">Admin</span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+<nav class="subnav">
+  <a href="/admin/" class="subnav-item">Dashboard</a>
+  <a href="/admin/organizations.html" class="subnav-item">Organizations</a>
+  <a href="/admin/participants.html" class="subnav-item active">Participants</a>
+  <a href="/admin/coaches.html" class="subnav-item">Coaches</a>
+  <a href="/admin/events.html" class="subnav-item">Screening Events</a>
+</nav>
+<main class="container">
+  <div id="login-wall" class="login-wall"><h2>Admin Portal</h2><p>Sign in to continue.</p><button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button></div>
+  <div id="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h1 class="page-title" style="margin-bottom:2px;">Participants</h1>
+        <p style="color:var(--gray-400);font-size:.88rem;">Manage enrolled participants and assign coaches.</p>
+      </div>
+      <button class="btn btn-primary" onclick="openModal()">+ Add Participant</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+      <div class="search-bar" style="flex:1;min-width:220px;"><input id="search-input" type="text" placeholder="Search name or email…" oninput="filterTable()"/></div>
+      <select id="org-filter" onchange="filterTable()" style="min-width:160px;"><option value="">All Organizations</option></select>
+      <select id="coach-filter" onchange="filterTable()" style="min-width:160px;"><option value="">All Coaches</option></select>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Email</th><th>Organization</th><th>Coach</th><th>Status</th><th style="width:100px;">Actions</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <p id="count-label" style="font-size:.8rem;color:var(--gray-400);margin-top:8px;"></p>
+  </div>
+</main>
+
+<div id="modal-backdrop" class="modal-backdrop" style="display:none;" onclick="closeOuter(event)">
+  <div class="modal modal-lg">
+    <div class="modal-title" id="modal-title">Add Participant</div>
+    <div class="form-grid cols-3">
+      <div class="form-group"><label>First Name *</label><input id="f-fname" type="text"/></div>
+      <div class="form-group"><label>Last Name *</label><input id="f-lname" type="text"/></div>
+      <div class="form-group"><label>Email *</label><input id="f-email" type="email"/></div>
+      <div class="form-group"><label>Phone</label><input id="f-phone" type="tel"/></div>
+      <div class="form-group"><label>Date of Birth</label><input id="f-dob" type="date"/></div>
+      <div class="form-group"><label>Gender</label>
+        <select id="f-gender"><option value="">— select —</option><option value="male">Male</option><option value="female">Female</option><option value="non_binary">Non-binary</option><option value="prefer_not">Prefer not to say</option></select>
+      </div>
+      <div class="form-group"><label>Organization</label><select id="f-org"><option value="">— none —</option></select></div>
+      <div class="form-group"><label>Assigned Coach</label><select id="f-coach"><option value="">— none —</option></select></div>
+      <div class="form-group"><label>Department</label><input id="f-dept" type="text"/></div>
+      <div class="form-group"><label>Employee ID</label><input id="f-empid" type="text"/></div>
+    </div>
+    <div id="modal-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="save-btn" onclick="save()">Add Participant</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, participants=[], orgs=[], coaches=[], editId=null;
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; });
+
+async function boot(user) {
+  document.getElementById('login-wall').style.display='none';
+  document.getElementById('content').style.display='';
+  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+  const hdr={ Authorization:'Bearer '+authToken };
+  [orgs, coaches] = await Promise.all([
+    fetch('/api/organizations',{headers:hdr}).then(r=>r.json()),
+    fetch('/api/coaches?admin=true',{headers:hdr}).then(r=>r.json()),
+  ]);
+  populateSelects();
+  loadParticipants();
+}
+
+function populateSelects() {
+  const orgF=document.getElementById('org-filter'), orgM=document.getElementById('f-org');
+  orgs.forEach(o=>{ orgF.add(new Option(o.name,o.id)); orgM.add(new Option(o.name,o.id)); });
+  const coachF=document.getElementById('coach-filter'), coachM=document.getElementById('f-coach');
+  coaches.filter(c=>c.active).forEach(c=>{ coachF.add(new Option(c.name,c.id)); coachM.add(new Option(c.name,c.id)); });
+}
+
+async function loadParticipants() {
+  try {
+    const r=await fetch('/api/participants',{headers:{Authorization:'Bearer '+authToken}});
+    participants=await r.json();
+    renderTable(participants);
+  } catch(e){ showToast('Error: '+e.message); }
+}
+
+function filterTable() {
+  const q=document.getElementById('search-input').value.toLowerCase();
+  const oid=document.getElementById('org-filter').value;
+  const cid=document.getElementById('coach-filter').value;
+  renderTable(participants.filter(p=>{
+    const name=(p.first_name+' '+p.last_name).toLowerCase();
+    if(q && !name.includes(q) && !p.email.toLowerCase().includes(q)) return false;
+    if(oid && String(p.org_id)!==oid) return false;
+    if(cid && String(p.assigned_coach_id)!==cid) return false;
+    return true;
+  }));
+}
+
+function renderTable(rows) {
+  document.getElementById('count-label').textContent=rows.length+' participant'+(rows.length!==1?'s':'');
+  document.getElementById('tbody').innerHTML=!rows.length
+    ?'<tr><td colspan="6" class="empty">No participants found.</td></tr>'
+    :rows.map(p=>`<tr onclick="window.location='/coach/participant.html?id=${p.id}'">
+      <td><strong>${esc(p.last_name)}, ${esc(p.first_name)}</strong></td>
+      <td style="color:var(--gray-600)">${esc(p.email)}</td>
+      <td>${esc(p.org_name||'—')}</td>
+      <td>${esc(p.coach_name||'—')}</td>
+      <td><span class="badge badge-${p.active?'active':'inactive'}">${p.active?'Active':'Inactive'}</span></td>
+      <td onclick="event.stopPropagation()"><div class="actions">
+        <button class="btn btn-ghost btn-sm" onclick="openModal(${p.id})">Edit</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+function openModal(id) {
+  editId=id||null;
+  document.getElementById('modal-err').style.display='none';
+  document.getElementById('modal-title').textContent=id?'Edit Participant':'Add Participant';
+  document.getElementById('save-btn').textContent=id?'Save Changes':'Add Participant';
+  if(id){
+    const p=participants.find(x=>x.id===id);
+    document.getElementById('f-fname').value=p.first_name;
+    document.getElementById('f-lname').value=p.last_name;
+    document.getElementById('f-email').value=p.email;
+    document.getElementById('f-phone').value=p.phone||'';
+    document.getElementById('f-dob').value=p.date_of_birth?.split('T')[0]||'';
+    document.getElementById('f-gender').value=p.gender||'';
+    document.getElementById('f-org').value=p.org_id||'';
+    document.getElementById('f-coach').value=p.assigned_coach_id||'';
+    document.getElementById('f-dept').value=p.department||'';
+    document.getElementById('f-empid').value=p.employee_id||'';
+  } else {
+    ['f-fname','f-lname','f-email','f-phone','f-dob','f-dept','f-empid'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('f-gender').value=''; document.getElementById('f-org').value=''; document.getElementById('f-coach').value='';
+  }
+  document.getElementById('modal-backdrop').style.display='flex';
+  document.getElementById('f-fname').focus();
+}
+function closeModal(){ document.getElementById('modal-backdrop').style.display='none'; }
+function closeOuter(e){ if(e.target===document.getElementById('modal-backdrop'))closeModal(); }
+
+async function save() {
+  const fname=document.getElementById('f-fname').value.trim();
+  const lname=document.getElementById('f-lname').value.trim();
+  const email=document.getElementById('f-email').value.trim();
+  if(!fname||!lname||!email){ showErr('First name, last name, and email are required.'); return; }
+  const btn=document.getElementById('save-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const body={ first_name:fname, last_name:lname, email,
+      phone:document.getElementById('f-phone').value||null,
+      date_of_birth:document.getElementById('f-dob').value||null,
+      gender:document.getElementById('f-gender').value||null,
+      org_id:document.getElementById('f-org').value||null,
+      assigned_coach_id:document.getElementById('f-coach').value||null,
+      department:document.getElementById('f-dept').value||null,
+      employee_id:document.getElementById('f-empid').value||null,
+    };
+    if(editId) body.id=editId;
+    const r=await fetch('/api/participants',{ method:editId?'PUT':'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken}, body:JSON.stringify(body) });
+    if(!r.ok){ showErr((await r.json()).error||'Save failed'); return; }
+    closeModal(); showToast(editId?'Participant updated':'Participant added'); loadParticipants();
+  } catch(e){ showErr(e.message); }
+  finally{ btn.disabled=false; btn.textContent=editId?'Save Changes':'Add Participant'; }
+}
+
+function showErr(m){ const e=document.getElementById('modal-err'); e.textContent=m; e.style.display=''; }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>

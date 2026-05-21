@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>My Health — HealYou</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <style>
+    .timeline { position:relative; padding-left:24px; }
+    .timeline::before { content:''; position:absolute; left:6px; top:8px; bottom:8px; width:2px; background:var(--gray-200); }
+    .timeline-item { position:relative; margin-bottom:20px; }
+    .timeline-dot { position:absolute; left:-21px; top:4px; width:12px; height:12px; border-radius:50%; background:var(--teal); border:2px solid #fff; box-shadow:0 0 0 2px var(--teal-light); }
+    .timeline-item .card { margin-bottom:0; }
+    .goal-progress { height:6px; background:var(--gray-200); border-radius:99px; overflow:hidden; margin-top:6px; }
+    .goal-progress-fill { height:100%; background:var(--teal); border-radius:99px; }
+  </style>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/participant/"><img src="/assets/img/logo-icon.svg" alt="">Health<span>you</span></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" id="logout-btn" style="display:none;color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+
+<main class="container">
+  <div id="login-wall" class="login-wall">
+    <h2>Welcome to HealYou</h2>
+    <p>Sign in to view your personal health dashboard.</p>
+    <button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button>
+    <div class="demo-hint">
+      <div class="demo-hint-label">Demo Access</div>
+      <div class="demo-hint-row"><strong>Email:</strong><code>demo@healthyou.com</code></div>
+      <div class="demo-hint-row"><strong>Password:</strong><code>Demo1234!</code></div>
+    </div>
+  </div>
+
+  <div id="content" style="display:none;">
+    <div class="participant-header">
+      <div class="participant-avatar" id="p-avatar"></div>
+      <div class="participant-info" style="flex:1;">
+        <h1 id="p-name"></h1>
+        <div class="meta" id="p-meta"></div>
+      </div>
+      <div id="p-risk-badge"></div>
+    </div>
+
+    <!-- Risk strip -->
+    <div class="risk-strip" id="risk-strip" style="display:none;"></div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('health',this)">My Health</button>
+      <button class="tab" onclick="switchTab('goals',this)">Goals</button>
+      <button class="tab" onclick="switchTab('sessions',this)">Sessions</button>
+    </div>
+
+    <!-- Health tab -->
+    <div id="tab-health">
+      <div id="bio-section"><div class="empty">No biometric data on file yet.</div></div>
+    </div>
+
+    <!-- Goals tab -->
+    <div id="tab-goals" style="display:none;">
+      <div id="goals-section"><div class="empty">No goals set yet. Ask your coach to add goals for you.</div></div>
+    </div>
+
+    <!-- Sessions tab -->
+    <div id="tab-sessions" style="display:none;">
+      <div id="sessions-section"><div class="empty">No sessions on file yet.</div></div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, participant=null, sessions=[], goals=[];
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; document.getElementById('logout-btn').style.display='none'; });
+
+async function boot(user) {
+  document.getElementById('login-wall').style.display='none';
+  document.getElementById('content').style.display='';
+  document.getElementById('logout-btn').style.display='';
+  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+
+  const hdr={Authorization:'Bearer '+authToken};
+  // Look up participant by email
+  try {
+    const list=await fetch(`/api/participants?search=${encodeURIComponent(user.email)}`,{headers:hdr}).then(r=>r.json());
+    const me=list.find(p=>p.email.toLowerCase()===user.email.toLowerCase());
+    if(!me){ document.getElementById('content').innerHTML='<div class="empty" style="padding:60px 20px;">No participant record found for your account.<br><small>Contact your wellness coordinator.</small></div>'; return; }
+
+    [participant, sessions, goals] = await Promise.all([
+      fetch(`/api/participants?id=${me.id}`,{headers:hdr}).then(r=>r.json()),
+      fetch(`/api/sessions?participant_id=${me.id}`,{headers:hdr}).then(r=>r.json()),
+      fetch(`/api/goals?participant_id=${me.id}`,{headers:hdr}).then(r=>r.json()),
+    ]);
+
+    renderHeader();
+    renderHealth();
+    renderGoals();
+    renderSessions();
+  } catch(e){ showToast('Error loading your data'); }
+}
+
+function renderHeader() {
+  const p=participant;
+  const initials=((p.first_name||'')[0]+(p.last_name||'')[0]).toUpperCase();
+  document.getElementById('p-avatar').textContent=initials;
+  document.getElementById('p-name').textContent=p.first_name+' '+p.last_name;
+  const meta=[];
+  if(p.org_name) meta.push(p.org_name);
+  if(p.coach_name) meta.push('Coach: '+p.coach_name);
+  document.getElementById('p-meta').textContent=meta.join(' · ');
+
+  const bio=p.biometrics?.[0];
+  if(bio?.overall_risk){
+    document.getElementById('p-risk-badge').innerHTML=`<span class="badge badge-${bio.overall_risk}">Overall Risk: ${bio.overall_risk}</span>`;
+    const strip=document.getElementById('risk-strip');
+    strip.style.display='flex';
+    const items=[
+      {label:'Blood Pressure',value:bio.systolic_bp?`${bio.systolic_bp}/${bio.diastolic_bp}`:'—',risk:bio.bp_risk},
+      {label:'Cholesterol',value:bio.total_cholesterol?bio.total_cholesterol+' mg/dL':'—',risk:bio.cholesterol_risk},
+      {label:'Blood Glucose',value:bio.blood_glucose?bio.blood_glucose+' mg/dL':'—',risk:bio.glucose_risk},
+      {label:'BMI',value:bio.bmi?Number(bio.bmi).toFixed(1):'—',risk:bio.bmi_category},
+    ];
+    strip.innerHTML=items.map(i=>`<div class="risk-item">
+      <div class="risk-item-value">${esc(String(i.value))}</div>
+      <div class="risk-item-label">${i.label}${i.risk?`<br><span class="badge badge-${i.risk}" style="font-size:.62rem;">${i.risk.replace('_',' ')}</span>`:''}</div>
+    </div>`).join('');
+  }
+}
+
+function renderHealth() {
+  const bio=participant.biometrics;
+  if(!bio||!bio.length){ return; }
+
+  const sections=bio.map((b,idx)=>{
+    const tiles=[
+      {label:'Height',value:b.height_in?`${Math.floor(b.height_in/12)}\'${b.height_in%12}"`:null},
+      {label:'Weight',value:b.weight_lbs?b.weight_lbs+' lbs':null},
+      {label:'BMI',value:b.bmi?Number(b.bmi).toFixed(1):null,risk:riskClass(b.bmi_category)},
+      {label:'Waist',value:b.waist_circumference_in?b.waist_circumference_in+'"':null},
+      {label:'Blood Pressure',value:b.systolic_bp?`${b.systolic_bp}/${b.diastolic_bp}`:null,risk:riskClass(b.bp_risk)},
+      {label:'Heart Rate',value:b.heart_rate?b.heart_rate+' bpm':null},
+      {label:'Total Chol.',value:b.total_cholesterol?b.total_cholesterol+' mg/dL':null,risk:riskClass(b.cholesterol_risk)},
+      {label:'HDL',value:b.hdl_cholesterol?b.hdl_cholesterol+' mg/dL':null},
+      {label:'LDL',value:b.ldl_cholesterol?b.ldl_cholesterol+' mg/dL':null},
+      {label:'Blood Glucose',value:b.blood_glucose?b.blood_glucose+' mg/dL':null,risk:riskClass(b.glucose_risk)},
+      {label:'HbA1c',value:b.hba1c?b.hba1c+'%':null},
+    ].filter(t=>t.value);
+
+    return `<div class="card" style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:0;">${idx===0?'Latest Results':'Screening '+fmtDate(b.screened_at)}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:.78rem;color:var(--gray-400);">${fmtDate(b.screened_at)}</span>
+          ${b.overall_risk?`<span class="badge badge-${b.overall_risk}">${b.overall_risk}</span>`:''}
+        </div>
+      </div>
+      <div class="biometric-grid">
+        ${tiles.map(t=>`<div class="bio-tile${t.risk?' '+t.risk:''}">
+          <div class="bio-tile-value">${esc(t.value)}</div>
+          <div class="bio-tile-label">${t.label}</div>
+        </div>`).join('')}
+      </div>
+      ${b.notes?`<div style="margin-top:10px;font-size:.82rem;color:var(--gray-600);padding:10px;background:var(--gray-50);border-radius:6px;">${esc(b.notes)}</div>`:''}
+    </div>`;
+  });
+
+  document.getElementById('bio-section').innerHTML=sections.join('');
+}
+
+function renderGoals() {
+  if(!goals.length) return;
+  const active=goals.filter(g=>g.status==='active'||g.status==='achieved');
+  const el=document.getElementById('goals-section');
+  if(!active.length){ el.innerHTML='<div class="empty">No active goals.</div>'; return; }
+  el.innerHTML=active.map(g=>`
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+        <div style="flex:1;">
+          <div style="font-weight:600;font-size:.95rem;">${esc(g.title)}</div>
+          ${g.description?`<div style="font-size:.82rem;color:var(--gray-600);margin-top:4px;">${esc(g.description)}</div>`:''}
+          <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <span class="badge badge-${g.status==='achieved'?'achieved':'active'}">${g.status}</span>
+            <span style="font-size:.75rem;color:var(--gray-400);">${g.category}</span>
+            ${g.target_date?`<span style="font-size:.75rem;color:var(--gray-400);">Target: ${fmtDate(g.target_date)}</span>`:''}
+          </div>
+          ${g.status==='active'?`<div class="goal-progress"><div class="goal-progress-fill" style="width:${g.status==='achieved'?'100':'40'}%;"></div></div>`:''}
+          ${g.progress_notes?`<div style="margin-top:8px;font-size:.8rem;color:var(--gray-600);padding:8px;background:var(--gray-50);border-radius:6px;">${esc(g.progress_notes)}</div>`:''}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderSessions() {
+  if(!sessions.length) return;
+  const now=new Date();
+  const upcoming=sessions.filter(s=>new Date(s.scheduled_at)>=now&&s.status==='scheduled').sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
+  const past=sessions.filter(s=>new Date(s.scheduled_at)<now||s.status!=='scheduled').sort((a,b)=>new Date(b.scheduled_at)-new Date(a.scheduled_at));
+
+  let html='';
+  if(upcoming.length){
+    html+=`<div style="margin-bottom:20px;">
+      <div style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--teal);margin-bottom:10px;">Upcoming</div>
+      ${upcoming.map(s=>`<div class="card" style="margin-bottom:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-weight:600;">${fmtDt(s.scheduled_at)}</div>
+            <div style="font-size:.8rem;color:var(--gray-400);margin-top:2px;">${s.session_type.replace('_',' ')} · ${s.duration_minutes} min${s.coach_name?' · '+esc(s.coach_name):''}</div>
+          </div>
+          <span class="badge badge-scheduled">Scheduled</span>
+        </div>
+        ${s.intake_notes?`<div style="margin-top:8px;font-size:.82rem;color:var(--gray-600);">${esc(s.intake_notes)}</div>`:''}
+      </div>`).join('')}
+    </div>`;
+  }
+  if(past.length){
+    html+=`<div>
+      <div style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-400);margin-bottom:10px;">Past Sessions</div>
+      <div class="timeline">
+        ${past.map(s=>`<div class="timeline-item">
+          <div class="timeline-dot${s.status==='completed'?'':' style="background:var(--gray-400);"'}"></div>
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+              <div>
+                <div style="font-weight:600;font-size:.88rem;">${fmtDt(s.scheduled_at)}</div>
+                <div style="font-size:.78rem;color:var(--gray-400);">${s.session_type.replace('_',' ')} · ${s.duration_minutes} min</div>
+              </div>
+              <span class="badge badge-${s.status}">${s.status.replace('_',' ')}</span>
+            </div>
+            ${s.stage_of_change?`<div style="margin-top:6px;font-size:.78rem;color:var(--teal);font-weight:500;">Stage of Change: ${s.stage_of_change}</div>`:''}
+            ${s.session_notes?`<div style="margin-top:8px;font-size:.82rem;color:var(--gray-600);line-height:1.5;">${esc(s.session_notes)}</div>`:''}
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
+  document.getElementById('sessions-section').innerHTML=html||'<div class="empty">No sessions on file yet.</div>';
+}
+
+function riskClass(risk){
+  if(!risk) return null;
+  if(['high_1','high_2','crisis','high','very_high','diabetes','obese'].includes(risk)) return 'risk-high';
+  if(['elevated','borderline','prediabetes','overweight','moderate'].includes(risk)) return 'risk-moderate';
+  return 'risk-normal';
+}
+
+function switchTab(tab,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  ['health','goals','sessions'].forEach(t=>document.getElementById('tab-'+t).style.display=t===tab?'':'none');
+}
+
+function fmtDt(iso){ return new Date(iso).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }
+function fmtDate(d){ return d?new Date(d.includes('T')?d:d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''; }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 38" fill="none">
+  <!-- Three leaves fanned from a common stem base at (20,36) -->
+  <!-- Left leaf: rotated -30° -->
+  <ellipse cx="20" cy="18" rx="5" ry="14" fill="rgba(255,255,255,0.68)"
+           transform="rotate(-30,20,36)"/>
+  <!-- Center leaf: straight up, tallest -->
+  <ellipse cx="20" cy="15" rx="5.5" ry="16" fill="white"/>
+  <!-- Right leaf: rotated +24° -->
+  <ellipse cx="20" cy="18" rx="5" ry="14" fill="rgba(255,255,255,0.82)"
+           transform="rotate(24,20,36)"/>
+</svg>
