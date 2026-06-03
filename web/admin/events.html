@@ -8,134 +8,578 @@
 </head>
 <body>
 <header class="header">
-  <a class="header-logo" href="/admin/"><img src="/assets/img/logo-icon.svg" alt="">Health<span>you</span></a>
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo.png" alt="Healthyou"></a>
   <div style="display:flex;align-items:center;gap:12px;">
     <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
     <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
   </div>
 </header>
-<nav class="subnav">
-  <a href="/admin/" class="subnav-item">Dashboard</a>
-  <a href="/admin/organizations.html" class="subnav-item">Organizations</a>
-  <a href="/admin/participants.html" class="subnav-item">Participants</a>
-  <a href="/admin/coaches.html" class="subnav-item">Coaches</a>
-  <a href="/admin/events.html" class="subnav-item active">Screening Events</a>
-</nav>
-<main class="container">
-  <div id="login-wall" class="login-wall"><h2>Admin Portal</h2><p>Sign in to continue.</p><button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button></div>
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <div class="sidebar-section" style="margin-top:12px;">Users</div>
+    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <a href="/admin/organizations.html" class="sidebar-item">Organizations</a>
+    <div class="sidebar-section" style="margin-top:12px;">Programs</div>
+    <a href="/admin/events.html" class="sidebar-item active">Screening Events</a>
+    <div class="sidebar-section" style="margin-top:12px;">Communication</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/settings.html" class="sidebar-item">System Settings</a>
+    <div class="sidebar-section" style="margin-top:12px;">Portals</div>
+    <a href="/coach/" class="sidebar-item">Coach Portal →</a>
+    <a href="/screener/" class="sidebar-item">Screener Portal →</a>
+    <a href="/book/" class="sidebar-item">Booking Page →</a>
+  </nav>
+</aside>
+
+<main class="container has-sidebar">
+  <div id="login-wall" class="login-wall">
   <div id="content" style="display:none;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-      <div><h1 class="page-title" style="margin-bottom:2px;">Screening Events</h1><p style="color:var(--gray-400);font-size:.88rem;">Schedule and manage biometric screening events.</p></div>
-      <div style="display:flex;gap:8px;">
-        <a href="/screener/" class="btn btn-ghost">Open Screener Portal →</a>
-        <button class="btn btn-primary" onclick="openModal()">+ New Event</button>
+
+    <!-- ── LIST VIEW ── -->
+    <div id="view-list">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div>
+          <h1 class="page-title" style="margin-bottom:2px;">Screening Events</h1>
+          <p style="color:var(--gray-400);font-size:.88rem;">Schedule, manage, and register participants for biometric screening events.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openEventModal()">+ New Event</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <table class="data-table">
+          <thead><tr>
+            <th>Event</th><th>Date</th><th>Organization</th><th>Type</th>
+            <th style="text-align:center;">Registered</th><th style="text-align:center;">Screened</th>
+            <th>Status</th><th style="width:140px;">Actions</th>
+          </tr></thead>
+          <tbody id="tbody"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+        </table>
       </div>
     </div>
-    <div class="card" style="padding:0;overflow:hidden;">
-      <table class="data-table">
-        <thead><tr><th>Event</th><th>Date</th><th>Organization</th><th>Type</th><th>Screened</th><th>Status</th><th style="width:120px;">Actions</th></tr></thead>
-        <tbody id="tbody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
-      </table>
-    </div>
-  </div>
+
+    <!-- ── DETAIL VIEW ── -->
+    <div id="view-detail" style="display:none;">
+      <button class="btn btn-ghost btn-sm" onclick="backToList()" style="margin-bottom:16px;">← Back to Events</button>
+
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+            <h1 class="page-title" id="ev-name" style="margin-bottom:0;"></h1>
+            <span id="ev-status-badge"></span>
+            <span id="ev-type-badge"></span>
+          </div>
+          <div style="font-size:.84rem;color:var(--gray-400);" id="ev-meta"></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="openEventModal(activeEvent&&activeEvent.id)">Edit Event</button>
+      </div>
+
+      <div class="tabs">
+        <button class="tab event-tab active" data-tab="overview" onclick="switchEventTab('overview',this)">Overview</button>
+        <button class="tab event-tab" data-tab="participants" onclick="switchEventTab('participants',this)">Participants</button>
+        <button class="tab event-tab" data-tab="registration" onclick="switchEventTab('registration',this)">Registration Link</button>
+      </div>
+
+      <!-- Overview tab -->
+      <div id="et-overview">
+        <div class="stats-grid" style="margin-bottom:20px;">
+          <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-value" id="ov-registered">—</div><div class="stat-label">Registered</div></div>
+          <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value" id="ov-screened">—</div><div class="stat-label">Screened</div></div>
+          <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-value" id="ov-date" style="font-size:1.1rem;">—</div><div class="stat-label">Event Date</div></div>
+          <div class="stat-card"><div class="stat-icon">📍</div><div class="stat-value" id="ov-location" style="font-size:.9rem;line-height:1.3;">—</div><div class="stat-label">Location</div></div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div style="padding:14px 18px;border-bottom:1px solid var(--gray-100);display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-weight:600;font-size:.93rem;">Recent Screenings</span>
+            <button class="btn btn-ghost btn-sm" onclick="switchEventTab('participants',document.querySelector('[data-tab=participants]'))">View All →</button>
+          </div>
+          <table class="data-table">
+            <thead><tr><th>Participant</th><th>Screened</th><th>BMI</th><th>BP</th><th>Risk</th></tr></thead>
+            <tbody id="ov-screenings-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Participants tab -->
+      <div id="et-participants" style="display:none;">
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-title">Upload Participant File</div>
+          <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:14px;">
+            Upload a CSV to register participants for this event. Existing participants matched by email will be updated.
+            Accepted columns: <code style="font-size:.78rem;background:var(--gray-100);padding:1px 6px;border-radius:4px;">first_name, last_name, email, employee_id, date_of_birth, gender, phone, department</code>
+          </p>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <input type="file" id="pt-csv-file" accept=".csv,.txt" onchange="previewPtCSV()" style="flex:1;min-width:200px;font-size:.85rem;"/>
+            <button class="btn btn-primary" id="pt-upload-btn" onclick="uploadPtCSV()" disabled>Upload Participants</button>
+          </div>
+          <div id="pt-csv-preview" style="display:none;margin-top:16px;">
+            <div style="font-size:.82rem;margin-bottom:8px;" id="pt-preview-label"></div>
+            <div style="overflow-x:auto;max-height:160px;border:1px solid var(--gray-200);border-radius:var(--radius);">
+              <table class="data-table" id="pt-preview-table" style="font-size:.78rem;"></table>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-header" style="margin-bottom:14px;">
+          <h3>Registered Participants <span id="pt-count" style="font-size:.8rem;font-weight:400;color:var(--gray-400);"></span></h3>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="search-bar" style="width:220px;">
+              <input id="pt-search" type="text" placeholder="Search name or email…" oninput="debouncePtSearch()"/>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openAddModal()">+ Add Individual</button>
+          </div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <table class="data-table">
+            <thead><tr>
+              <th>Name</th><th>Email</th><th>Emp ID</th><th>Department</th>
+              <th>Status</th><th>Risk</th><th style="width:80px;">Actions</th>
+            </tr></thead>
+            <tbody id="pt-tbody"><tr><td colspan="7" class="empty">No participants registered yet.</td></tr></tbody>
+          </table>
+        </div>
+        <div id="pt-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;font-size:.82rem;color:var(--gray-400);"></div>
+      </div>
+
+      <!-- Registration Link tab -->
+      <div id="et-registration" style="display:none;">
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-title">Participant Self-Registration Link</div>
+          <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:16px;">
+            Share this link with participants so they can register for this screening event before it takes place.
+          </p>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="reg-link" type="text" readonly style="flex:1;background:var(--gray-50);font-size:.88rem;font-family:monospace;"/>
+            <button class="btn btn-primary" onclick="copyRegLink()">Copy Link</button>
+            <a id="reg-link-open" href="#" target="_blank" class="btn btn-ghost">Open →</a>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">How It Works</div>
+          <div style="font-size:.88rem;color:var(--gray-600);line-height:2;">
+            <div>1. Copy the link above and distribute it via email, your HR system, or a company bulletin.</div>
+            <div>2. Participants open the link and enter their name, email, and optional details (employee ID, department, date of birth).</div>
+            <div>3. Registered participants appear in the <strong>Participants</strong> tab and in the screener portal lookup.</div>
+            <div>4. Alternatively, upload a CSV of participants directly in the <strong>Participants</strong> tab.</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /view-detail -->
+
+  </div><!-- /content -->
 </main>
-<div id="modal-backdrop" class="modal-backdrop" style="display:none;" onclick="closeOuter(event)">
+
+<!-- Edit / Create Event Modal -->
+<div id="event-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'event-modal')">
   <div class="modal">
-    <div class="modal-title" id="modal-title">New Screening Event</div>
+    <div class="modal-title" id="em-title">New Screening Event</div>
     <div class="form-grid full">
-      <div class="form-group"><label>Event Name *</label><input id="f-name" type="text" placeholder="Q1 Wellness Screening"/></div>
-      <div class="form-group"><label>Event Date *</label><input id="f-date" type="date"/></div>
-      <div class="form-group"><label>Organization</label><select id="f-org"><option value="">— none —</option></select></div>
+      <div class="form-group"><label>Event Name *</label><input id="em-name" type="text" placeholder="Q1 Wellness Screening"/></div>
+      <div class="form-group"><label>Event Date *</label><input id="em-date" type="date"/></div>
+      <div class="form-group"><label>Organization</label><select id="em-org"><option value="">— none —</option></select></div>
       <div class="form-group"><label>Type</label>
-        <select id="f-type"><option value="onsite">On-site</option><option value="virtual">Virtual</option><option value="self_reported">Self-Reported</option></select>
+        <select id="em-type">
+          <option value="onsite">On-site</option>
+          <option value="virtual">Virtual</option>
+          <option value="self_reported">Self-Reported</option>
+        </select>
       </div>
-      <div class="form-group span-2"><label>Location</label><input id="f-loc" type="text" placeholder="Building A, Room 101"/></div>
-      <div class="form-group span-2"><label>Notes</label><textarea id="f-notes" rows="2"></textarea></div>
+      <div class="form-group span-2"><label>Location</label><input id="em-loc" type="text" placeholder="Building A, Room 101"/></div>
+      <div class="form-group span-2"><label>Notes</label><textarea id="em-notes" rows="2"></textarea></div>
     </div>
-    <div id="modal-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div id="em-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" id="save-btn" onclick="save()">Create Event</button>
+      <button class="btn btn-ghost" onclick="closeModal('event-modal')">Cancel</button>
+      <button class="btn btn-primary" id="em-btn" onclick="saveEvent()">Create Event</button>
     </div>
   </div>
 </div>
+
+<!-- Add Individual Participant Modal -->
+<div id="add-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'add-modal')">
+  <div class="modal">
+    <div class="modal-title">Add Participant</div>
+    <div class="form-grid" style="gap:14px;">
+      <div class="form-group"><label>First Name *</label><input id="am-first" type="text"/></div>
+      <div class="form-group"><label>Last Name *</label><input id="am-last" type="text"/></div>
+      <div class="form-group span-2"><label>Email *</label><input id="am-email" type="email"/></div>
+      <div class="form-group"><label>Employee ID</label><input id="am-empid" type="text"/></div>
+      <div class="form-group"><label>Department</label><input id="am-dept" type="text"/></div>
+      <div class="form-group"><label>Date of Birth</label><input id="am-dob" type="date"/></div>
+      <div class="form-group"><label>Phone</label><input id="am-phone" type="tel"/></div>
+    </div>
+    <div id="am-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('add-modal')">Cancel</button>
+      <button class="btn btn-primary" id="am-btn" onclick="saveParticipant()">Add Participant</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <script>
-let authToken=null, events=[], orgs=[], editId=null;
+let authToken=null, events=[], orgs=[], editEventId=null;
+let activeEvent=null, ptLoaded=false;
+let ptParsed=[], ptOffset=0, ptTotal=0, ptSearchTimer=null;
+const PT_LIMIT=50;
 const STATUS_OPTS=['scheduled','in_progress','completed','cancelled'];
 
-netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} });
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} else { location.href='/admin/login.html'; } });
 netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
-netlifyIdentity.on('logout',()=>{ document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; });
+netlifyIdentity.on('logout',()=>{ location.href='/admin/login.html'; });
 
-async function boot(u){
-  document.getElementById('login-wall').style.display='none'; document.getElementById('content').style.display='';
+async function boot(u) {
+  document.getElementById('content').style.display='';
   document.getElementById('header-name').textContent=u.user_metadata?.full_name||u.email;
   orgs=await fetch('/api/organizations',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
-  const sel=document.getElementById('f-org'); orgs.forEach(o=>sel.add(new Option(o.name,o.id)));
+  const sel=document.getElementById('em-org');
+  orgs.forEach(o=>sel.add(new Option(o.name,o.id)));
   load();
 }
 
-async function load(){
+async function load() {
   try {
     events=await fetch('/api/events',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
-    document.getElementById('tbody').innerHTML=!events.length
-      ?'<tr><td colspan="7" class="empty">No events yet.</td></tr>'
-      :events.map(e=>`<tr>
-          <td><strong>${esc(e.name)}</strong>${e.location?`<br><span style="font-size:.78rem;color:var(--gray-400)">${esc(e.location)}</span>`:''}</td>
-          <td>${fmtDate(e.event_date)}</td>
-          <td>${esc(e.org_name||'—')}</td>
-          <td><span class="badge badge-${e.event_type}">${e.event_type.replace('_',' ')}</span></td>
-          <td style="text-align:center;font-weight:600">${e.screened_count}</td>
-          <td>
-            <select onchange="updateStatus(${e.id},this.value)" class="btn btn-ghost btn-sm" style="padding:3px 8px;">
-              ${STATUS_OPTS.map(s=>`<option value="${s}"${s===e.status?' selected':''}>${s.replace('_',' ')}</option>`).join('')}
-            </select>
-          </td>
-          <td><div class="actions">
-            <button class="btn btn-ghost btn-sm" onclick="openModal(${e.id})">Edit</button>
-            <a href="/screener/?event=${e.id}" class="btn btn-ghost btn-sm">Screen</a>
-          </div></td>
-        </tr>`).join('');
-  } catch(e){ showToast('Error: '+e.message); }
+    renderList();
+  } catch(e){ showToast('Error loading events: '+e.message); }
 }
 
-function openModal(id){
-  editId=id||null;
-  document.getElementById('modal-err').style.display='none';
-  document.getElementById('modal-title').textContent=id?'Edit Event':'New Screening Event';
-  document.getElementById('save-btn').textContent=id?'Save Changes':'Create Event';
-  if(id){ const ev=events.find(x=>x.id===id);
-    document.getElementById('f-name').value=ev.name; document.getElementById('f-date').value=ev.event_date?.split('T')[0]||ev.event_date;
-    document.getElementById('f-org').value=ev.org_id||''; document.getElementById('f-type').value=ev.event_type;
-    document.getElementById('f-loc').value=ev.location||''; document.getElementById('f-notes').value=ev.notes||'';
-  } else { ['f-name','f-date','f-loc','f-notes'].forEach(i=>document.getElementById(i).value=''); document.getElementById('f-org').value=''; document.getElementById('f-type').value='onsite'; }
-  document.getElementById('modal-backdrop').style.display='flex';
+function renderList() {
+  document.getElementById('tbody').innerHTML=!events.length
+    ?'<tr><td colspan="8" class="empty">No events yet. Create one to get started.</td></tr>'
+    :events.map(e=>`<tr>
+        <td>
+          <strong style="cursor:pointer;color:var(--teal);" onclick="openEvent(${e.id})">${esc(e.name)}</strong>
+          ${e.location?`<br><span style="font-size:.78rem;color:var(--gray-400);">${esc(e.location)}</span>`:''}
+        </td>
+        <td>${fmtDate(e.event_date)}</td>
+        <td>${esc(e.org_name||'—')}</td>
+        <td><span class="badge badge-${e.event_type}">${e.event_type.replace('_',' ')}</span></td>
+        <td style="text-align:center;font-weight:600;">${e.registered_count||0}</td>
+        <td style="text-align:center;font-weight:600;">${e.screened_count||0}</td>
+        <td>
+          <select onchange="updateStatus(${e.id},this.value)" class="btn btn-ghost btn-sm" style="padding:3px 8px;">
+            ${STATUS_OPTS.map(s=>`<option value="${s}"${s===e.status?' selected':''}>${s.replace('_',' ')}</option>`).join('')}
+          </select>
+        </td>
+        <td><div class="actions">
+          <button class="btn btn-primary btn-sm" onclick="openEvent(${e.id})">Open</button>
+          <button class="btn btn-ghost btn-sm" onclick="openEventModal(${e.id})">Edit</button>
+        </div></td>
+      </tr>`).join('');
 }
-function closeModal(){ document.getElementById('modal-backdrop').style.display='none'; }
-function closeOuter(e){ if(e.target===document.getElementById('modal-backdrop'))closeModal(); }
 
-async function save(){
-  const name=document.getElementById('f-name').value.trim(), date=document.getElementById('f-date').value;
-  if(!name||!date){ showErr('Name and date are required.'); return; }
-  const btn=document.getElementById('save-btn'); btn.disabled=true; btn.textContent='Saving…';
+// ── Event detail ──────────────────────────────────────────────────────────────
+function openEvent(id) {
+  activeEvent=events.find(e=>e.id===id);
+  if(!activeEvent) return;
+  ptLoaded=false; ptParsed=[];
+
+  document.getElementById('ev-name').textContent=activeEvent.name;
+  document.getElementById('ev-status-badge').innerHTML=`<span class="badge badge-${activeEvent.status}">${activeEvent.status.replace('_',' ')}</span>`;
+  document.getElementById('ev-type-badge').innerHTML=`<span class="badge badge-${activeEvent.event_type}">${activeEvent.event_type.replace('_',' ')}</span>`;
+  const meta=[];
+  if(activeEvent.event_date) meta.push(fmtDate(activeEvent.event_date));
+  if(activeEvent.location) meta.push(activeEvent.location);
+  if(activeEvent.org_name) meta.push(activeEvent.org_name);
+  document.getElementById('ev-meta').textContent=meta.join(' · ');
+
+  document.getElementById('ov-registered').textContent=activeEvent.registered_count||0;
+  document.getElementById('ov-screened').textContent=activeEvent.screened_count||0;
+  document.getElementById('ov-date').textContent=activeEvent.event_date?fmtDate(activeEvent.event_date):'—';
+  document.getElementById('ov-location').textContent=activeEvent.location||'TBD';
+
+  document.getElementById('view-list').style.display='none';
+  document.getElementById('view-detail').style.display='';
+
+  document.querySelectorAll('.event-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelector('[data-tab="overview"]').classList.add('active');
+  ['overview','participants','registration'].forEach(t=>
+    document.getElementById('et-'+t).style.display=t==='overview'?'':'none'
+  );
+  loadOverview();
+}
+
+function backToList() {
+  activeEvent=null; ptLoaded=false;
+  document.getElementById('view-detail').style.display='none';
+  document.getElementById('view-list').style.display='';
+}
+
+function switchEventTab(tab, el) {
+  document.querySelectorAll('.event-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  ['overview','participants','registration'].forEach(t=>
+    document.getElementById('et-'+t).style.display=t===tab?'':'none'
+  );
+  if(tab==='participants'&&!ptLoaded) loadParticipants(0);
+  if(tab==='registration') renderRegTab();
+}
+
+// ── Overview tab ──────────────────────────────────────────────────────────────
+async function loadOverview() {
   try {
-    const body={name,event_date:date,org_id:document.getElementById('f-org').value||null,event_type:document.getElementById('f-type').value,location:document.getElementById('f-loc').value||null,notes:document.getElementById('f-notes').value||null};
-    if(editId) body.id=editId;
-    const r=await fetch('/api/events',{method:editId?'PUT':'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify(body)});
-    if(!r.ok){ showErr((await r.json()).error||'Save failed'); return; }
-    closeModal(); showToast(editId?'Event updated':'Event created'); load();
-  } catch(e){ showErr(e.message); } finally{ btn.disabled=false; }
+    const screenings=await fetch(`/api/biometrics?event_id=${activeEvent.id}`,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+    const tbody=document.getElementById('ov-screenings-tbody');
+    if(!screenings.length){
+      tbody.innerHTML='<tr><td colspan="5" class="empty">No screenings recorded for this event yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML=screenings.slice(0,10).map(s=>`<tr>
+      <td><strong>${esc(s.last_name)}, ${esc(s.first_name)}</strong></td>
+      <td style="font-size:.82rem;">${fmtDate(s.screened_at)}</td>
+      <td>${s.bmi||'—'}</td>
+      <td>${s.systolic_bp?s.systolic_bp+'/'+s.diastolic_bp:'—'}</td>
+      <td>${s.overall_risk?`<span class="badge badge-${s.overall_risk}">${s.overall_risk}</span>`:'—'}</td>
+    </tr>`).join('');
+  } catch(e){ showToast('Error loading screenings'); }
 }
 
-async function updateStatus(id,status){
-  try { await fetch('/api/events',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({id,status})}); showToast('Status updated'); }
-  catch(e){ showToast('Error: '+e.message); }
+// ── Participants tab ──────────────────────────────────────────────────────────
+async function loadParticipants(offset=0) {
+  ptOffset=offset; ptLoaded=true;
+  const search=(document.getElementById('pt-search')||{}).value||'';
+  const url=`/api/event-participants?event_id=${activeEvent.id}&limit=${PT_LIMIT}&offset=${offset}`+(search?'&search='+encodeURIComponent(search):'');
+  try {
+    const data=await fetch(url,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+    ptTotal=data.total;
+    renderParticipants(data.records, data.total);
+  } catch(e){ showToast('Error loading participants'); }
 }
 
-function fmtDate(d){ return d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'; }
-function showErr(m){ const e=document.getElementById('modal-err'); e.textContent=m; e.style.display=''; }
+function renderParticipants(records, total) {
+  document.getElementById('pt-count').textContent=total?`(${total.toLocaleString()})`:'';
+  const tbody=document.getElementById('pt-tbody');
+  if(!records.length){
+    tbody.innerHTML='<tr><td colspan="7" class="empty">No participants registered yet. Upload a CSV or add individuals using the controls above.</td></tr>';
+    document.getElementById('pt-pagination').innerHTML='';
+    return;
+  }
+  tbody.innerHTML=records.map(r=>`<tr>
+    <td><strong>${esc(r.last_name)}, ${esc(r.first_name)}</strong></td>
+    <td style="font-size:.84rem;">${esc(r.email||'—')}</td>
+    <td style="font-family:monospace;font-size:.82rem;">${esc(r.employee_id||'—')}</td>
+    <td style="font-size:.82rem;">${esc(r.department||'—')}</td>
+    <td>${r.bio_id?`<span class="badge badge-completed">Screened</span>`:`<span class="badge badge-scheduled">Registered</span>`}</td>
+    <td>${r.overall_risk?`<span class="badge badge-${r.overall_risk}">${r.overall_risk}</span>`:'—'}</td>
+    <td><button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);" onclick="removeParticipant(${r.id})">Remove</button></td>
+  </tr>`).join('');
+
+  const pages=Math.ceil(total/PT_LIMIT), page=Math.floor(ptOffset/PT_LIMIT)+1;
+  const pg=document.getElementById('pt-pagination');
+  if(pages<=1){pg.innerHTML='';return;}
+  const start=((page-1)*PT_LIMIT+1).toLocaleString(), end=Math.min(page*PT_LIMIT,total).toLocaleString();
+  pg.innerHTML=`<span>Page ${page} of ${pages} (${start}–${end} of ${total.toLocaleString()})</span>
+    <div style="display:flex;gap:6px;">
+      <button class="btn btn-ghost btn-sm" onclick="loadParticipants(${ptOffset-PT_LIMIT})" ${ptOffset===0?'disabled':''}>← Prev</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadParticipants(${ptOffset+PT_LIMIT})" ${ptOffset+PT_LIMIT>=total?'disabled':''}>Next →</button>
+    </div>`;
+}
+
+function debouncePtSearch(){
+  clearTimeout(ptSearchTimer);
+  ptSearchTimer=setTimeout(()=>loadParticipants(0),320);
+}
+
+// ── CSV upload ────────────────────────────────────────────────────────────────
+function parsePtCSV(text) {
+  const lines=text.trim().split(/\r?\n/);
+  if(lines.length<2) return [];
+  const parseRow=line=>{
+    const fields=[]; let f='',q=false;
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c==='"'){q=!q;}else if(c===','&&!q){fields.push(f.trim());f='';}else f+=c;
+    }
+    fields.push(f.trim()); return fields;
+  };
+  const ALIASES={
+    employee_id:['employee_id','emp_id','employeeid'],
+    first_name:['first_name','firstname','first'],
+    last_name:['last_name','lastname','last'],
+    email:['email','email_address'],
+    date_of_birth:['date_of_birth','dob','birthdate'],
+    gender:['gender','sex'],
+    phone:['phone','phone_number','telephone'],
+    department:['department','dept'],
+  };
+  const rawH=parseRow(lines[0]).map(h=>h.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,''));
+  const hdrs=rawH.map(h=>{ for(const[k,a] of Object.entries(ALIASES)) if(a.includes(h)) return k; return h; });
+  return lines.slice(1).filter(l=>l.trim()).map(line=>{
+    const vals=parseRow(line),rec={};
+    hdrs.forEach((h,i)=>{rec[h]=vals[i]||null;});
+    return rec;
+  });
+}
+
+function previewPtCSV() {
+  const file=document.getElementById('pt-csv-file').files[0];
+  const btn=document.getElementById('pt-upload-btn');
+  if(!file){btn.disabled=true;return;}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    ptParsed=parsePtCSV(e.target.result);
+    const preview=document.getElementById('pt-csv-preview');
+    const label=document.getElementById('pt-preview-label');
+    if(!ptParsed.length){
+      label.innerHTML='<span style="color:var(--red);">No valid rows found — check CSV format.</span>';
+      preview.style.display=''; btn.disabled=true; return;
+    }
+    label.innerHTML=`<strong>${ptParsed.length.toLocaleString()}</strong> rows parsed — preview of first 5:`;
+    const cols=Object.keys(ptParsed[0]);
+    document.getElementById('pt-preview-table').innerHTML=
+      `<thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead>`+
+      `<tbody>${ptParsed.slice(0,5).map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c]||'')}</td>`).join('')}</tr>`).join('')}</tbody>`;
+    preview.style.display=''; btn.disabled=false;
+  };
+  reader.readAsText(file);
+}
+
+async function uploadPtCSV() {
+  if(!ptParsed.length) return;
+  if(!confirm(`Register ${ptParsed.length.toLocaleString()} participants for this event?`)) return;
+  const btn=document.getElementById('pt-upload-btn'); btn.disabled=true; btn.textContent='Uploading…';
+  try {
+    const r=await fetch('/api/event-participants',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+      body:JSON.stringify({event_id:activeEvent.id,org_id:activeEvent.org_id,records:ptParsed})});
+    if(!r.ok){showToast('Error: '+((await r.json()).error||'Upload failed'));return;}
+    const j=await r.json();
+    showToast(`${j.inserted} new participants registered`);
+    document.getElementById('pt-csv-file').value='';
+    document.getElementById('pt-csv-preview').style.display='none';
+    ptParsed=[]; ptLoaded=false; loadParticipants(0);
+    const updEvts=await fetch('/api/events',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+    events=updEvts; const ae=events.find(e=>e.id===activeEvent.id);
+    if(ae){ activeEvent=ae; document.getElementById('ov-registered').textContent=ae.registered_count||0; }
+  } catch(e){showToast('Error: '+e.message);}
+  finally{btn.disabled=false; btn.textContent='Upload Participants';}
+}
+
+// ── Add individual ────────────────────────────────────────────────────────────
+function openAddModal() {
+  ['am-first','am-last','am-email','am-empid','am-dept','am-phone'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('am-dob').value='';
+  document.getElementById('am-err').style.display='none';
+  document.getElementById('add-modal').style.display='flex';
+  document.getElementById('am-first').focus();
+}
+
+async function saveParticipant() {
+  const first=document.getElementById('am-first').value.trim();
+  const last=document.getElementById('am-last').value.trim();
+  const email=document.getElementById('am-email').value.trim();
+  if(!first||!last||!email){showErr('am-err','First name, last name, and email are required.');return;}
+  const btn=document.getElementById('am-btn'); btn.disabled=true; btn.textContent='Adding…';
+  try {
+    const r=await fetch('/api/event-participants',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+      body:JSON.stringify({event_id:activeEvent.id,org_id:activeEvent.org_id,
+        participant:{first_name:first,last_name:last,email,
+          employee_id:document.getElementById('am-empid').value||null,
+          department:document.getElementById('am-dept').value||null,
+          date_of_birth:document.getElementById('am-dob').value||null,
+          phone:document.getElementById('am-phone').value||null}})});
+    if(!r.ok){showErr('am-err',(await r.json()).error||'Save failed');return;}
+    closeModal('add-modal'); showToast('Participant added'); ptLoaded=false; loadParticipants(0);
+  } catch(e){showErr('am-err',e.message);}
+  finally{btn.disabled=false; btn.textContent='Add Participant';}
+}
+
+async function removeParticipant(participantId) {
+  if(!confirm('Remove this participant from the event?')) return;
+  try {
+    await fetch(`/api/event-participants?event_id=${activeEvent.id}&participant_id=${participantId}`,
+      {method:'DELETE',headers:{Authorization:'Bearer '+authToken}});
+    showToast('Participant removed'); loadParticipants(ptOffset);
+  } catch(e){showToast('Error: '+e.message);}
+}
+
+// ── Registration tab ──────────────────────────────────────────────────────────
+function renderRegTab() {
+  const regUrl=`${location.origin}/register/?event=${activeEvent.id}`;
+  document.getElementById('reg-link').value=regUrl;
+  document.getElementById('reg-link-open').href=regUrl;
+}
+
+function copyRegLink() {
+  const val=document.getElementById('reg-link').value;
+  if(navigator.clipboard) {
+    navigator.clipboard.writeText(val).then(()=>showToast('Registration link copied!'));
+  } else {
+    document.getElementById('reg-link').select();
+    document.execCommand('copy');
+    showToast('Registration link copied!');
+  }
+}
+
+// ── Event CRUD ────────────────────────────────────────────────────────────────
+function openEventModal(id) {
+  editEventId=id||null;
+  document.getElementById('em-title').textContent=id?'Edit Event':'New Screening Event';
+  document.getElementById('em-btn').textContent=id?'Save Changes':'Create Event';
+  document.getElementById('em-err').style.display='none';
+  if(id){
+    const ev=events.find(x=>x.id===id);
+    document.getElementById('em-name').value=ev.name;
+    document.getElementById('em-date').value=ev.event_date?.split('T')[0]||ev.event_date;
+    document.getElementById('em-org').value=ev.org_id||'';
+    document.getElementById('em-type').value=ev.event_type;
+    document.getElementById('em-loc').value=ev.location||'';
+    document.getElementById('em-notes').value=ev.notes||'';
+  } else {
+    ['em-name','em-date','em-loc','em-notes'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('em-org').value=''; document.getElementById('em-type').value='onsite';
+  }
+  document.getElementById('event-modal').style.display='flex';
+}
+
+async function saveEvent() {
+  const name=document.getElementById('em-name').value.trim(), date=document.getElementById('em-date').value;
+  if(!name||!date){showErr('em-err','Name and date are required.');return;}
+  const btn=document.getElementById('em-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const body={name,event_date:date,
+      org_id:document.getElementById('em-org').value||null,
+      event_type:document.getElementById('em-type').value,
+      location:document.getElementById('em-loc').value||null,
+      notes:document.getElementById('em-notes').value||null};
+    if(editEventId) body.id=editEventId;
+    const r=await fetch('/api/events',{method:editEventId?'PUT':'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify(body)});
+    if(!r.ok){showErr('em-err',(await r.json()).error||'Save failed');return;}
+    closeModal('event-modal'); showToast(editEventId?'Event updated':'Event created'); await load();
+    if(editEventId && activeEvent?.id===editEventId) {
+      activeEvent=events.find(e=>e.id===editEventId);
+      if(activeEvent) openEvent(activeEvent.id);
+    }
+  } catch(e){showErr('em-err',e.message);}
+  finally{btn.disabled=false;}
+}
+
+async function updateStatus(id,status) {
+  try {
+    await fetch('/api/events',{method:'PUT',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+      body:JSON.stringify({id,status})});
+    showToast('Status updated');
+  } catch(e){showToast('Error: '+e.message);}
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtDate(d){ return d?new Date(d.length>10?d:d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—'; }
+function showErr(elId,m){ const e=document.getElementById(elId); e.textContent=m; e.style.display=''; }
+function closeModal(id){ document.getElementById(id).style.display='none'; }
+function closeOuter(e,id){ if(e.target===document.getElementById(id))closeModal(id); }
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
-</body></html>
+</body>
+</html>

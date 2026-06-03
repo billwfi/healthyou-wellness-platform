@@ -14,7 +14,8 @@ exports.handler = async (event, context) => {
       try {
         const r = await db.query(
           `SELECT e.*, o.name AS org_name,
-                  (SELECT COUNT(*) FROM biometric_results br WHERE br.event_id=e.id) AS screened_count
+                  (SELECT COUNT(*) FROM biometric_results br WHERE br.event_id=e.id) AS screened_count,
+                  (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id=e.id) AS registered_count
              FROM screening_events e
              LEFT JOIN organizations o ON o.id=e.org_id
             WHERE e.id=$1`,
@@ -28,7 +29,8 @@ exports.handler = async (event, context) => {
     try {
       const r = await db.query(
         `SELECT e.*, o.name AS org_name,
-                (SELECT COUNT(*) FROM biometric_results br WHERE br.event_id=e.id) AS screened_count
+                (SELECT COUNT(*) FROM biometric_results br WHERE br.event_id=e.id) AS screened_count,
+                (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id=e.id) AS registered_count
            FROM screening_events e
            LEFT JOIN organizations o ON o.id=e.org_id
           ORDER BY e.event_date DESC`

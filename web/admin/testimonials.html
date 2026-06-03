@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Testimonials — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo.png" alt="Healthyou"></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <div class="sidebar-section" style="margin-top:12px;">Users</div>
+    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <a href="/admin/organizations.html" class="sidebar-item">Organizations</a>
+    <div class="sidebar-section" style="margin-top:12px;">Programs</div>
+    <a href="/admin/events.html" class="sidebar-item">Screening Events</a>
+    <div class="sidebar-section" style="margin-top:12px;">Communication</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item active">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/settings.html" class="sidebar-item">System Settings</a>
+    <div class="sidebar-section" style="margin-top:12px;">Portals</div>
+    <a href="/coach/" class="sidebar-item">Coach Portal →</a>
+    <a href="/screener/" class="sidebar-item">Screener Portal →</a>
+    <a href="/book/" class="sidebar-item">Booking Page →</a>
+  </nav>
+</aside>
+
+<main class="container has-sidebar">
+  <div id="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div>
+        <h1 class="page-title" style="margin-bottom:2px;">Testimonials</h1>
+        <p style="color:var(--gray-400);font-size:.88rem;">Manage participant success stories and testimonials.</p>
+      </div>
+      <button class="btn btn-primary" onclick="openModal()">+ Add Testimonial</button>
+    </div>
+
+    <!-- Filter bar -->
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+      <div class="status-pills">
+        <button class="status-pill active" onclick="setFilter('all',this)">All</button>
+        <button class="status-pill" onclick="setFilter('published',this)">Published</button>
+        <button class="status-pill" onclick="setFilter('draft',this)">Draft</button>
+        <button class="status-pill" onclick="setFilter('archived',this)">Archived</button>
+      </div>
+      <div class="search-bar" style="flex:1;max-width:280px;">
+        <input type="text" id="search-input" placeholder="Search testimonials…" oninput="renderTable()"/>
+      </div>
+    </div>
+
+    <!-- Card grid view -->
+    <div id="cards-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;"></div>
+    <p id="empty-msg" class="empty" style="display:none;">No testimonials found.</p>
+  </div>
+</main>
+
+<!-- Add / Edit Modal -->
+<div id="modal-backdrop" class="modal-backdrop" style="display:none;" onclick="closeOuter(event)">
+  <div class="modal modal-lg">
+    <div class="modal-title" id="modal-title">Add Testimonial</div>
+    <form id="form" onsubmit="save(event)">
+      <div class="form-grid" style="margin-bottom:14px;">
+        <div class="form-group">
+          <label>Participant Name *</label>
+          <input type="text" id="f-name" required placeholder="Jane D."/>
+        </div>
+        <div class="form-group">
+          <label>Organization / Employer</label>
+          <input type="text" id="f-org" placeholder="Acme Corp"/>
+        </div>
+        <div class="form-group">
+          <label>Title / Role</label>
+          <input type="text" id="f-title" placeholder="e.g. HR Manager"/>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="f-status">
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+        <div class="form-group span-2">
+          <label>Quote *</label>
+          <textarea id="f-quote" rows="4" required placeholder="Their success story in their own words…"></textarea>
+        </div>
+        <div class="form-group span-2">
+          <label>Outcome / Result</label>
+          <input type="text" id="f-outcome" placeholder="e.g. Lost 20 lbs, reduced cholesterol by 30 points"/>
+        </div>
+        <div class="form-group">
+          <label>Photo URL</label>
+          <input type="url" id="f-photo" placeholder="https://…"/>
+        </div>
+        <div class="form-group">
+          <label>Star Rating (1–5)</label>
+          <select id="f-rating">
+            <option value="">—</option>
+            <option value="5">5 ★★★★★</option>
+            <option value="4">4 ★★★★</option>
+            <option value="3">3 ★★★</option>
+            <option value="2">2 ★★</option>
+            <option value="1">1 ★</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Featured on Homepage?</label>
+          <select id="f-featured">
+            <option value="false">No</option>
+            <option value="true">Yes</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Display Order</label>
+          <input type="number" id="f-sort-order" min="0" placeholder="0"/>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="save-btn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+let authToken = null;
+let items = [];
+let editId = null;
+let activeFilter = 'all';
+
+netlifyIdentity.on('init',  u => { if (u) { authToken = u.token.access_token; boot(u); } else { location.href = '/admin/login.html'; } });
+netlifyIdentity.on('login', u => { authToken = u.token.access_token; boot(u); });
+netlifyIdentity.on('logout',() => { location.href = '/admin/login.html'; });
+
+function boot(user) {
+  document.getElementById('content').style.display = '';
+  document.getElementById('header-name').textContent = user.user_metadata?.full_name || user.email;
+  load();
+}
+
+async function load() {
+  try {
+    const r = await fetch('/api/testimonials', { headers: { Authorization: 'Bearer '+authToken } });
+    items = await r.json();
+    renderCards();
+  } catch(e) { showToast('Error loading testimonials'); }
+}
+
+function setFilter(f, el) {
+  activeFilter = f;
+  document.querySelectorAll('.status-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  renderCards();
+}
+
+function renderCards() {
+  const q = (document.getElementById('search-input').value || '').toLowerCase();
+  const rows = items.filter(t => {
+    if (activeFilter !== 'all' && t.status !== activeFilter) return false;
+    if (q && !t.participant_name.toLowerCase().includes(q) && !(t.quote||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const grid = document.getElementById('cards-grid');
+  const empty = document.getElementById('empty-msg');
+  if (!rows.length) { grid.innerHTML=''; empty.style.display=''; return; }
+  empty.style.display='none';
+  grid.innerHTML = rows.map(t => `
+    <div class="card" style="margin-bottom:0;cursor:pointer;" onclick="openModal(${t.id})">
+      <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;">
+        <div style="width:44px;height:44px;border-radius:50%;flex-shrink:0;overflow:hidden;background:var(--teal-light);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--teal);font-size:1rem;">
+          ${t.photo_url ? `<img src="${esc(t.photo_url)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'"/>` : esc(t.participant_name.charAt(0).toUpperCase())}
+        </div>
+        <div>
+          <div style="font-weight:600;font-size:.9rem;">${esc(t.participant_name)}</div>
+          <div style="font-size:.78rem;color:var(--gray-400);">${esc(t.organization||'')}${t.title_role?(' · '+esc(t.title_role)):''}</div>
+          ${t.rating ? `<div style="color:#f59e0b;font-size:.85rem;">${'★'.repeat(t.rating)}${'☆'.repeat(5-t.rating)}</div>` : ''}
+        </div>
+        <div style="margin-left:auto;">
+          <span class="badge badge-${t.status==='published'?'active':t.status==='draft'?'inactive':'no_show'}">${t.status}</span>
+        </div>
+      </div>
+      <blockquote style="font-size:.88rem;color:var(--gray-600);line-height:1.5;font-style:italic;border-left:3px solid var(--teal-light);padding-left:12px;margin:0 0 10px;">
+        "${esc((t.quote||'').substring(0,200))}${t.quote&&t.quote.length>200?'…':''}"
+      </blockquote>
+      ${t.outcome ? `<div style="font-size:.78rem;color:var(--teal);font-weight:600;">Result: ${esc(t.outcome)}</div>` : ''}
+      ${t.featured ? '<div style="font-size:.74rem;color:var(--amber);margin-top:6px;">⭐ Featured</div>' : ''}
+      <div style="display:flex;gap:6px;margin-top:12px;" onclick="event.stopPropagation()">
+        <button class="btn btn-ghost btn-sm" onclick="openModal(${t.id})">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="del(${t.id})">Delete</button>
+      </div>
+    </div>`).join('');
+}
+
+function openModal(id) {
+  editId = id || null;
+  document.getElementById('modal-title').textContent = id ? 'Edit Testimonial' : 'Add Testimonial';
+  document.getElementById('save-btn').textContent = id ? 'Save Changes' : 'Save';
+  if (id) {
+    const t = items.find(x => x.id === id);
+    if (!t) return;
+    document.getElementById('f-name').value       = t.participant_name || '';
+    document.getElementById('f-org').value        = t.organization || '';
+    document.getElementById('f-title').value      = t.title_role || '';
+    document.getElementById('f-status').value     = t.status || 'draft';
+    document.getElementById('f-quote').value      = t.quote || '';
+    document.getElementById('f-outcome').value    = t.outcome || '';
+    document.getElementById('f-photo').value      = t.photo_url || '';
+    document.getElementById('f-rating').value     = t.rating || '';
+    document.getElementById('f-featured').value   = t.featured ? 'true' : 'false';
+    document.getElementById('f-sort-order').value = t.sort_order || '';
+  } else {
+    document.getElementById('form').reset();
+  }
+  document.getElementById('modal-backdrop').style.display = 'flex';
+}
+
+function closeModal() { document.getElementById('modal-backdrop').style.display = 'none'; editId = null; }
+function closeOuter(e) { if (e.target === document.getElementById('modal-backdrop')) closeModal(); }
+
+async function save(e) {
+  e.preventDefault();
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const body = {
+    participant_name: document.getElementById('f-name').value.trim(),
+    organization:     document.getElementById('f-org').value.trim(),
+    title_role:       document.getElementById('f-title').value.trim(),
+    status:           document.getElementById('f-status').value,
+    quote:            document.getElementById('f-quote').value.trim(),
+    outcome:          document.getElementById('f-outcome').value.trim(),
+    photo_url:        document.getElementById('f-photo').value.trim(),
+    rating:           parseInt(document.getElementById('f-rating').value) || null,
+    featured:         document.getElementById('f-featured').value === 'true',
+    sort_order:       parseInt(document.getElementById('f-sort-order').value) || 0,
+  };
+  try {
+    const url = editId ? `/api/testimonials/${editId}` : '/api/testimonials';
+    const method = editId ? 'PUT' : 'POST';
+    const r = await fetch(url, { method, headers: { Authorization:'Bearer '+authToken, 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(await r.text());
+    showToast(editId ? 'Updated!' : 'Created!');
+    closeModal(); load();
+  } catch(err) { showToast('Error: '+err.message); }
+  finally { btn.disabled = false; btn.textContent = editId ? 'Save Changes' : 'Save'; }
+}
+
+async function del(id) {
+  if (!confirm('Delete this testimonial?')) return;
+  try {
+    await fetch(`/api/testimonials/${id}`, { method:'DELETE', headers:{ Authorization:'Bearer '+authToken } });
+    showToast('Deleted.'); load();
+  } catch(e) { showToast('Error'); }
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showToast(m) { const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+</script>
+</body>
+</html>

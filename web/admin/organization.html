@@ -8,17 +8,17 @@
   <style>
     .location-card {
       background:#fff; border:1px solid var(--gray-200); border-radius:var(--radius);
-      margin-bottom:12px; overflow:hidden;
+      margin-bottom:12px; overflow:hidden; cursor:pointer;
     }
+    .location-card:hover { border-color:var(--teal); box-shadow:0 0 0 1px var(--teal); }
     .location-header {
       display:flex; align-items:center; justify-content:space-between;
-      padding:14px 18px; cursor:pointer; gap:12px; user-select:none;
+      padding:14px 18px; gap:12px;
     }
-    .location-header:hover { background:var(--gray-50); }
-    .location-chevron { font-size:.9rem; color:var(--gray-400); transition:transform .2s; }
-    .location-card.open .location-chevron { transform:rotate(90deg); }
-    .location-body { display:none; border-top:1px solid var(--gray-100); padding:16px 18px; }
-    .location-card.open .location-body { display:block; }
+    .location-detail-panel {
+      background:#fff; border:1px solid var(--gray-200); border-radius:var(--radius);
+      padding:18px; margin-bottom:16px;
+    }
     .dept-row {
       display:flex; align-items:center; justify-content:space-between;
       padding:8px 0; border-bottom:1px solid var(--gray-100); font-size:.88rem;
@@ -35,22 +35,38 @@
 </head>
 <body>
 <header class="header">
-  <a class="header-logo" href="/admin/"><img src="/assets/img/logo-icon.svg" alt="">Health<span>you</span></a>
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo.png" alt="Healthyou"></a>
   <div style="display:flex;align-items:center;gap:12px;">
     <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
     <button class="btn btn-ghost btn-sm" onclick="netlifyIdentity.logout()" style="color:#fff;border-color:rgba(255,255,255,.5);">Log Out</button>
   </div>
 </header>
-<nav class="subnav">
-  <a href="/admin/" class="subnav-item">Dashboard</a>
-  <a href="/admin/organizations.html" class="subnav-item active">Organizations</a>
-  <a href="/admin/participants.html" class="subnav-item">Participants</a>
-  <a href="/admin/coaches.html" class="subnav-item">Coaches</a>
-  <a href="/admin/events.html" class="subnav-item">Screening Events</a>
-</nav>
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <div class="sidebar-section" style="margin-top:12px;">Users</div>
+    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <a href="/admin/organizations.html" class="sidebar-item active">Organizations</a>
+    <div class="sidebar-section" style="margin-top:12px;">Programs</div>
+    <a href="/admin/events.html" class="sidebar-item">Screening Events</a>
+    <div class="sidebar-section" style="margin-top:12px;">Communication</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/settings.html" class="sidebar-item">System Settings</a>
+    <div class="sidebar-section" style="margin-top:12px;">Portals</div>
+    <a href="/coach/" class="sidebar-item">Coach Portal →</a>
+    <a href="/screener/" class="sidebar-item">Screener Portal →</a>
+    <a href="/book/" class="sidebar-item">Booking Page →</a>
+  </nav>
+</aside>
 
-<main class="container">
-  <div id="login-wall" class="login-wall"><h2>Admin Portal</h2><p>Sign in to continue.</p><button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button></div>
+<main class="container has-sidebar">
   <div id="content" style="display:none;">
 
     <a href="/admin/organizations.html" class="back-link">&#8592; Organizations</a>
@@ -72,6 +88,7 @@
     <div class="tabs">
       <button class="tab active" onclick="switchTab('contacts',this)">Contacts</button>
       <button class="tab" onclick="switchTab('locations',this)">Locations</button>
+      <button class="tab" onclick="switchTab('eligibility',this)">Eligibility</button>
     </div>
 
     <!-- Contacts tab -->
@@ -90,11 +107,82 @@
 
     <!-- Locations tab -->
     <div id="tab-locations" style="display:none;">
-      <div class="section-header" style="margin-bottom:14px;">
+      <!-- List view -->
+      <div id="loc-list-header" class="section-header" style="margin-bottom:14px;">
         <h3>Locations</h3>
         <button class="btn btn-primary btn-sm" onclick="openLocationModal()">+ Add Location</button>
       </div>
       <div id="locations-list"><div class="empty">Loading…</div></div>
+
+      <!-- Detail view (drill-down) -->
+      <div id="location-detail" style="display:none;">
+        <div style="margin-bottom:16px;">
+          <button class="btn btn-ghost btn-sm" onclick="backToLocations()">&#8592; Back to Locations</button>
+        </div>
+        <div class="location-detail-panel">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div>
+              <div style="font-size:1.05rem;font-weight:700;margin-bottom:4px;" id="ld-name"></div>
+              <div style="font-size:.82rem;color:var(--gray-400);margin-bottom:6px;" id="ld-address"></div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" id="ld-meta"></div>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="ld-edit-btn">Edit Location</button>
+          </div>
+        </div>
+        <div class="section-header" style="margin-bottom:14px;">
+          <h3>Departments</h3>
+          <button class="btn btn-primary btn-sm" id="ld-add-dept-btn">+ Add Department</button>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div id="ld-dept-list" style="padding:0 18px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Eligibility tab -->
+    <div id="tab-eligibility" style="display:none;">
+      <!-- Upload card -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-title">Upload Eligibility File</div>
+        <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:14px;">
+          Upload a CSV to <strong>replace all</strong> eligibility records for this organization.
+          Accepted columns: <code style="font-size:.78rem;background:var(--gray-100);padding:1px 6px;border-radius:4px;">employee_id, first_name, last_name, email, date_of_birth, department, location, status, coverage_tier, effective_date, termination_date</code>
+        </p>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <input type="file" id="elig-file" accept=".csv,.txt" onchange="previewEligibility()" style="flex:1;min-width:200px;font-size:.85rem;"/>
+          <button class="btn btn-primary" id="elig-upload-btn" onclick="uploadEligibility()" disabled>Upload &amp; Replace</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);" onclick="clearEligibility()">Clear All</button>
+        </div>
+        <div id="elig-preview" style="display:none;margin-top:16px;">
+          <div style="font-size:.82rem;margin-bottom:8px;" id="elig-preview-label"></div>
+          <div style="overflow-x:auto;max-height:180px;border:1px solid var(--gray-200);border-radius:var(--radius);">
+            <table class="data-table" id="elig-preview-table" style="font-size:.78rem;"></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid" style="margin-bottom:20px;">
+        <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-value" id="elig-stat-total">—</div><div class="stat-label">Total Records</div></div>
+        <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value" id="elig-stat-active" style="color:var(--green);">—</div><div class="stat-label">Active</div></div>
+        <div class="stat-card"><div class="stat-icon">⛔</div><div class="stat-value" id="elig-stat-other" style="color:var(--red);">—</div><div class="stat-label">Inactive / Term.</div></div>
+        <div class="stat-card"><div class="stat-icon">🕐</div><div class="stat-value" style="font-size:.95rem;" id="elig-stat-date">—</div><div class="stat-label">Last Upload</div></div>
+      </div>
+
+      <!-- Records table -->
+      <div class="section-header" style="margin-bottom:14px;">
+        <h3>Records <span id="elig-count" style="font-size:.8rem;font-weight:400;color:var(--gray-400);"></span></h3>
+        <div class="search-bar" style="width:260px;">
+          <input id="elig-search" type="text" placeholder="Search name, email, ID…" oninput="debounceEligSearch()"/>
+        </div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <table class="data-table">
+          <thead><tr><th>Emp ID</th><th>Name</th><th>Email</th><th>Dept / Location</th><th>Status</th><th>Coverage</th><th>Eff. Date</th></tr></thead>
+          <tbody id="elig-tbody"><tr><td colspan="7" class="empty">No eligibility records loaded.</td></tr></tbody>
+        </table>
+      </div>
+      <div id="elig-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;font-size:.82rem;color:var(--gray-400);"></div>
     </div>
 
   </div>
@@ -192,15 +280,14 @@
 <script>
 const orgId = parseInt(new URLSearchParams(location.search).get('id'));
 let authToken=null, org=null, contacts=[], locations=[], deptsByLocation={};
-let editContactId=null, editLocationId=null, editDeptId=null, activeDeptLocationId=null;
+let editContactId=null, editLocationId=null, editDeptId=null, activeDeptLocationId=null, activeLocationId=null;
 
-netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} });
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} else { location.href='/admin/login.html'; } });
 netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
-netlifyIdentity.on('logout',()=>{ document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; });
+netlifyIdentity.on('logout',()=>{ location.href='/admin/login.html'; });
 
 async function boot(user) {
   if (!orgId) { location.href='/admin/organizations.html'; return; }
-  document.getElementById('login-wall').style.display='none';
   document.getElementById('content').style.display='';
   document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
   const hdr={Authorization:'Bearer '+authToken};
@@ -297,9 +384,9 @@ function renderLocations() {
   const el=document.getElementById('locations-list');
   if(!locations.length){ el.innerHTML='<div class="empty">No locations yet.</div>'; return; }
   el.innerHTML=locations.map(l=>`
-    <div class="location-card" id="loc-card-${l.id}">
-      <div class="location-header" onclick="toggleLocation(${l.id})">
-        <div style="flex:1;">
+    <div class="location-card" id="loc-card-${l.id}" ondblclick="openLocation(${l.id})">
+      <div class="location-header">
+        <div style="flex:1;" onclick="openLocation(${l.id})">
           <div style="font-weight:600;">${esc(l.name)}
             <span class="badge badge-${l.active?'active':'inactive'}" style="margin-left:6px;">${l.active?'Active':'Inactive'}</span>
           </div>
@@ -310,27 +397,41 @@ function renderLocations() {
             &nbsp;·&nbsp;<strong>${l.department_count||0}</strong> dept${l.department_count!=1?'s':''}
           </div>
         </div>
-        <div style="display:flex;gap:6px;align-items:center;" onclick="event.stopPropagation()">
-          <button class="btn btn-ghost btn-sm" onclick="openLocationModal(${l.id})">Edit</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);" onclick="deleteLocation(${l.id})">Del</button>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();openLocation(${l.id})">Open</button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openLocationModal(${l.id})">Edit</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);" onclick="event.stopPropagation();deleteLocation(${l.id})">Del</button>
         </div>
-        <span class="location-chevron">&#9654;</span>
-      </div>
-      <div class="location-body" id="loc-body-${l.id}">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <span style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--teal);">Departments</span>
-          <button class="btn btn-primary btn-sm" onclick="openDeptModal(${l.id})">+ Add Department</button>
-        </div>
-        <div id="dept-list-${l.id}"><div style="font-size:.85rem;color:var(--gray-400);padding:8px 0;">Loading…</div></div>
       </div>
     </div>`).join('');
 }
 
-function toggleLocation(id) {
-  const card=document.getElementById('loc-card-'+id);
-  const isOpen=card.classList.contains('open');
-  card.classList.toggle('open');
-  if(!isOpen && !deptsByLocation[id]) loadDepts(id);
+function openLocation(id) {
+  activeLocationId=id;
+  const l=locations.find(x=>x.id===id);
+  document.getElementById('ld-name').textContent=l.name;
+  const addr=[l.address,l.city,l.state,l.zip].filter(Boolean).map(esc).join(', ');
+  document.getElementById('ld-address').textContent=addr||(l.phone?esc(l.phone):'No address on file');
+  document.getElementById('ld-meta').innerHTML=
+    `<span class="badge badge-${l.active?'active':'inactive'}">${l.active?'Active':'Inactive'}</span>`+
+    `<span style="text-transform:capitalize;font-size:.8rem;color:var(--gray-400);">${l.location_type||'office'}</span>`+
+    (l.phone&&addr?`<span style="font-size:.8rem;color:var(--gray-400);">${esc(l.phone)}</span>`:'');
+  document.getElementById('ld-edit-btn').onclick=()=>openLocationModal(id);
+  document.getElementById('ld-add-dept-btn').onclick=()=>openDeptModal(id);
+  // Create a named container so renderDepts(id) targets it
+  document.getElementById('ld-dept-list').innerHTML=`<div id="dept-list-${id}" style="padding:2px 0;"></div>`;
+  document.getElementById('locations-list').style.display='none';
+  document.getElementById('loc-list-header').style.display='none';
+  document.getElementById('location-detail').style.display='';
+  if(!deptsByLocation[id]) loadDepts(id);
+  else renderDepts(id);
+}
+
+function backToLocations() {
+  activeLocationId=null;
+  document.getElementById('location-detail').style.display='none';
+  document.getElementById('locations-list').style.display='';
+  document.getElementById('loc-list-header').style.display='';
 }
 
 async function loadDepts(locationId) {
@@ -402,6 +503,7 @@ async function saveLocation() {
     if(editLocationId){ const i=locations.findIndex(x=>x.id===editLocationId); if(i>=0) locations[i]={...locations[i],...loc}; }
     else locations.push({...loc, department_count:0});
     renderLocations(); closeModal('location-modal'); showToast(editLocationId?'Location updated':'Location added');
+    if(!editLocationId) openLocation(loc.id);
   } catch(e){ showErr('lm-err',e.message); }
   finally{ btn.disabled=false; btn.textContent=editLocationId?'Save Changes':'Add Location'; }
 }
@@ -412,6 +514,7 @@ async function deleteLocation(id) {
   try {
     await fetch(`/api/org-locations?id=${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+authToken}});
     locations=locations.filter(l=>l.id!==id); delete deptsByLocation[id];
+    if(activeLocationId===id) backToLocations();
     renderLocations(); showToast('Location deleted');
   } catch(e){ showToast('Error: '+e.message); }
 }
@@ -450,15 +553,9 @@ async function saveDept() {
     if(!deptsByLocation[activeDeptLocationId]) deptsByLocation[activeDeptLocationId]=[];
     if(editDeptId){ const i=deptsByLocation[activeDeptLocationId].findIndex(x=>x.id===editDeptId); if(i>=0) deptsByLocation[activeDeptLocationId][i]=d; }
     else deptsByLocation[activeDeptLocationId].push(d);
-    // Update dept count on location
     const li=locations.findIndex(x=>x.id===activeDeptLocationId);
     if(li>=0 && !editDeptId) locations[li].department_count=(parseInt(locations[li].department_count)||0)+1;
     renderDepts(activeDeptLocationId);
-    // Refresh the location card header count
-    renderLocations();
-    // Re-open the card
-    const card=document.getElementById('loc-card-'+activeDeptLocationId);
-    if(card){ card.classList.add('open'); }
     closeModal('dept-modal'); showToast(editDeptId?'Department updated':'Department added');
   } catch(e){ showErr('dm-err',e.message); }
   finally{ btn.disabled=false; btn.textContent=editDeptId?'Save Changes':'Add Department'; }
@@ -472,9 +569,6 @@ async function deleteDept(locationId, deptId) {
     const li=locations.findIndex(x=>x.id===locationId);
     if(li>=0) locations[li].department_count=Math.max(0,(parseInt(locations[li].department_count)||1)-1);
     renderDepts(locationId);
-    renderLocations();
-    const card=document.getElementById('loc-card-'+locationId);
-    if(card){ card.classList.add('open'); }
     showToast('Department deleted');
   } catch(e){ showToast('Error: '+e.message); }
 }
@@ -510,7 +604,148 @@ async function saveOrg() {
 function switchTab(tab, el) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  ['contacts','locations'].forEach(t=>document.getElementById('tab-'+t).style.display=t===tab?'':'none');
+  ['contacts','locations','eligibility'].forEach(t=>document.getElementById('tab-'+t).style.display=t===tab?'':'none');
+  if(tab==='eligibility' && !eligLoaded) loadEligibility(0);
+}
+
+// ── Eligibility ───────────────────────────────────────────────────────────────
+let eligParsed=[], eligOffset=0, eligTotal=0, eligLoaded=false, eligSearchTimer=null;
+const ELIG_LIMIT=50;
+
+function parseCSV(text) {
+  const lines=text.trim().split(/\r?\n/);
+  if(lines.length<2) return [];
+  const parseRow=line=>{
+    const fields=[]; let f='',q=false;
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c==='"'){q=!q;}
+      else if(c===','&&!q){fields.push(f.trim());f='';}
+      else f+=c;
+    }
+    fields.push(f.trim()); return fields;
+  };
+  const ALIASES={
+    employee_id:['employee_id','emp_id','employeeid','empid'],
+    first_name:['first_name','firstname','first'],
+    last_name:['last_name','lastname','last'],
+    email:['email','email_address','emailaddress'],
+    date_of_birth:['date_of_birth','dob','birth_date','birthdate'],
+    department:['department','dept'],
+    location:['location','site','office'],
+    status:['status','eligibility_status'],
+    coverage_tier:['coverage_tier','tier','coverage'],
+    effective_date:['effective_date','effectivedate','start_date'],
+    termination_date:['termination_date','term_date','end_date'],
+  };
+  const rawH=parseRow(lines[0]).map(h=>h.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,''));
+  const hdrs=rawH.map(h=>{
+    for(const[k,a] of Object.entries(ALIASES)) if(a.includes(h)) return k;
+    return h;
+  });
+  return lines.slice(1).filter(l=>l.trim()).map(line=>{
+    const vals=parseRow(line), rec={};
+    hdrs.forEach((h,i)=>{rec[h]=vals[i]||null;});
+    return rec;
+  });
+}
+
+function previewEligibility() {
+  const file=document.getElementById('elig-file').files[0];
+  const btn=document.getElementById('elig-upload-btn');
+  if(!file){btn.disabled=true;return;}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    eligParsed=parseCSV(e.target.result);
+    const preview=document.getElementById('elig-preview');
+    const label=document.getElementById('elig-preview-label');
+    if(!eligParsed.length){
+      label.innerHTML='<span style="color:var(--red);">No valid rows found — check CSV format.</span>';
+      preview.style.display=''; btn.disabled=true; return;
+    }
+    label.innerHTML=`<strong>${eligParsed.length.toLocaleString()}</strong> rows parsed — preview of first 5:`;
+    const cols=Object.keys(eligParsed[0]);
+    document.getElementById('elig-preview-table').innerHTML=
+      `<thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead>`+
+      `<tbody>${eligParsed.slice(0,5).map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c]||'')}</td>`).join('')}</tr>`).join('')}</tbody>`;
+    preview.style.display=''; btn.disabled=false;
+  };
+  reader.readAsText(file);
+}
+
+async function uploadEligibility() {
+  if(!eligParsed.length) return;
+  if(!confirm(`Replace ALL existing eligibility records with ${eligParsed.length.toLocaleString()} new rows from this file?`)) return;
+  const btn=document.getElementById('elig-upload-btn'); btn.disabled=true; btn.textContent='Uploading…';
+  try {
+    const r=await fetch('/api/eligibility',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+      body:JSON.stringify({org_id:orgId,records:eligParsed})});
+    if(!r.ok){showToast('Error: '+((await r.json()).error||'Upload failed'));return;}
+    const j=await r.json();
+    showToast(`Uploaded ${j.inserted.toLocaleString()} records`);
+    document.getElementById('elig-file').value='';
+    document.getElementById('elig-preview').style.display='none';
+    eligParsed=[]; loadEligibility(0);
+  } catch(e){showToast('Error: '+e.message);}
+  finally{btn.disabled=true; btn.textContent='Upload & Replace';}
+}
+
+async function clearEligibility() {
+  if(!confirm('Delete ALL eligibility records for this organization? This cannot be undone.')) return;
+  try {
+    await fetch(`/api/eligibility?org_id=${orgId}`,{method:'DELETE',headers:{Authorization:'Bearer '+authToken}});
+    showToast('Eligibility records cleared'); loadEligibility(0);
+  } catch(e){showToast('Error: '+e.message);}
+}
+
+async function loadEligibility(offset=0) {
+  eligOffset=offset; eligLoaded=true;
+  const search=(document.getElementById('elig-search')||{}).value||'';
+  const url=`/api/eligibility?org_id=${orgId}&limit=${ELIG_LIMIT}&offset=${offset}`+(search?'&search='+encodeURIComponent(search):'');
+  try {
+    const data=await fetch(url,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+    eligTotal=data.total;
+    renderEligibility(data.records, data.total);
+    updateEligStats(data.total, data.status_counts||{}, data.last_upload);
+  } catch(e){showToast('Error loading eligibility');}
+}
+
+function renderEligibility(records, total) {
+  document.getElementById('elig-count').textContent=total?`(${total.toLocaleString()} records)`:'';
+  const tbody=document.getElementById('elig-tbody');
+  if(!records.length){tbody.innerHTML='<tr><td colspan="7" class="empty">No eligibility records.</td></tr>'; document.getElementById('elig-pagination').innerHTML=''; return;}
+  tbody.innerHTML=records.map(r=>`<tr>
+    <td style="font-family:monospace;font-size:.82rem;">${esc(r.employee_id||'—')}</td>
+    <td><strong>${esc([r.last_name,r.first_name].filter(Boolean).join(', '))}</strong></td>
+    <td style="font-size:.84rem;">${esc(r.email||'—')}</td>
+    <td style="font-size:.82rem;">${esc([r.department,r.location].filter(Boolean).join(' / ')||'—')}</td>
+    <td><span class="badge badge-${r.status==='active'?'active':r.status==='terminated'?'cancelled':'inactive'}">${esc(r.status||'—')}</span></td>
+    <td style="font-size:.82rem;">${esc(r.coverage_tier||'—')}</td>
+    <td style="font-size:.82rem;">${r.effective_date?new Date(r.effective_date).toLocaleDateString():'—'}</td>
+  </tr>`).join('');
+  const pages=Math.ceil(total/ELIG_LIMIT), page=Math.floor(eligOffset/ELIG_LIMIT)+1;
+  const pg=document.getElementById('elig-pagination');
+  if(pages<=1){pg.innerHTML='';return;}
+  const start=((page-1)*ELIG_LIMIT+1).toLocaleString(), end=Math.min(page*ELIG_LIMIT,total).toLocaleString();
+  pg.innerHTML=`<span>Page ${page} of ${pages} &nbsp;(${start}–${end} of ${total.toLocaleString()})</span>
+    <div style="display:flex;gap:6px;">
+      <button class="btn btn-ghost btn-sm" onclick="loadEligibility(${eligOffset-ELIG_LIMIT})" ${eligOffset===0?'disabled':''}>← Prev</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadEligibility(${eligOffset+ELIG_LIMIT})" ${eligOffset+ELIG_LIMIT>=total?'disabled':''}>Next →</button>
+    </div>`;
+}
+
+function updateEligStats(total, counts, lastUpload) {
+  document.getElementById('elig-stat-total').textContent=total.toLocaleString();
+  document.getElementById('elig-stat-active').textContent=(counts['active']||0).toLocaleString();
+  const other=Object.entries(counts).filter(([k])=>k!=='active').reduce((s,[,v])=>s+parseInt(v),0);
+  document.getElementById('elig-stat-other').textContent=other.toLocaleString();
+  document.getElementById('elig-stat-date').textContent=lastUpload?new Date(lastUpload).toLocaleDateString():'—';
+}
+
+function debounceEligSearch(){
+  clearTimeout(eligSearchTimer);
+  eligSearchTimer=setTimeout(()=>loadEligibility(0),320);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

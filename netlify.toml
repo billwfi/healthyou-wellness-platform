@@ -48,6 +48,61 @@
   status = 200
 
 [[redirects]]
+  from = "/register"
+  to = "/register/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/register/*"
+  to = "/register/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/book"
+  to = "/book/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/book/*"
+  to = "/book/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/health-tips/*"
+  to = "/.netlify/functions/health-tips/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/health-tips"
+  to = "/.netlify/functions/health-tips"
+  status = 200
+
+[[redirects]]
+  from = "/api/testimonials/*"
+  to = "/.netlify/functions/testimonials/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/testimonials"
+  to = "/.netlify/functions/testimonials"
+  status = 200
+
+[[redirects]]
+  from = "/api/content-library/*"
+  to = "/.netlify/functions/content-library/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/content-library"
+  to = "/.netlify/functions/content-library"
+  status = 200
+
+[[redirects]]
+  from = "/api/settings"
+  to = "/.netlify/functions/settings"
+  status = 200
+
+[[redirects]]
   from = "/"
   to = "/admin/index.html"
   status = 302

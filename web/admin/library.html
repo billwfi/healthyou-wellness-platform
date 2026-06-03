@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Content Library — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo.png" alt="Healthyou"></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <div class="sidebar-section" style="margin-top:12px;">Users</div>
+    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <a href="/admin/organizations.html" class="sidebar-item">Organizations</a>
+    <div class="sidebar-section" style="margin-top:12px;">Programs</div>
+    <a href="/admin/events.html" class="sidebar-item">Screening Events</a>
+    <div class="sidebar-section" style="margin-top:12px;">Communication</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item active">Library</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/settings.html" class="sidebar-item">System Settings</a>
+    <div class="sidebar-section" style="margin-top:12px;">Portals</div>
+    <a href="/coach/" class="sidebar-item">Coach Portal →</a>
+    <a href="/screener/" class="sidebar-item">Screener Portal →</a>
+    <a href="/book/" class="sidebar-item">Booking Page →</a>
+  </nav>
+</aside>
+
+<main class="container has-sidebar">
+  <div id="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div>
+        <h1 class="page-title" style="margin-bottom:2px;">Content Library</h1>
+        <p style="color:var(--gray-400);font-size:.88rem;">Manage documents, videos, and wellness resources for participants.</p>
+      </div>
+      <button class="btn btn-primary" onclick="openModal()">+ Add Resource</button>
+    </div>
+
+    <!-- Filter bar -->
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+      <div class="status-pills">
+        <button class="status-pill active" onclick="setFilter('type','all',this)">All Types</button>
+        <button class="status-pill" onclick="setFilter('type','article',this)">Articles</button>
+        <button class="status-pill" onclick="setFilter('type','video',this)">Videos</button>
+        <button class="status-pill" onclick="setFilter('type','pdf',this)">PDFs</button>
+        <button class="status-pill" onclick="setFilter('type','link',this)">Links</button>
+      </div>
+      <div class="search-bar" style="flex:1;max-width:280px;">
+        <input type="text" id="search-input" placeholder="Search library…" oninput="renderTable()"/>
+      </div>
+      <select id="cat-filter" onchange="renderTable()" style="width:160px;">
+        <option value="">All Categories</option>
+        <option value="nutrition">Nutrition</option>
+        <option value="fitness">Fitness</option>
+        <option value="mental_health">Mental Health</option>
+        <option value="sleep">Sleep</option>
+        <option value="stress">Stress</option>
+        <option value="heart_health">Heart Health</option>
+        <option value="diabetes">Diabetes</option>
+        <option value="weight">Weight Management</option>
+        <option value="general">General</option>
+      </select>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Type</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th>Added</th>
+            <th style="width:160px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- Add / Edit Modal -->
+<div id="modal-backdrop" class="modal-backdrop" style="display:none;" onclick="closeOuter(event)">
+  <div class="modal modal-lg">
+    <div class="modal-title" id="modal-title">Add Resource</div>
+    <form id="lib-form" onsubmit="save(event)">
+      <div class="form-grid" style="margin-bottom:14px;">
+        <div class="form-group span-2">
+          <label>Title *</label>
+          <input type="text" id="f-title" required placeholder="e.g. Understanding Blood Pressure"/>
+        </div>
+        <div class="form-group">
+          <label>Resource Type *</label>
+          <select id="f-type" required>
+            <option value="article">Article</option>
+            <option value="video">Video</option>
+            <option value="pdf">PDF / Document</option>
+            <option value="link">External Link</option>
+            <option value="infographic">Infographic</option>
+            <option value="podcast">Podcast</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="f-category">
+            <option value="general">General Wellness</option>
+            <option value="nutrition">Nutrition</option>
+            <option value="fitness">Fitness</option>
+            <option value="mental_health">Mental Health</option>
+            <option value="sleep">Sleep</option>
+            <option value="stress">Stress Management</option>
+            <option value="heart_health">Heart Health</option>
+            <option value="diabetes">Diabetes Prevention</option>
+            <option value="weight">Weight Management</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="f-status">
+            <option value="published">Published</option>
+            <option value="draft">Draft</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Audience</label>
+          <select id="f-audience">
+            <option value="all">All Participants</option>
+            <option value="high_risk">High Risk</option>
+            <option value="moderate_risk">Moderate Risk</option>
+            <option value="coaches">Coaches Only</option>
+          </select>
+        </div>
+        <div class="form-group span-2">
+          <label>URL / Link *</label>
+          <input type="url" id="f-url" required placeholder="https://…"/>
+        </div>
+        <div class="form-group span-2">
+          <label>Description</label>
+          <textarea id="f-description" rows="3" placeholder="Brief description of this resource…"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Author / Source</label>
+          <input type="text" id="f-author" placeholder="e.g. Mayo Clinic"/>
+        </div>
+        <div class="form-group">
+          <label>Duration / Length</label>
+          <input type="text" id="f-duration" placeholder="e.g. 5 min read, 10:30"/>
+        </div>
+        <div class="form-group">
+          <label>Thumbnail URL</label>
+          <input type="url" id="f-thumbnail" placeholder="https://…"/>
+        </div>
+        <div class="form-group">
+          <label>Tags (comma-separated)</label>
+          <input type="text" id="f-tags" placeholder="cholesterol, heart, diet"/>
+        </div>
+        <div class="form-group span-2" style="display:flex;align-items:center;gap:8px;padding-top:4px;">
+          <input type="checkbox" id="f-featured" style="width:auto;"/>
+          <label for="f-featured" style="margin:0;cursor:pointer;">Feature this resource on the dashboard</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="save-btn">Save Resource</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+let authToken = null;
+let items = [];
+let editId = null;
+let typeFilter = 'all';
+
+const TYPE_ICONS = { article:'📄', video:'🎥', pdf:'📑', link:'🔗', infographic:'🖼', podcast:'🎙' };
+const TYPE_LABELS = { article:'Article', video:'Video', pdf:'PDF', link:'Link', infographic:'Infographic', podcast:'Podcast' };
+
+netlifyIdentity.on('init',  u => { if (u) { authToken = u.token.access_token; boot(u); } else { location.href = '/admin/login.html'; } });
+netlifyIdentity.on('login', u => { authToken = u.token.access_token; boot(u); });
+netlifyIdentity.on('logout',() => { location.href = '/admin/login.html'; });
+
+function boot(user) {
+  document.getElementById('content').style.display = '';
+  document.getElementById('header-name').textContent = user.user_metadata?.full_name || user.email;
+  load();
+}
+
+async function load() {
+  try {
+    const r = await fetch('/api/content-library', { headers: { Authorization: 'Bearer '+authToken } });
+    items = await r.json();
+    renderTable();
+  } catch(e) { showToast('Error loading library'); }
+}
+
+function setFilter(key, val, el) {
+  typeFilter = val;
+  document.querySelectorAll('.status-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  renderTable();
+}
+
+function renderTable() {
+  const q   = (document.getElementById('search-input').value || '').toLowerCase();
+  const cat = document.getElementById('cat-filter').value;
+  const rows = items.filter(r => {
+    if (typeFilter !== 'all' && r.resource_type !== typeFilter) return false;
+    if (cat && r.category !== cat) return false;
+    if (q && !r.title.toLowerCase().includes(q) && !(r.description||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const tbody = document.getElementById('tbody');
+  if (!rows.length) { tbody.innerHTML='<tr><td colspan="6" class="empty">No resources found.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(r => `
+    <tr onclick="openModal(${r.id})">
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:1.1rem;">${TYPE_ICONS[r.resource_type]||'📄'}</span>
+          <div>
+            <strong style="display:block;">${esc(r.title)}</strong>
+            ${r.description?`<span class="content-preview">${esc(r.description)}</span>`:''}
+          </div>
+        </div>
+      </td>
+      <td><span class="badge badge-${r.resource_type==='video'?'virtual':r.resource_type==='pdf'?'onsite':'scheduled'}">${TYPE_LABELS[r.resource_type]||r.resource_type}</span></td>
+      <td style="font-size:.83rem;text-transform:capitalize;">${(r.category||'general').replace(/_/g,' ')}</td>
+      <td><span class="badge badge-${r.status==='published'?'active':r.status==='draft'?'inactive':'no_show'}">${r.status}</span></td>
+      <td style="font-size:.83rem;color:var(--gray-400);">${fmtDate(r.created_at)}</td>
+      <td onclick="event.stopPropagation()">
+        <div class="actions">
+          ${r.url?`<a href="${esc(r.url)}" target="_blank" class="btn btn-ghost btn-sm">View</a>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="openModal(${r.id})">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="del(${r.id})">Del</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function openModal(id) {
+  editId = id || null;
+  document.getElementById('modal-title').textContent = id ? 'Edit Resource' : 'Add Resource';
+  document.getElementById('save-btn').textContent = id ? 'Save Changes' : 'Save Resource';
+  if (id) {
+    const r = items.find(x => x.id === id);
+    if (!r) return;
+    document.getElementById('f-title').value       = r.title || '';
+    document.getElementById('f-type').value        = r.resource_type || 'article';
+    document.getElementById('f-category').value    = r.category || 'general';
+    document.getElementById('f-status').value      = r.status || 'published';
+    document.getElementById('f-audience').value    = r.audience || 'all';
+    document.getElementById('f-url').value         = r.url || '';
+    document.getElementById('f-description').value = r.description || '';
+    document.getElementById('f-author').value      = r.author || '';
+    document.getElementById('f-duration').value    = r.duration || '';
+    document.getElementById('f-thumbnail').value   = r.thumbnail_url || '';
+    document.getElementById('f-tags').value        = (r.tags||[]).join(', ');
+    document.getElementById('f-featured').checked  = r.featured || false;
+  } else {
+    document.getElementById('lib-form').reset();
+    document.getElementById('f-featured').checked = false;
+  }
+  document.getElementById('modal-backdrop').style.display = 'flex';
+}
+
+function closeModal() { document.getElementById('modal-backdrop').style.display = 'none'; editId = null; }
+function closeOuter(e) { if (e.target === document.getElementById('modal-backdrop')) closeModal(); }
+
+async function save(e) {
+  e.preventDefault();
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const body = {
+    title:         document.getElementById('f-title').value.trim(),
+    resource_type: document.getElementById('f-type').value,
+    category:      document.getElementById('f-category').value,
+    status:        document.getElementById('f-status').value,
+    audience:      document.getElementById('f-audience').value,
+    url:           document.getElementById('f-url').value.trim(),
+    description:   document.getElementById('f-description').value.trim(),
+    author:        document.getElementById('f-author').value.trim(),
+    duration:      document.getElementById('f-duration').value.trim(),
+    thumbnail_url: document.getElementById('f-thumbnail').value.trim(),
+    tags:          document.getElementById('f-tags').value.split(',').map(s=>s.trim()).filter(Boolean),
+    featured:      document.getElementById('f-featured').checked,
+  };
+  try {
+    const url = editId ? `/api/content-library/${editId}` : '/api/content-library';
+    const method = editId ? 'PUT' : 'POST';
+    const r = await fetch(url, { method, headers: { Authorization:'Bearer '+authToken, 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(await r.text());
+    showToast(editId ? 'Updated!' : 'Resource added!');
+    closeModal(); load();
+  } catch(err) { showToast('Error: '+err.message); }
+  finally { btn.disabled = false; btn.textContent = editId ? 'Save Changes' : 'Save Resource'; }
+}
+
+async function del(id) {
+  if (!confirm('Delete this resource?')) return;
+  try {
+    await fetch(`/api/content-library/${id}`, { method:'DELETE', headers:{ Authorization:'Bearer '+authToken } });
+    showToast('Deleted.'); load();
+  } catch(e) { showToast('Error'); }
+}
+
+function fmtDate(iso) { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showToast(m) { const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+</script>
+</body>
+</html>

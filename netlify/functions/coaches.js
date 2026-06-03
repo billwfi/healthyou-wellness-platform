@@ -4,11 +4,11 @@ const { getUser, ok, created, badRequest, unauthorized, notFound, serverError, o
 exports.handler = async (event, context) => {
   if (event.httpMethod === 'OPTIONS') return options();
 
-  // Public GET (for booking / participant-facing dropdowns)
+  // Public GET (booking page / dropdowns) — no auth required
   if (event.httpMethod === 'GET' && !event.queryStringParameters?.admin) {
     try {
       const r = await getPool().query(
-        'SELECT id,name,bio,specialty,avatar_url FROM coaches WHERE active=true ORDER BY name'
+        'SELECT id,name,bio,specialty,avatar_url,phone FROM coaches WHERE active=true ORDER BY name'
       );
       return ok(r.rows);
     } catch (e) { return serverError(e); }
@@ -27,12 +27,14 @@ exports.handler = async (event, context) => {
 
   if (event.httpMethod === 'POST') {
     let b; try { b = JSON.parse(event.body||'{}'); } catch { return badRequest('Invalid JSON'); }
-    const { name, email, bio, specialty } = b;
+    const { name, email, bio, specialty, phone, avatar_url } = b;
     if (!name || !email) return badRequest('name and email required');
+    if (avatar_url && avatar_url.length > 350000) return badRequest('Photo too large');
     try {
       const r = await db.query(
-        'INSERT INTO coaches (name,email,bio,specialty) VALUES ($1,$2,$3,$4) RETURNING *',
-        [name.trim(), email.trim().toLowerCase(), bio||null, specialty||null]
+        `INSERT INTO coaches (name,email,bio,specialty,phone,avatar_url)
+         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+        [name.trim(), email.trim().toLowerCase(), bio||null, specialty||null, phone||null, avatar_url||null]
       );
       return created(r.rows[0]);
     } catch (e) {
@@ -43,16 +45,27 @@ exports.handler = async (event, context) => {
 
   if (event.httpMethod === 'PUT') {
     let b; try { b = JSON.parse(event.body||'{}'); } catch { return badRequest('Invalid JSON'); }
-    const { id, name, email, bio, specialty, active } = b;
+    const { id, name, email, bio, specialty, active, phone } = b;
     if (!id) return badRequest('id required');
+    // avatar_url is handled separately — only updated if explicitly present in body
+    const hasAvatar = 'avatar_url' in b;
+    if (hasAvatar && b.avatar_url && b.avatar_url.length > 350000) return badRequest('Photo too large');
     try {
+      const sets = [
+        'name=COALESCE($2,name)',
+        'email=COALESCE($3,email)',
+        'bio=COALESCE($4,bio)',
+        'specialty=COALESCE($5,specialty)',
+        'active=COALESCE($6,active)',
+        'phone=COALESCE($7,phone)',
+      ];
+      const params = [id, name||null, email?.toLowerCase()||null, bio||null, specialty||null, active??null, phone||null];
+      if (hasAvatar) {
+        sets.push(`avatar_url=$${params.length + 1}`);
+        params.push(b.avatar_url ?? null);
+      }
       const r = await db.query(
-        `UPDATE coaches SET
-           name=COALESCE($2,name), email=COALESCE($3,email),
-           bio=COALESCE($4,bio), specialty=COALESCE($5,specialty),
-           active=COALESCE($6,active)
-         WHERE id=$1 RETURNING *`,
-        [id, name||null, email?.toLowerCase()||null, bio||null, specialty||null, active??null]
+        `UPDATE coaches SET ${sets.join(',')} WHERE id=$1 RETURNING *`, params
       );
       if (!r.rows.length) return notFound();
       return ok(r.rows[0]);

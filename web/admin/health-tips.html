@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Health Tips — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo.png" alt="Healthyou"></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <div class="sidebar-section" style="margin-top:12px;">Users</div>
+    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <a href="/admin/organizations.html" class="sidebar-item">Organizations</a>
+    <div class="sidebar-section" style="margin-top:12px;">Programs</div>
+    <a href="/admin/events.html" class="sidebar-item">Screening Events</a>
+    <div class="sidebar-section" style="margin-top:12px;">Communication</div>
+    <a href="/admin/health-tips.html" class="sidebar-item active">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/settings.html" class="sidebar-item">System Settings</a>
+    <div class="sidebar-section" style="margin-top:12px;">Portals</div>
+    <a href="/coach/" class="sidebar-item">Coach Portal →</a>
+    <a href="/screener/" class="sidebar-item">Screener Portal →</a>
+    <a href="/book/" class="sidebar-item">Booking Page →</a>
+  </nav>
+</aside>
+
+<main class="container has-sidebar">
+  <div id="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div>
+        <h1 class="page-title" style="margin-bottom:2px;">Health Tips</h1>
+        <p style="color:var(--gray-400);font-size:.88rem;">Create and publish health tip articles for participants.</p>
+      </div>
+      <button class="btn btn-primary" onclick="openModal()">+ Add Health Tip</button>
+    </div>
+
+    <!-- Filter bar -->
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+      <div class="status-pills">
+        <button class="status-pill active" onclick="setFilter('all',this)">All</button>
+        <button class="status-pill" onclick="setFilter('published',this)">Published</button>
+        <button class="status-pill" onclick="setFilter('draft',this)">Draft</button>
+        <button class="status-pill" onclick="setFilter('archived',this)">Archived</button>
+      </div>
+      <div class="search-bar" style="flex:1;max-width:280px;">
+        <input type="text" id="search-input" placeholder="Search tips…" oninput="renderTable()"/>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th>Published</th>
+            <th style="width:160px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- Add / Edit Modal -->
+<div id="modal-backdrop" class="modal-backdrop" style="display:none;" onclick="closeOuter(event)">
+  <div class="modal modal-lg">
+    <div class="modal-title" id="modal-title">Add Health Tip</div>
+    <form id="tip-form" onsubmit="saveTip(event)">
+      <div class="form-grid" style="margin-bottom:14px;">
+        <div class="form-group span-2">
+          <label>Title *</label>
+          <input type="text" id="f-title" required placeholder="e.g. 5 Ways to Improve Sleep Quality"/>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="f-category">
+            <option value="nutrition">Nutrition</option>
+            <option value="fitness">Fitness</option>
+            <option value="mental_health">Mental Health</option>
+            <option value="sleep">Sleep</option>
+            <option value="stress">Stress Management</option>
+            <option value="heart_health">Heart Health</option>
+            <option value="diabetes">Diabetes Prevention</option>
+            <option value="weight">Weight Management</option>
+            <option value="general">General Wellness</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="f-status">
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Author</label>
+          <input type="text" id="f-author" placeholder="e.g. HealYou Team"/>
+        </div>
+        <div class="form-group">
+          <label>Read Time (minutes)</label>
+          <input type="number" id="f-read-time" min="1" max="60" placeholder="3"/>
+        </div>
+        <div class="form-group span-2">
+          <label>Summary / Excerpt</label>
+          <textarea id="f-summary" rows="2" placeholder="Brief summary shown in tip previews…"></textarea>
+        </div>
+        <div class="form-group span-2">
+          <label>Full Content *</label>
+          <textarea id="f-content" rows="8" required placeholder="Write the full health tip content here…"></textarea>
+        </div>
+        <div class="form-group span-2">
+          <label>Cover Image URL</label>
+          <input type="url" id="f-image-url" placeholder="https://…"/>
+        </div>
+        <div class="form-group span-2">
+          <label>Tags (comma-separated)</label>
+          <input type="text" id="f-tags" placeholder="e.g. sleep, wellness, habits"/>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="save-btn">Save Tip</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+let authToken = null;
+let tips = [];
+let editId = null;
+let activeFilter = 'all';
+
+netlifyIdentity.on('init',  u => { if (u) { authToken = u.token.access_token; boot(u); } else { location.href = '/admin/login.html'; } });
+netlifyIdentity.on('login', u => { authToken = u.token.access_token; boot(u); });
+netlifyIdentity.on('logout',() => { location.href = '/admin/login.html'; });
+
+function boot(user) {
+  document.getElementById('content').style.display = '';
+  document.getElementById('header-name').textContent = user.user_metadata?.full_name || user.email;
+  loadTips();
+}
+
+async function loadTips() {
+  try {
+    const r = await fetch('/api/health-tips', { headers: { Authorization: 'Bearer '+authToken } });
+    tips = await r.json();
+    renderTable();
+  } catch(e) { showToast('Error loading tips'); }
+}
+
+function setFilter(f, el) {
+  activeFilter = f;
+  document.querySelectorAll('.status-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  renderTable();
+}
+
+function renderTable() {
+  const q = (document.getElementById('search-input').value || '').toLowerCase();
+  const rows = tips.filter(t => {
+    if (activeFilter !== 'all' && t.status !== activeFilter) return false;
+    if (q && !t.title.toLowerCase().includes(q) && !(t.category||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const tbody = document.getElementById('tbody');
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No health tips found.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(t => `
+    <tr onclick="openModal(${t.id})">
+      <td>
+        <strong style="display:block;">${esc(t.title)}</strong>
+        ${t.summary ? `<span class="content-preview">${esc(t.summary)}</span>` : ''}
+      </td>
+      <td><span class="badge badge-${t.category||'general'}" style="text-transform:capitalize;">${(t.category||'general').replace(/_/g,' ')}</span></td>
+      <td><span class="badge badge-${t.status==='published'?'active':t.status==='draft'?'inactive':'no_show'}">${t.status}</span></td>
+      <td style="font-size:.83rem;color:var(--gray-400);">${t.published_at ? fmtDate(t.published_at) : '—'}</td>
+      <td onclick="event.stopPropagation()">
+        <div class="actions">
+          <button class="btn btn-ghost btn-sm" onclick="openModal(${t.id})">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteTip(${t.id})">Delete</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function openModal(id) {
+  editId = id || null;
+  document.getElementById('modal-title').textContent = id ? 'Edit Health Tip' : 'Add Health Tip';
+  document.getElementById('save-btn').textContent = id ? 'Save Changes' : 'Save Tip';
+  if (id) {
+    const t = tips.find(x => x.id === id);
+    if (!t) return;
+    document.getElementById('f-title').value    = t.title || '';
+    document.getElementById('f-category').value = t.category || 'general';
+    document.getElementById('f-status').value   = t.status || 'draft';
+    document.getElementById('f-author').value   = t.author || '';
+    document.getElementById('f-read-time').value= t.read_time_minutes || '';
+    document.getElementById('f-summary').value  = t.summary || '';
+    document.getElementById('f-content').value  = t.content || '';
+    document.getElementById('f-image-url').value= t.image_url || '';
+    document.getElementById('f-tags').value     = (t.tags || []).join(', ');
+  } else {
+    document.getElementById('tip-form').reset();
+  }
+  document.getElementById('modal-backdrop').style.display = 'flex';
+}
+
+function closeModal() { document.getElementById('modal-backdrop').style.display = 'none'; editId = null; }
+function closeOuter(e) { if (e.target === document.getElementById('modal-backdrop')) closeModal(); }
+
+async function saveTip(e) {
+  e.preventDefault();
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const body = {
+    title:              document.getElementById('f-title').value.trim(),
+    category:           document.getElementById('f-category').value,
+    status:             document.getElementById('f-status').value,
+    author:             document.getElementById('f-author').value.trim(),
+    read_time_minutes:  parseInt(document.getElementById('f-read-time').value) || null,
+    summary:            document.getElementById('f-summary').value.trim(),
+    content:            document.getElementById('f-content').value.trim(),
+    image_url:          document.getElementById('f-image-url').value.trim(),
+    tags:               document.getElementById('f-tags').value.split(',').map(s=>s.trim()).filter(Boolean),
+  };
+  try {
+    const url = editId ? `/api/health-tips/${editId}` : '/api/health-tips';
+    const method = editId ? 'PUT' : 'POST';
+    const r = await fetch(url, { method, headers: { Authorization:'Bearer '+authToken, 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(await r.text());
+    showToast(editId ? 'Tip updated!' : 'Tip created!');
+    closeModal();
+    loadTips();
+  } catch(err) { showToast('Error: '+err.message); }
+  finally { btn.disabled = false; btn.textContent = editId ? 'Save Changes' : 'Save Tip'; }
+}
+
+async function deleteTip(id) {
+  if (!confirm('Delete this health tip?')) return;
+  try {
+    await fetch(`/api/health-tips/${id}`, { method:'DELETE', headers:{ Authorization:'Bearer '+authToken } });
+    showToast('Tip deleted.');
+    loadTips();
+  } catch(e) { showToast('Error deleting tip'); }
+}
+
+function fmtDate(iso) { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showToast(m) { const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+</script>
+</body>
+</html>

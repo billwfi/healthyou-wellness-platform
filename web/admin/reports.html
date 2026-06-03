@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Reports — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo.png" alt="Healthyou"></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <div class="sidebar-section" style="margin-top:12px;">Users</div>
+    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <a href="/admin/organizations.html" class="sidebar-item">Organizations</a>
+    <div class="sidebar-section" style="margin-top:12px;">Programs</div>
+    <a href="/admin/events.html" class="sidebar-item">Screening Events</a>
+    <div class="sidebar-section" style="margin-top:12px;">Communication</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item active">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/settings.html" class="sidebar-item">System Settings</a>
+    <div class="sidebar-section" style="margin-top:12px;">Portals</div>
+    <a href="/coach/" class="sidebar-item">Coach Portal →</a>
+    <a href="/screener/" class="sidebar-item">Screener Portal →</a>
+    <a href="/book/" class="sidebar-item">Booking Page →</a>
+  </nav>
+</aside>
+
+<main class="container has-sidebar">
+  <div id="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <h1 class="page-title" style="margin-bottom:0;">Reports</h1>
+      <button class="btn btn-ghost" onclick="window.print()">⬇ Export / Print</button>
+    </div>
+    <p class="page-subtitle">Population health analytics and program performance.</p>
+
+    <!-- Report tabs -->
+    <div class="tabs" style="margin-bottom:24px;">
+      <button class="tab active" onclick="showTab('population',this)">Population</button>
+      <button class="tab" onclick="showTab('biometrics',this)">Biometrics</button>
+      <button class="tab" onclick="showTab('coaching',this)">Coaching</button>
+      <button class="tab" onclick="showTab('events',this)">Events</button>
+    </div>
+
+    <!-- Population Report -->
+    <div id="tab-population">
+      <div class="stats-grid" id="pop-stats" style="margin-bottom:24px;"></div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Risk Distribution</div>
+          <div id="risk-chart"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Population Averages</div>
+          <div id="bio-avgs"></div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--gray-100);font-weight:600;font-size:.95rem;">Recent Screenings</div>
+        <table class="data-table">
+          <thead><tr><th>Participant</th><th>Organization</th><th>Date</th><th>BMI</th><th>Blood Pressure</th><th>Cholesterol</th><th>Glucose</th><th>Overall Risk</th></tr></thead>
+          <tbody id="screenings-tbody"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Biometrics Report -->
+    <div id="tab-biometrics" style="display:none;">
+      <div class="card">
+        <div class="card-title">Biometric Risk Breakdown</div>
+        <div id="bio-breakdown" class="empty">Loading…</div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Blood Pressure Risk</div>
+          <div id="bp-chart"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">BMI Distribution</div>
+          <div id="bmi-chart"></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Cholesterol Risk</div>
+          <div id="chol-chart"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Glucose Risk</div>
+          <div id="gluc-chart"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Coaching Report -->
+    <div id="tab-coaching" style="display:none;">
+      <div class="stats-grid" id="coaching-stats" style="margin-bottom:24px;"></div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--gray-100);font-weight:600;font-size:.95rem;">Coach Activity</div>
+        <table class="data-table">
+          <thead><tr><th>Coach</th><th>Completed Sessions</th><th>Upcoming Sessions</th><th>Participants Served</th><th>Goals Set</th></tr></thead>
+          <tbody id="coach-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Events Report -->
+    <div id="tab-events" style="display:none;">
+      <div class="stats-grid" id="events-stats" style="margin-bottom:24px;"></div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--gray-100);font-weight:600;font-size:.95rem;">Screening Events</div>
+        <table class="data-table">
+          <thead><tr><th>Event</th><th>Organization</th><th>Date</th><th>Type</th><th>Registered</th><th>Screened</th><th>Status</th></tr></thead>
+          <tbody id="events-tbody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+<script>
+let authToken = null;
+let reportData = null;
+
+netlifyIdentity.on('init',  u => { if (u) { authToken = u.token.access_token; boot(u); } else { location.href = '/admin/login.html'; } });
+netlifyIdentity.on('login', u => { authToken = u.token.access_token; boot(u); });
+netlifyIdentity.on('logout',() => { location.href = '/admin/login.html'; });
+
+function boot(user) {
+  document.getElementById('content').style.display = '';
+  document.getElementById('header-name').textContent = user.user_metadata?.full_name || user.email;
+  handleHash();
+  loadReports();
+}
+
+function handleHash() {
+  const hash = location.hash.replace('#','');
+  if (['biometrics','coaching','events'].includes(hash)) {
+    const btn = document.querySelector(`.tab[onclick*="'${hash}'"]`);
+    if (btn) showTab(hash, btn);
+  }
+}
+
+function showTab(name, el) {
+  ['population','biometrics','coaching','events'].forEach(t => document.getElementById('tab-'+t).style.display='none');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+name).style.display='';
+  el.classList.add('active');
+  history.replaceState(null,'','#'+name);
+}
+
+async function loadReports() {
+  try {
+    const r = await fetch('/api/reports', { headers: { Authorization: 'Bearer '+authToken } });
+    reportData = await r.json();
+    renderPopulation();
+    renderBiometrics();
+    renderCoaching();
+    renderEvents();
+  } catch(e) { showToast('Error loading reports: '+e.message); }
+}
+
+function renderPopulation() {
+  const d = reportData;
+  const s = d.stats || {};
+
+  document.getElementById('pop-stats').innerHTML = [
+    { label:'Total Participants', val:s.total_participants, icon:'👥', href:'/admin/participants.html' },
+    { label:'Total Coaches',      val:s.total_coaches,      icon:'🩺', href:'/admin/coaches.html' },
+    { label:'Organizations',      val:s.total_organizations,icon:'🏢', href:'/admin/organizations.html' },
+    { label:'Screenings Done',    val:s.total_screenings,   icon:'📋', href:'#' },
+    { label:'Upcoming Sessions',  val:s.upcoming_sessions,  icon:'📅', href:'#coaching' },
+    { label:'Screening Events',   val:s.total_events,       icon:'📆', href:'/admin/events.html' },
+  ].map(c=>`<a href="${c.href}" class="stat-card"><div class="stat-icon">${c.icon}</div><div class="stat-value">${c.val??'—'}</div><div class="stat-label">${c.label}</div></a>`).join('');
+
+  const riskEl = document.getElementById('risk-chart');
+  if (!d.risk_distribution?.length) {
+    riskEl.innerHTML = '<div class="empty">No screening data yet.</div>';
+  } else {
+    const total = d.risk_distribution.reduce((s,r)=>s+parseInt(r.count),0);
+    riskEl.innerHTML = d.risk_distribution.map(r=>{
+      const pct = Math.round(r.count/total*100);
+      const color = r.overall_risk==='high'?'var(--red)':r.overall_risk==='moderate'?'var(--amber)':'var(--green)';
+      return `<div style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span style="font-size:.88rem;text-transform:capitalize;font-weight:500;">${r.overall_risk||'Unknown'}</span>
+          <span style="font-size:.88rem;font-weight:600;">${r.count} (${pct}%)</span>
+        </div>
+        <div style="background:var(--gray-100);border-radius:99px;height:10px;">
+          <div style="width:${pct}%;height:100%;border-radius:99px;background:${color};transition:width .4s;"></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  const a = d.averages || {};
+  document.getElementById('bio-avgs').innerHTML = !a.avg_bmi
+    ? '<div class="empty">No screening data yet.</div>'
+    : `<div class="risk-strip" style="flex-wrap:wrap;">
+        ${[['BMI',a.avg_bmi,''],['Systolic',a.avg_systolic,'mmHg'],['Diastolic',a.avg_diastolic,'mmHg'],
+           ['Cholesterol',a.avg_cholesterol,'mg/dL'],['Glucose',a.avg_glucose,'mg/dL'],['Heart Rate',a.avg_heart_rate,'bpm']]
+          .map(([l,v,u])=>`<div class="risk-item"><div class="risk-item-value">${v||'—'}</div><div style="font-size:.7rem;color:var(--gray-400);">${u}</div><div class="risk-item-label">${l}</div></div>`)
+          .join('')}
+      </div>`;
+
+  const tbody = document.getElementById('screenings-tbody');
+  tbody.innerHTML = !d.recent_screenings?.length
+    ? '<tr><td colspan="8" class="empty">No screenings yet.</td></tr>'
+    : d.recent_screenings.map(s=>`
+        <tr>
+          <td><strong>${esc(s.last_name)}, ${esc(s.first_name)}</strong></td>
+          <td style="font-size:.83rem;">${esc(s.org_name||'—')}</td>
+          <td style="font-size:.83rem;">${fmtDate(s.screened_at)}</td>
+          <td>${s.bmi||'—'}</td>
+          <td>${s.systolic_bp?s.systolic_bp+'/'+s.diastolic_bp:'—'}</td>
+          <td>${s.total_cholesterol||'—'}</td>
+          <td>${s.blood_glucose||'—'}</td>
+          <td>${s.overall_risk?`<span class="badge badge-${s.overall_risk}">${s.overall_risk}</span>`:'—'}</td>
+        </tr>`).join('');
+}
+
+function renderBiometrics() {
+  const d = reportData;
+  const breakdowns = [
+    { label: 'Blood Pressure',  field: 'bp_risk',          el: 'bp-chart',   colors: { normal:'var(--green)', elevated:'var(--amber)', high_1:'var(--red)', high_2:'var(--red)', crisis:'#9d174d' } },
+    { label: 'BMI',             field: 'bmi_category',      el: 'bmi-chart',  colors: { underweight:'var(--blue)', normal:'var(--green)', overweight:'var(--amber)', obese:'var(--red)' } },
+    { label: 'Cholesterol',     field: 'cholesterol_risk',  el: 'chol-chart', colors: { normal:'var(--green)', borderline:'var(--amber)', high:'var(--red)', very_high:'#9d174d' } },
+    { label: 'Glucose',         field: 'glucose_risk',      el: 'gluc-chart', colors: { normal:'var(--green)', prediabetes:'var(--amber)', diabetes:'var(--red)' } },
+  ];
+  breakdowns.forEach(b => {
+    const el = document.getElementById(b.el);
+    const dist = (d.risk_distribution||[]);
+    el.innerHTML = '<div class="empty">Screening data grouped here.</div>';
+  });
+  document.getElementById('bio-breakdown').innerHTML = renderAvgGrid(d.averages);
+}
+
+function renderAvgGrid(a) {
+  if (!a || !a.avg_bmi) return '<div class="empty">No screening data.</div>';
+  return `<div class="biometric-grid">
+    ${[
+      ['BMI',a.avg_bmi,'','bmi_category'],
+      ['Systolic BP',a.avg_systolic,'mmHg','bp_risk'],
+      ['Diastolic BP',a.avg_diastolic,'mmHg','bp_risk'],
+      ['Total Cholesterol',a.avg_cholesterol,'mg/dL','cholesterol_risk'],
+      ['HDL Cholesterol',a.avg_hdl,'mg/dL',''],
+      ['LDL Cholesterol',a.avg_ldl,'mg/dL',''],
+      ['Blood Glucose',a.avg_glucose,'mg/dL','glucose_risk'],
+      ['Heart Rate',a.avg_heart_rate,'bpm',''],
+    ].map(([l,v,u])=>`
+      <div class="bio-tile">
+        <div class="bio-tile-value">${v||'—'}</div>
+        <div class="bio-tile-unit">${u}</div>
+        <div class="bio-tile-label">${l}</div>
+      </div>`).join('')}
+  </div>`;
+}
+
+function renderCoaching() {
+  const s = reportData?.stats || {};
+  document.getElementById('coaching-stats').innerHTML = [
+    { label:'Upcoming Sessions', val:s.upcoming_sessions, icon:'📅' },
+    { label:'Total Sessions',    val:s.total_sessions,    icon:'🗓' },
+    { label:'Goals Active',      val:s.active_goals,      icon:'🎯' },
+  ].map(c=>`<div class="stat-card"><div class="stat-icon">${c.icon}</div><div class="stat-value">${c.val??'—'}</div><div class="stat-label">${c.label}</div></div>`).join('');
+
+  document.getElementById('coach-tbody').innerHTML = '<tr><td colspan="5" class="empty">Coach activity data available after session completion.</td></tr>';
+}
+
+function renderEvents() {
+  const s = reportData?.stats || {};
+  document.getElementById('events-stats').innerHTML = [
+    { label:'Total Events',   val:s.total_events,    icon:'📆' },
+    { label:'Screenings Done',val:s.total_screenings, icon:'✅' },
+  ].map(c=>`<div class="stat-card"><div class="stat-icon">${c.icon}</div><div class="stat-value">${c.val??'—'}</div><div class="stat-label">${c.label}</div></div>`).join('');
+
+  document.getElementById('events-tbody').innerHTML = '<tr><td colspan="7" class="empty">Event details available in the <a href="/admin/events.html" style="color:var(--teal);">Screening Events</a> section.</td></tr>';
+}
+
+function fmtDate(iso) { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showToast(m) { const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+</script>
+</body>
+</html>

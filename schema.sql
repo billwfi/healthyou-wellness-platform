@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS coaches (
   bio         TEXT,
   avatar_url  TEXT,
   specialty   TEXT,
+  phone       TEXT,
   active      BOOLEAN DEFAULT true,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
@@ -145,13 +146,14 @@ CREATE TABLE IF NOT EXISTS goals (
 
 -- ── Coach Availability ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS coach_availability (
-  id            SERIAL PRIMARY KEY,
-  coach_id      INTEGER REFERENCES coaches(id) ON DELETE CASCADE,
-  day_of_week   INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
-  start_time    TIME NOT NULL,
-  end_time      TIME NOT NULL,
-  active        BOOLEAN DEFAULT true,
-  UNIQUE (coach_id, day_of_week, start_time)
+  id             SERIAL PRIMARY KEY,
+  coach_id       INTEGER REFERENCES coaches(id) ON DELETE CASCADE,
+  day_of_week    INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+  start_time     TIME NOT NULL,
+  end_time       TIME NOT NULL,
+  effective_from DATE,    -- first day of the month this block applies to
+  effective_to   DATE,    -- last day of the month this block applies to
+  active         BOOLEAN DEFAULT true
 );
 
 -- ── Organization Contacts ────────────────────────────────────────────────────
@@ -192,6 +194,24 @@ CREATE TABLE IF NOT EXISTS departments (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ── Eligibility ──────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS eligibility (
+  id               SERIAL PRIMARY KEY,
+  org_id           INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  employee_id      TEXT,
+  first_name       TEXT,
+  last_name        TEXT,
+  email            TEXT,
+  date_of_birth    DATE,
+  department       TEXT,
+  location         TEXT,
+  status           TEXT DEFAULT 'active',  -- active | inactive | terminated
+  coverage_tier    TEXT,
+  effective_date   DATE,
+  termination_date DATE,
+  created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ── Indexes ───────────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_participants_org        ON participants(org_id);
 CREATE INDEX IF NOT EXISTS idx_participants_coach      ON participants(assigned_coach_id);
@@ -208,3 +228,85 @@ CREATE INDEX IF NOT EXISTS idx_availability_coach      ON coach_availability(coa
 CREATE INDEX IF NOT EXISTS idx_contacts_org            ON org_contacts(org_id);
 CREATE INDEX IF NOT EXISTS idx_locations_org           ON org_locations(org_id);
 CREATE INDEX IF NOT EXISTS idx_departments_loc         ON departments(location_id);
+CREATE INDEX IF NOT EXISTS idx_eligibility_org         ON eligibility(org_id);
+CREATE INDEX IF NOT EXISTS idx_eligibility_email       ON eligibility(email);
+
+-- ── Health Tips ───────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS health_tips (
+  id                SERIAL PRIMARY KEY,
+  title             TEXT NOT NULL,
+  category          TEXT DEFAULT 'general',
+  status            TEXT DEFAULT 'draft',   -- draft | published | archived
+  author            TEXT,
+  read_time_minutes INTEGER,
+  summary           TEXT,
+  content           TEXT,
+  image_url         TEXT,
+  tags              JSONB DEFAULT '[]',
+  published_at      TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_health_tips_status   ON health_tips(status);
+CREATE INDEX IF NOT EXISTS idx_health_tips_category ON health_tips(category);
+
+-- ── Testimonials ──────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS testimonials (
+  id               SERIAL PRIMARY KEY,
+  participant_name TEXT NOT NULL,
+  organization     TEXT,
+  title_role       TEXT,
+  status           TEXT DEFAULT 'draft',  -- draft | published | archived
+  quote            TEXT,
+  outcome          TEXT,
+  photo_url        TEXT,
+  rating           INTEGER CHECK (rating BETWEEN 1 AND 5),
+  featured         BOOLEAN DEFAULT false,
+  sort_order       INTEGER DEFAULT 0,
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_testimonials_status   ON testimonials(status);
+CREATE INDEX IF NOT EXISTS idx_testimonials_featured ON testimonials(featured);
+
+-- ── Content Library ───────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS content_library (
+  id            SERIAL PRIMARY KEY,
+  title         TEXT NOT NULL,
+  resource_type TEXT DEFAULT 'article',   -- article | video | pdf | link | infographic | podcast
+  category      TEXT DEFAULT 'general',
+  status        TEXT DEFAULT 'published', -- published | draft | archived
+  audience      TEXT DEFAULT 'all',       -- all | high_risk | moderate_risk | coaches
+  url           TEXT,
+  description   TEXT,
+  author        TEXT,
+  duration      TEXT,
+  thumbnail_url TEXT,
+  tags          JSONB DEFAULT '[]',
+  featured      BOOLEAN DEFAULT false,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_library_status   ON content_library(status);
+CREATE INDEX IF NOT EXISTS idx_library_category ON content_library(category);
+CREATE INDEX IF NOT EXISTS idx_library_type     ON content_library(resource_type);
+
+-- ── System Settings ───────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS system_settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Event Registrations ───────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS event_registrations (
+  id                  SERIAL PRIMARY KEY,
+  event_id            INTEGER NOT NULL REFERENCES screening_events(id) ON DELETE CASCADE,
+  participant_id      INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
+  registered_at       TIMESTAMPTZ DEFAULT NOW(),
+  registration_source TEXT DEFAULT 'manual',    -- csv | self | manual
+  status              TEXT DEFAULT 'registered', -- registered | screened | no_show | cancelled
+  UNIQUE (event_id, participant_id)
+);
+CREATE INDEX IF NOT EXISTS idx_event_reg_event       ON event_registrations(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_reg_participant ON event_registrations(participant_id);

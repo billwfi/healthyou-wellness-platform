@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>System Settings — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo.png" alt="Healthyou"></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <div class="sidebar-section" style="margin-top:12px;">Users</div>
+    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <a href="/admin/organizations.html" class="sidebar-item">Organizations</a>
+    <div class="sidebar-section" style="margin-top:12px;">Programs</div>
+    <a href="/admin/events.html" class="sidebar-item">Screening Events</a>
+    <div class="sidebar-section" style="margin-top:12px;">Communication</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/settings.html" class="sidebar-item active">System Settings</a>
+    <div class="sidebar-section" style="margin-top:12px;">Portals</div>
+    <a href="/coach/" class="sidebar-item">Coach Portal →</a>
+    <a href="/screener/" class="sidebar-item">Screener Portal →</a>
+    <a href="/book/" class="sidebar-item">Booking Page →</a>
+  </nav>
+</aside>
+
+<main class="container has-sidebar">
+  <div id="content" style="display:none;">
+    <h1 class="page-title">System Settings</h1>
+    <p class="page-subtitle">Configure platform-wide settings, branding, and features.</p>
+
+    <!-- Tab nav -->
+    <div class="tabs" style="margin-bottom:28px;">
+      <button class="tab active" onclick="showTab('general',this)">General</button>
+      <button class="tab" id="tab-branding" onclick="showTab('branding',this)">Branding</button>
+      <button class="tab" id="tab-features" onclick="showTab('features',this)">Features</button>
+      <button class="tab" id="tab-udfs" onclick="showTab('udfs',this)">Custom Fields</button>
+      <button class="tab" id="tab-security" onclick="showTab('security',this)">Security</button>
+    </div>
+
+    <!-- General -->
+    <div id="tab-general" class="tab-panel">
+      <form onsubmit="saveSection(event,'general')">
+        <div class="card">
+          <div class="card-title">Platform Information</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Platform Name</label>
+              <input type="text" id="g-platform-name" placeholder="HealYou Wellness"/>
+            </div>
+            <div class="form-group">
+              <label>Support Email</label>
+              <input type="email" id="g-support-email" placeholder="support@healthyou.com"/>
+            </div>
+            <div class="form-group">
+              <label>Support Phone</label>
+              <input type="tel" id="g-support-phone" placeholder="(800) 555-0100"/>
+            </div>
+            <div class="form-group">
+              <label>Default Timezone</label>
+              <select id="g-timezone">
+                <option value="America/New_York">Eastern (ET)</option>
+                <option value="America/Chicago">Central (CT)</option>
+                <option value="America/Denver">Mountain (MT)</option>
+                <option value="America/Los_Angeles">Pacific (PT)</option>
+                <option value="America/Anchorage">Alaska (AKT)</option>
+                <option value="Pacific/Honolulu">Hawaii (HT)</option>
+                <option value="UTC">UTC</option>
+              </select>
+            </div>
+            <div class="form-group span-2">
+              <label>Platform Description</label>
+              <textarea id="g-description" rows="2" placeholder="Brief description shown on login page…"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Coaching Defaults</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Default Session Duration (minutes)</label>
+              <input type="number" id="g-session-duration" min="15" max="180" step="15" placeholder="60"/>
+            </div>
+            <div class="form-group">
+              <label>Booking Lead Time (hours)</label>
+              <input type="number" id="g-booking-lead" min="1" max="168" placeholder="24"/>
+            </div>
+            <div class="form-group">
+              <label>Max Sessions Per Participant Per Month</label>
+              <input type="number" id="g-max-sessions" min="1" placeholder="4"/>
+            </div>
+            <div class="form-group">
+              <label>Cancellation Window (hours)</label>
+              <input type="number" id="g-cancel-window" min="1" placeholder="24"/>
+            </div>
+          </div>
+        </div>
+        <div class="save-bar">
+          <span id="general-saved" style="font-size:.84rem;color:var(--teal);display:none;">Saved!</span>
+          <button type="submit" class="btn btn-primary">Save General Settings</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Branding -->
+    <div id="tab-branding" class="tab-panel" style="display:none;">
+      <form onsubmit="saveSection(event,'branding')">
+        <div class="card">
+          <div class="card-title">Branding &amp; Appearance</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Primary Color</label>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input type="color" id="b-primary-color" value="#0d9488" style="width:48px;height:36px;padding:2px;cursor:pointer;"/>
+                <input type="text" id="b-primary-color-hex" value="#0d9488" style="flex:1;" oninput="document.getElementById('b-primary-color').value=this.value"/>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Secondary Color</label>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input type="color" id="b-secondary-color" value="#0f766e" style="width:48px;height:36px;padding:2px;cursor:pointer;"/>
+                <input type="text" id="b-secondary-color-hex" value="#0f766e" style="flex:1;" oninput="document.getElementById('b-secondary-color').value=this.value"/>
+              </div>
+            </div>
+            <div class="form-group span-2">
+              <label>Logo URL</label>
+              <input type="url" id="b-logo-url" placeholder="https://…/logo.png"/>
+            </div>
+            <div class="form-group span-2">
+              <label>Favicon URL</label>
+              <input type="url" id="b-favicon-url" placeholder="https://…/favicon.ico"/>
+            </div>
+            <div class="form-group span-2">
+              <label>Login Page Welcome Message</label>
+              <textarea id="b-welcome-msg" rows="2" placeholder="Sign in to access your personalized wellness experience."></textarea>
+            </div>
+            <div class="form-group span-2">
+              <label>Footer Text</label>
+              <input type="text" id="b-footer" placeholder="© 2026 HealYou Wellness. All rights reserved."/>
+            </div>
+          </div>
+        </div>
+        <div class="save-bar">
+          <span id="branding-saved" style="font-size:.84rem;color:var(--teal);display:none;">Saved!</span>
+          <button type="submit" class="btn btn-primary">Save Branding</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Features -->
+    <div id="tab-features" class="tab-panel" style="display:none;">
+      <form onsubmit="saveSection(event,'features')">
+        <div class="card">
+          <div class="card-title">Feature Flags</div>
+          <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:16px;">Enable or disable modules across the platform.</p>
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div id="feature-list"></div>
+          </div>
+        </div>
+        <div class="save-bar">
+          <span id="features-saved" style="font-size:.84rem;color:var(--teal);display:none;">Saved!</span>
+          <button type="submit" class="btn btn-primary">Save Features</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Custom Fields (UDFs) -->
+    <div id="tab-udfs" class="tab-panel" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div>
+          <div class="card-title" style="margin-bottom:2px;">Custom Participant Fields</div>
+          <p style="font-size:.84rem;color:var(--gray-400);">Add extra fields to participant profiles for your organization's needs.</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="addUdf()">+ Add Field</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <table class="data-table">
+          <thead><tr><th>Label</th><th>Field Type</th><th>Required</th><th>Active</th><th style="width:100px;">Actions</th></tr></thead>
+          <tbody id="udf-tbody"><tr><td colspan="5" class="empty">No custom fields yet.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Security -->
+    <div id="tab-security" class="tab-panel" style="display:none;">
+      <form onsubmit="saveSection(event,'security')">
+        <div class="card">
+          <div class="card-title">Security &amp; Access</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Session Timeout (minutes)</label>
+              <input type="number" id="s-session-timeout" min="5" max="1440" placeholder="60"/>
+            </div>
+            <div class="form-group">
+              <label>Max Login Attempts</label>
+              <input type="number" id="s-max-attempts" min="3" max="20" placeholder="5"/>
+            </div>
+            <div class="form-group span-2" style="display:flex;align-items:center;gap:8px;padding-top:4px;">
+              <input type="checkbox" id="s-require-2fa" style="width:auto;"/>
+              <label for="s-require-2fa" style="margin:0;cursor:pointer;">Require two-factor authentication for admin accounts</label>
+            </div>
+            <div class="form-group span-2" style="display:flex;align-items:center;gap:8px;padding-top:4px;">
+              <input type="checkbox" id="s-audit-log" style="width:auto;" checked/>
+              <label for="s-audit-log" style="margin:0;cursor:pointer;">Enable audit logging for admin actions</label>
+            </div>
+            <div class="form-group span-2">
+              <label>Allowed IP Ranges (one per line, blank = all)</label>
+              <textarea id="s-ip-allowlist" rows="3" placeholder="e.g. 192.168.1.0/24&#10;10.0.0.0/8"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="save-bar">
+          <span id="security-saved" style="font-size:.84rem;color:var(--teal);display:none;">Saved!</span>
+          <button type="submit" class="btn btn-primary">Save Security Settings</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+<script>
+let authToken = null;
+let settings = {};
+
+const FEATURES = [
+  { key: 'coaching',       label: 'Coaching Sessions',    desc: 'One-on-one and group coaching booking' },
+  { key: 'screenings',     label: 'Biometric Screenings', desc: 'On-site and virtual health screenings' },
+  { key: 'health_tips',    label: 'Health Tips',          desc: 'Published health tip articles for participants' },
+  { key: 'library',        label: 'Content Library',      desc: 'Resource library visible to participants' },
+  { key: 'testimonials',   label: 'Testimonials',         desc: 'Participant success stories on the public site' },
+  { key: 'self_booking',   label: 'Self-Service Booking', desc: 'Participants can book their own coaching sessions' },
+  { key: 'goals',          label: 'Goals Tracking',       desc: 'Coach-assigned wellness goals for participants' },
+  { key: 'eligibility',    label: 'Eligibility Checks',   desc: 'Verify participant eligibility before registration' },
+  { key: 'reports',        label: 'Reporting Dashboard',  desc: 'Population-level analytics and exports' },
+];
+
+netlifyIdentity.on('init',  u => { if (u) { authToken = u.token.access_token; boot(u); } else { location.href = '/admin/login.html'; } });
+netlifyIdentity.on('login', u => { authToken = u.token.access_token; boot(u); });
+netlifyIdentity.on('logout',() => { location.href = '/admin/login.html'; });
+
+function boot(user) {
+  document.getElementById('content').style.display = '';
+  document.getElementById('header-name').textContent = user.user_metadata?.full_name || user.email;
+  renderFeatures();
+  loadSettings();
+  handleHashTab();
+}
+
+function handleHashTab() {
+  const hash = location.hash.replace('#','');
+  const validTabs = ['general','branding','features','udfs','security'];
+  if (validTabs.includes(hash)) {
+    const btn = document.querySelector(`.tab[onclick*="'${hash}'"]`);
+    if (btn) showTab(hash, btn);
+  }
+}
+
+function showTab(name, el) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.style.display='none');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+name).style.display = '';
+  el.classList.add('active');
+  history.replaceState(null,'','#'+name);
+}
+
+function renderFeatures() {
+  document.getElementById('feature-list').innerHTML = FEATURES.map(f => `
+    <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:10px;border:1px solid var(--gray-200);border-radius:var(--radius);">
+      <input type="checkbox" id="feat-${f.key}" style="width:auto;margin-top:2px;" checked/>
+      <div>
+        <div style="font-weight:600;font-size:.88rem;">${f.label}</div>
+        <div style="font-size:.78rem;color:var(--gray-400);">${f.desc}</div>
+      </div>
+    </label>`).join('');
+}
+
+async function loadSettings() {
+  try {
+    const r = await fetch('/api/settings', { headers: { Authorization: 'Bearer '+authToken } });
+    if (!r.ok) return;
+    settings = await r.json();
+    applySettings();
+  } catch(e) { /* settings API may not exist yet — use defaults */ }
+}
+
+function applySettings() {
+  const s = settings;
+  if (!s) return;
+  // General
+  if (s.platform_name)     document.getElementById('g-platform-name').value    = s.platform_name;
+  if (s.support_email)     document.getElementById('g-support-email').value     = s.support_email;
+  if (s.support_phone)     document.getElementById('g-support-phone').value     = s.support_phone;
+  if (s.timezone)          document.getElementById('g-timezone').value          = s.timezone;
+  if (s.description)       document.getElementById('g-description').value       = s.description;
+  if (s.session_duration)  document.getElementById('g-session-duration').value  = s.session_duration;
+  if (s.booking_lead_time) document.getElementById('g-booking-lead').value      = s.booking_lead_time;
+  if (s.max_sessions)      document.getElementById('g-max-sessions').value      = s.max_sessions;
+  if (s.cancel_window)     document.getElementById('g-cancel-window').value     = s.cancel_window;
+  // Branding
+  if (s.primary_color)     { document.getElementById('b-primary-color').value     = s.primary_color; document.getElementById('b-primary-color-hex').value   = s.primary_color; }
+  if (s.secondary_color)   { document.getElementById('b-secondary-color').value   = s.secondary_color; document.getElementById('b-secondary-color-hex').value = s.secondary_color; }
+  if (s.logo_url)          document.getElementById('b-logo-url').value          = s.logo_url;
+  if (s.favicon_url)       document.getElementById('b-favicon-url').value       = s.favicon_url;
+  if (s.welcome_message)   document.getElementById('b-welcome-msg').value       = s.welcome_message;
+  if (s.footer_text)       document.getElementById('b-footer').value            = s.footer_text;
+  // Features
+  if (s.features) {
+    FEATURES.forEach(f => {
+      const el = document.getElementById('feat-'+f.key);
+      if (el && s.features[f.key] !== undefined) el.checked = s.features[f.key];
+    });
+  }
+  // Security
+  if (s.session_timeout)   document.getElementById('s-session-timeout').value  = s.session_timeout;
+  if (s.max_login_attempts)document.getElementById('s-max-attempts').value     = s.max_login_attempts;
+  if (s.require_2fa)       document.getElementById('s-require-2fa').checked    = s.require_2fa;
+  if (s.audit_log !== undefined) document.getElementById('s-audit-log').checked = s.audit_log;
+  if (s.ip_allowlist)      document.getElementById('s-ip-allowlist').value     = (s.ip_allowlist||[]).join('\n');
+}
+
+async function saveSection(e, section) {
+  e.preventDefault();
+  let payload = {};
+  if (section === 'general') {
+    payload = {
+      platform_name:     document.getElementById('g-platform-name').value.trim(),
+      support_email:     document.getElementById('g-support-email').value.trim(),
+      support_phone:     document.getElementById('g-support-phone').value.trim(),
+      timezone:          document.getElementById('g-timezone').value,
+      description:       document.getElementById('g-description').value.trim(),
+      session_duration:  parseInt(document.getElementById('g-session-duration').value)||60,
+      booking_lead_time: parseInt(document.getElementById('g-booking-lead').value)||24,
+      max_sessions:      parseInt(document.getElementById('g-max-sessions').value)||4,
+      cancel_window:     parseInt(document.getElementById('g-cancel-window').value)||24,
+    };
+  } else if (section === 'branding') {
+    payload = {
+      primary_color:   document.getElementById('b-primary-color').value,
+      secondary_color: document.getElementById('b-secondary-color').value,
+      logo_url:        document.getElementById('b-logo-url').value.trim(),
+      favicon_url:     document.getElementById('b-favicon-url').value.trim(),
+      welcome_message: document.getElementById('b-welcome-msg').value.trim(),
+      footer_text:     document.getElementById('b-footer').value.trim(),
+    };
+  } else if (section === 'features') {
+    const features = {};
+    FEATURES.forEach(f => { features[f.key] = document.getElementById('feat-'+f.key).checked; });
+    payload = { features };
+  } else if (section === 'security') {
+    payload = {
+      session_timeout:    parseInt(document.getElementById('s-session-timeout').value)||60,
+      max_login_attempts: parseInt(document.getElementById('s-max-attempts').value)||5,
+      require_2fa:        document.getElementById('s-require-2fa').checked,
+      audit_log:          document.getElementById('s-audit-log').checked,
+      ip_allowlist:       document.getElementById('s-ip-allowlist').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    };
+  }
+  try {
+    const r = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { Authorization:'Bearer '+authToken, 'Content-Type':'application/json' },
+      body: JSON.stringify({ section, ...payload })
+    });
+    if (!r.ok) throw new Error(await r.text());
+    settings = { ...settings, ...payload };
+    showToast('Settings saved!');
+    const savedEl = document.getElementById(section+'-saved');
+    if (savedEl) { savedEl.style.display=''; setTimeout(()=>savedEl.style.display='none', 2500); }
+  } catch(err) { showToast('Error: '+err.message); }
+}
+
+function addUdf() {
+  showToast('Custom field management coming soon.');
+}
+
+function showToast(m) { const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+</script>
+</body>
+</html>

@@ -1,156 +1,234 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Admin Dashboard — HealYou Wellness</title>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Control Panel — HealYou Admin</title>
   <link rel="stylesheet" href="/assets/css/style.css"/>
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body>
 <header class="header">
-  <a class="header-logo" href="/admin/"><img src="/assets/img/logo-icon.svg" alt="">Health<span>you</span></a>
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo.png" alt="Healthyou"></a>
   <div style="display:flex;align-items:center;gap:12px;">
     <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
     <span style="font-size:.75rem;opacity:.6;padding:2px 8px;border:1px solid rgba(255,255,255,.4);border-radius:99px;">Admin</span>
     <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
   </div>
 </header>
-<nav class="subnav">
-  <a href="/admin/" class="subnav-item active">Dashboard</a>
-  <a href="/admin/organizations.html" class="subnav-item">Organizations</a>
-  <a href="/admin/participants.html" class="subnav-item">Participants</a>
-  <a href="/admin/coaches.html" class="subnav-item">Coaches</a>
-  <a href="/admin/events.html" class="subnav-item">Screening Events</a>
-  <a href="/coach/" class="subnav-item" style="margin-left:auto;">Coach Portal →</a>
-</nav>
 
-<main class="container">
-  <div id="login-wall" class="login-wall">
-    <h2>Admin Portal</h2>
-    <p>Sign in to manage the wellness platform.</p>
-    <button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button>
-    <div class="demo-hint">
-      <div class="demo-hint-label">Demo Access</div>
-      <div class="demo-hint-row"><strong>Email:</strong><code>demo@healthyou.com</code></div>
-      <div class="demo-hint-row"><strong>Password:</strong><code>Demo1234!</code></div>
-      <button class="btn btn-ghost btn-sm" style="margin-top:10px;width:100%;" onclick="netlifyIdentity.open()">Sign In as Demo Admin</button>
-    </div>
-  </div>
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item active">Control Panel</a>
 
+    <div class="sidebar-section" style="margin-top:12px;">Users</div>
+    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <a href="/admin/organizations.html" class="sidebar-item">Organizations</a>
+
+    <div class="sidebar-section" style="margin-top:12px;">Programs</div>
+    <a href="/admin/events.html" class="sidebar-item">Screening Events</a>
+
+    <div class="sidebar-section" style="margin-top:12px;">Communication</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/settings.html" class="sidebar-item">System Settings</a>
+
+    <div class="sidebar-section" style="margin-top:12px;">Portals</div>
+    <a href="/coach/" class="sidebar-item">Coach Portal →</a>
+    <a href="/screener/" class="sidebar-item">Screener Portal →</a>
+    <a href="/book/" class="sidebar-item">Booking Page →</a>
+  </nav>
+</aside>
+
+<main class="container has-sidebar">
   <div id="content" style="display:none;">
-    <h1 class="page-title">Dashboard</h1>
+    <h1 class="page-title">Control Panel</h1>
     <p class="page-subtitle" id="welcome-msg"></p>
 
-    <div class="stats-grid" id="stats-grid">
-      <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-value" id="s-participants">—</div><div class="stat-label">Participants</div></div>
-      <div class="stat-card"><div class="stat-icon">🩺</div><div class="stat-value" id="s-coaches">—</div><div class="stat-label">Coaches</div></div>
-      <div class="stat-card"><div class="stat-icon">🏢</div><div class="stat-value" id="s-orgs">—</div><div class="stat-label">Organizations</div></div>
-      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-value" id="s-screenings">—</div><div class="stat-label">Screenings Done</div></div>
-      <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-value" id="s-sessions">—</div><div class="stat-label">Upcoming Sessions</div></div>
-      <div class="stat-card"><div class="stat-icon">📆</div><div class="stat-value" id="s-events">—</div><div class="stat-label">Screening Events</div></div>
+    <!-- Quick stats bar -->
+    <div class="stats-grid" style="margin-bottom:32px;" id="stats-grid">
+      <a href="/admin/participants.html" class="stat-card"><div class="stat-icon">👥</div><div class="stat-value" id="s-participants">—</div><div class="stat-label">Participants</div></a>
+      <a href="/admin/coaches.html" class="stat-card"><div class="stat-icon">🩺</div><div class="stat-value" id="s-coaches">—</div><div class="stat-label">Coaches</div></a>
+      <a href="/admin/organizations.html" class="stat-card"><div class="stat-icon">🏢</div><div class="stat-value" id="s-orgs">—</div><div class="stat-label">Organizations</div></a>
+      <a href="/admin/events.html" class="stat-card"><div class="stat-icon">📋</div><div class="stat-value" id="s-screenings">—</div><div class="stat-label">Screenings Done</div></a>
+      <a href="/admin/events.html" class="stat-card"><div class="stat-icon">📅</div><div class="stat-value" id="s-sessions">—</div><div class="stat-label">Upcoming Sessions</div></a>
+      <a href="/admin/events.html" class="stat-card"><div class="stat-icon">📆</div><div class="stat-value" id="s-events">—</div><div class="stat-label">Screening Events</div></a>
     </div>
 
-    <div class="grid-2">
-      <!-- Risk distribution -->
-      <div class="card">
-        <div class="card-title">Population Risk Distribution</div>
-        <div id="risk-dist" class="empty">Loading…</div>
+    <!-- Control Panel tile grid -->
+    <div class="cp-grid">
+
+      <!-- Users -->
+      <div class="cp-tile">
+        <div class="cp-tile-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div class="cp-tile-title">Users</div>
+        <hr class="cp-tile-divider"/>
+        <ul class="cp-tile-links">
+          <li><a href="/admin/participants.html">Manage Participants</a></li>
+          <li><a href="/admin/eligibility.html">Bulk Update</a></li>
+          <li><a href="/admin/organizations.html">Organizations</a></li>
+          <li><a href="/admin/coaches.html">Coaches</a></li>
+        </ul>
       </div>
 
-      <!-- Avg biometrics -->
-      <div class="card">
-        <div class="card-title">Population Averages</div>
-        <div id="bio-avgs" class="empty">Loading…</div>
+      <!-- Programs -->
+      <div class="cp-tile">
+        <div class="cp-tile-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </div>
+        <div class="cp-tile-title">Programs</div>
+        <hr class="cp-tile-divider"/>
+        <ul class="cp-tile-links">
+          <li><a href="/admin/events.html">Screening Events</a></li>
+          <li><a href="/admin/sessions.html">Coaching Sessions</a></li>
+          <li><a href="/admin/schedules.html">Schedules</a></li>
+          <li><a href="/admin/wellness-score.html">Wellness Score</a></li>
+        </ul>
       </div>
-    </div>
 
-    <!-- Recent screenings -->
-    <div class="card" style="padding:0;overflow:hidden;">
-      <div style="padding:16px 20px;border-bottom:1px solid var(--gray-100);font-weight:600;font-size:.95rem;">Recent Screenings</div>
-      <table class="data-table">
-        <thead><tr><th>Participant</th><th>Date</th><th>BMI</th><th>BP</th><th>Overall Risk</th></tr></thead>
-        <tbody id="recent-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
-      </table>
-    </div>
-  </div>
+      <!-- Site Settings -->
+      <div class="cp-tile">
+        <div class="cp-tile-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 0 1 21 12a10 10 0 0 1-1.93 7.07M4.93 19.07A10 10 0 0 1 3 12a10 10 0 0 1 1.93-7.07"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2"/></svg>
+        </div>
+        <div class="cp-tile-title">Site Settings</div>
+        <hr class="cp-tile-divider"/>
+        <ul class="cp-tile-links">
+          <li><a href="/admin/settings.html">System Settings</a></li>
+          <li><a href="/admin/settings.html#branding">Branding</a></li>
+          <li><a href="/admin/settings.html#features">Feature Flags</a></li>
+        </ul>
+      </div>
+
+      <!-- Profile -->
+      <div class="cp-tile">
+        <div class="cp-tile-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <div class="cp-tile-title">Profile</div>
+        <hr class="cp-tile-divider"/>
+        <ul class="cp-tile-links">
+          <li><a href="/admin/participants.html">Participant Profiles</a></li>
+          <li><a href="/admin/coaches.html">Coach Profiles</a></li>
+          <li><a href="/admin/settings.html#udfs">Custom Fields</a></li>
+        </ul>
+      </div>
+
+      <!-- Components -->
+      <div class="cp-tile">
+        <div class="cp-tile-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        </div>
+        <div class="cp-tile-title">Components</div>
+        <hr class="cp-tile-divider"/>
+        <ul class="cp-tile-links">
+          <li><a href="/admin/organizations.html">Organizations</a></li>
+          <li><a href="/admin/events.html">Event Calendar</a></li>
+          <li><a href="/admin/library.html">Resource Library</a></li>
+        </ul>
+      </div>
+
+      <!-- Communication -->
+      <div class="cp-tile">
+        <div class="cp-tile-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div class="cp-tile-title">Communication</div>
+        <hr class="cp-tile-divider"/>
+        <ul class="cp-tile-links">
+          <li><a href="/admin/health-tips.html">Health Tips</a></li>
+          <li><a href="/admin/health-tips.html">Manage Tip Sets</a></li>
+          <li><a href="/admin/testimonials.html">Testimonials</a></li>
+          <li><a href="/admin/library.html">Library</a></li>
+          <li><a href="/admin/events.html">Event Calendar</a></li>
+        </ul>
+      </div>
+
+      <!-- Security -->
+      <div class="cp-tile">
+        <div class="cp-tile-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div class="cp-tile-title">Security</div>
+        <hr class="cp-tile-divider"/>
+        <ul class="cp-tile-links">
+          <li><a href="/admin/login.html">Access Control</a></li>
+          <li><a href="/admin/settings.html#security">Security Settings</a></li>
+        </ul>
+      </div>
+
+      <!-- Reports -->
+      <div class="cp-tile">
+        <div class="cp-tile-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <div class="cp-tile-title">Reports</div>
+        <hr class="cp-tile-divider"/>
+        <ul class="cp-tile-links">
+          <li><a href="/admin/reports.html">Population Report</a></li>
+          <li><a href="/admin/reports.html#biometrics">Biometrics Summary</a></li>
+          <li><a href="/admin/reports.html#coaching">Coaching Activity</a></li>
+          <li><a href="/admin/reports.html#events">Event Reports</a></li>
+        </ul>
+      </div>
+
+      <!-- Help -->
+      <div class="cp-tile">
+        <div class="cp-tile-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="cp-tile-title">Help</div>
+        <hr class="cp-tile-divider"/>
+        <ul class="cp-tile-links">
+          <li><a href="/book/">Booking Page →</a></li>
+          <li><a href="/coach/">Coach Portal →</a></li>
+          <li><a href="/screener/">Screener Portal →</a></li>
+        </ul>
+      </div>
+
+    </div><!-- /cp-grid -->
+  </div><!-- /content -->
 </main>
+
 <div class="toast" id="toast"></div>
 <script>
 let authToken = null;
 
-netlifyIdentity.on('init',  u => { if (u) { authToken = u.token.access_token; boot(u); } });
+netlifyIdentity.on('init',  u => { if (u) { authToken = u.token.access_token; boot(u); } else { location.href = '/admin/login.html'; } });
 netlifyIdentity.on('login', u => { authToken = u.token.access_token; boot(u); });
-netlifyIdentity.on('logout',() => { document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; });
+netlifyIdentity.on('logout',() => { location.href = '/admin/login.html'; });
 
 async function boot(user) {
-  document.getElementById('login-wall').style.display = 'none';
   document.getElementById('content').style.display = '';
   document.getElementById('header-name').textContent = user.user_metadata?.full_name || user.email;
   document.getElementById('welcome-msg').textContent = 'Welcome back, ' + (user.user_metadata?.full_name || user.email);
-  loadReports();
+  loadStats();
 }
 
-async function loadReports() {
+async function loadStats() {
   try {
     const r = await fetch('/api/reports', { headers: { Authorization: 'Bearer '+authToken } });
+    if (!r.ok) return;
     const d = await r.json();
-
-    // Stats
-    document.getElementById('s-participants').textContent = d.stats.total_participants;
-    document.getElementById('s-coaches').textContent      = d.stats.total_coaches;
-    document.getElementById('s-orgs').textContent         = d.stats.total_organizations;
-    document.getElementById('s-screenings').textContent   = d.stats.total_screenings;
-    document.getElementById('s-sessions').textContent     = d.stats.upcoming_sessions;
-    document.getElementById('s-events').textContent       = d.stats.total_events;
-
-    // Risk distribution
-    const riskEl = document.getElementById('risk-dist');
-    if (!d.risk_distribution?.length) {
-      riskEl.innerHTML = '<div class="empty">No screening data yet.</div>';
-    } else {
-      const total = d.risk_distribution.reduce((s,r) => s + parseInt(r.count), 0);
-      riskEl.innerHTML = d.risk_distribution.map(r => {
-        const pct = Math.round(r.count/total*100);
-        return `<div style="margin-bottom:12px;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-            <span style="font-size:.88rem;text-transform:capitalize;">${r.overall_risk}</span>
-            <span style="font-size:.88rem;font-weight:600;">${r.count} (${pct}%)</span>
-          </div>
-          <div style="background:var(--gray-100);border-radius:99px;height:8px;">
-            <div style="width:${pct}%;height:100%;border-radius:99px;background:${r.overall_risk==='high'?'var(--red)':r.overall_risk==='moderate'?'var(--amber)':'var(--green)'}"></div>
-          </div>
-        </div>`;
-      }).join('');
-    }
-
-    // Averages
-    const a = d.averages;
-    const bioEl = document.getElementById('bio-avgs');
-    bioEl.innerHTML = !a.avg_bmi ? '<div class="empty">No screening data yet.</div>' :
-      `<div class="risk-strip" style="flex-wrap:wrap;">
-        ${[['BMI',a.avg_bmi,''],['Systolic BP',a.avg_systolic,'mmHg'],['Diastolic BP',a.avg_diastolic,'mmHg'],
-           ['Cholesterol',a.avg_cholesterol,'mg/dL'],['Glucose',a.avg_glucose,'mg/dL'],['Heart Rate',a.avg_heart_rate,'bpm']]
-          .map(([l,v,u])=>`<div class="risk-item"><div class="risk-item-value">${v||'—'}</div><div style="font-size:.7rem;color:var(--gray-400);">${u}</div><div class="risk-item-label">${l}</div></div>`)
-          .join('')}
-      </div>`;
-
-    // Recent screenings
-    const tbody = document.getElementById('recent-tbody');
-    tbody.innerHTML = !d.recent_screenings?.length
-      ? '<tr><td colspan="5" class="empty">No screenings yet.</td></tr>'
-      : d.recent_screenings.map(s => `
-          <tr>
-            <td><strong>${esc(s.last_name)}, ${esc(s.first_name)}</strong></td>
-            <td>${fmtDate(s.screened_at)}</td>
-            <td>${s.bmi||'—'}</td>
-            <td>${s.systolic_bp ? s.systolic_bp+'/'+s.diastolic_bp : '—'}</td>
-            <td>${s.overall_risk ? `<span class="badge badge-${s.overall_risk}">${s.overall_risk}</span>` : '—'}</td>
-          </tr>`).join('');
-  } catch(e) { showToast('Error loading reports: '+e.message); }
+    document.getElementById('s-participants').textContent = d.stats?.total_participants ?? '—';
+    document.getElementById('s-coaches').textContent      = d.stats?.total_coaches ?? '—';
+    document.getElementById('s-orgs').textContent         = d.stats?.total_organizations ?? '—';
+    document.getElementById('s-screenings').textContent   = d.stats?.total_screenings ?? '—';
+    document.getElementById('s-sessions').textContent     = d.stats?.upcoming_sessions ?? '—';
+    document.getElementById('s-events').textContent       = d.stats?.total_events ?? '—';
+  } catch(e) { /* stats are non-critical */ }
 }
 
-function fmtDate(iso) { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
-function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function showToast(m) { const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
 </script>
-</body></html>
+</body>
+</html>

@@ -8,21 +8,37 @@
 </head>
 <body>
 <header class="header">
-  <a class="header-logo" href="/admin/"><img src="/assets/img/logo-icon.svg" alt="">Health<span>you</span></a>
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo.png" alt="Healthyou"></a>
   <div style="display:flex;align-items:center;gap:12px;">
     <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
     <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
   </div>
 </header>
-<nav class="subnav">
-  <a href="/admin/" class="subnav-item">Dashboard</a>
-  <a href="/admin/organizations.html" class="subnav-item">Organizations</a>
-  <a href="/admin/participants.html" class="subnav-item">Participants</a>
-  <a href="/admin/coaches.html" class="subnav-item active">Coaches</a>
-  <a href="/admin/events.html" class="subnav-item">Screening Events</a>
-</nav>
-<main class="container">
-  <div id="login-wall" class="login-wall"><h2>Admin Portal</h2><p>Sign in to continue.</p><button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button></div>
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <div class="sidebar-section" style="margin-top:12px;">Users</div>
+    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
+    <a href="/admin/coaches.html" class="sidebar-item active">Coaches</a>
+    <a href="/admin/organizations.html" class="sidebar-item">Organizations</a>
+    <div class="sidebar-section" style="margin-top:12px;">Programs</div>
+    <a href="/admin/events.html" class="sidebar-item">Screening Events</a>
+    <div class="sidebar-section" style="margin-top:12px;">Communication</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/settings.html" class="sidebar-item">System Settings</a>
+    <div class="sidebar-section" style="margin-top:12px;">Portals</div>
+    <a href="/coach/" class="sidebar-item">Coach Portal →</a>
+    <a href="/screener/" class="sidebar-item">Screener Portal →</a>
+    <a href="/book/" class="sidebar-item">Booking Page →</a>
+  </nav>
+</aside>
+<main class="container has-sidebar">
   <div id="content" style="display:none;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
       <div><h1 class="page-title" style="margin-bottom:2px;">Coaches</h1><p style="color:var(--gray-400);font-size:.88rem;">Manage coaching staff and screeners.</p></div>
@@ -30,20 +46,36 @@
     </div>
     <div class="card" style="padding:0;overflow:hidden;">
       <table class="data-table">
-        <thead><tr><th>Coach</th><th>Email</th><th>Specialty</th><th>Status</th><th style="width:160px;">Actions</th></tr></thead>
-        <tbody id="tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+        <thead><tr><th style="width:48px;"></th><th>Coach</th><th>Contact</th><th>Specialty</th><th>Status</th><th style="width:220px;">Actions</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
 </main>
+
+<!-- ── Add / Edit Coach Modal ─────────────────────────────────────────────── -->
 <div id="modal-backdrop" class="modal-backdrop" style="display:none;" onclick="closeOuter(event)">
-  <div class="modal">
+  <div class="modal" style="max-width:560px;">
     <div class="modal-title" id="modal-title">Add Coach</div>
-    <div class="form-grid full">
-      <div class="form-group"><label>Full Name *</label><input id="f-name" type="text" placeholder="e.g. Sarah Johnson"/></div>
+    <!-- Photo upload -->
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:18px;">
+      <div id="photo-preview" onclick="document.getElementById('photo-input').click()"
+           style="width:72px;height:72px;border-radius:50%;background:var(--teal);color:#fff;font-size:1.4rem;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0;border:2px dashed rgba(0,0,0,.1);">
+        <span id="photo-initials">?</span>
+      </div>
+      <div>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('photo-input').click()">Upload Photo</button>
+        <button class="btn btn-ghost btn-sm" id="remove-photo-btn" style="display:none;color:var(--red);border-color:var(--red);" onclick="removePhoto()">Remove</button>
+        <p style="margin:4px 0 0;font-size:.78rem;color:var(--gray-400);">Square photo recommended. Resized to 200×200 on upload.</p>
+      </div>
+      <input type="file" id="photo-input" accept="image/*" style="display:none;" onchange="handlePhoto(event)">
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Full Name *</label><input id="f-name" type="text" placeholder="e.g. Sarah Johnson" oninput="updateInitials()"/></div>
       <div class="form-group"><label>Email *</label><input id="f-email" type="email" placeholder="coach@healthyou.com"/></div>
+      <div class="form-group"><label>Phone</label><input id="f-phone" type="tel" placeholder="(555) 555-5555"/></div>
       <div class="form-group"><label>Specialty</label><input id="f-spec" type="text" placeholder="Nutrition, Fitness, Stress Management…"/></div>
-      <div class="form-group"><label>Bio</label><textarea id="f-bio" rows="3" placeholder="Certified health coach specializing in…"></textarea></div>
+      <div class="form-group full"><label>Bio</label><textarea id="f-bio" rows="3" placeholder="Certified health coach specializing in…"></textarea></div>
     </div>
     <div id="modal-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
     <div class="modal-footer">
@@ -52,58 +84,240 @@
     </div>
   </div>
 </div>
+
+<!-- ── Welcome Modal ──────────────────────────────────────────────────────── -->
+<div id="welcome-modal" class="modal-backdrop" style="display:none;" onclick="closeWelcomeOuter(event)">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-title">Welcome Email Sent</div>
+    <p style="font-size:.88rem;color:var(--gray-500);margin-top:-8px;margin-bottom:20px;">
+      A welcome email with login credentials has been sent to <strong id="wm-email"></strong>.
+    </p>
+    <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+      <p style="margin:0 0 8px;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#92400e;">Temporary Password</p>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <code id="wm-pass" style="font-size:1.25rem;font-weight:700;letter-spacing:.12em;color:#1f2937;font-family:monospace;flex:1;"></code>
+        <button class="btn btn-ghost btn-sm" id="copy-btn" onclick="copyTempPass()">Copy</button>
+      </div>
+      <p style="margin:10px 0 0;font-size:.8rem;color:#92400e;">Ask the coach to change this password after first login.</p>
+    </div>
+    <p id="wm-no-key" style="display:none;font-size:.83rem;color:var(--gray-400);background:var(--gray-100);border-radius:8px;padding:10px 14px;margin-bottom:16px;">
+      Email was <strong>not</strong> sent — RESEND_API_KEY is not configured. Share the password above manually.
+    </p>
+    <p id="wm-email-err" style="display:none;font-size:.83rem;color:var(--red);background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;margin-bottom:16px;">
+      Email failed: <span id="wm-email-err-msg"></span>
+    </p>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeWelcomeModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Availability Modal ─────────────────────────────────────────────────── -->
+<div id="avail-modal" class="modal-backdrop" style="display:none;" onclick="closeAvailOuter(event)">
+  <div class="modal modal-lg">
+    <div class="modal-title" id="avail-title">Coach Schedule</div>
+    <p style="font-size:.84rem;color:var(--gray-400);margin-top:-12px;margin-bottom:16px;">Set weekly availability by month. Use the arrows to navigate months and add time blocks for each day.</p>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;margin-bottom:16px;border-bottom:1px solid var(--gray-200);">
+      <button class="btn btn-ghost btn-sm" onclick="prevAvMonth()">&#8592; Prev</button>
+      <span id="avail-month-label" style="font-weight:600;font-size:.95rem;"></span>
+      <button class="btn btn-ghost btn-sm" onclick="nextAvMonth()">Next &#8594;</button>
+    </div>
+    <div id="avail-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeAvail()">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
+<canvas id="resize-canvas" style="display:none;"></canvas>
+
+<style>
+.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+.form-grid .full { grid-column:1/-1; }
+@media(max-width:520px){ .form-grid { grid-template-columns:1fr; } }
+</style>
+
 <script>
-let authToken=null, coaches=[], editId=null;
+let authToken=null, coaches=[], editId=null, photoDataUrl=null;
 
-netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} });
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} else { location.href='/admin/login.html'; } });
 netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
-netlifyIdentity.on('logout',()=>{ document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; });
+netlifyIdentity.on('logout',()=>{ location.href='/admin/login.html'; });
 
-async function boot(u){ document.getElementById('login-wall').style.display='none'; document.getElementById('content').style.display=''; document.getElementById('header-name').textContent=u.user_metadata?.full_name||u.email; load(); }
+async function boot(u){ document.getElementById('content').style.display=''; document.getElementById('header-name').textContent=u.user_metadata?.full_name||u.email; load(); }
+
+// ── Table ────────────────────────────────────────────────────────────────────
 
 async function load() {
   try {
     coaches=await fetch('/api/coaches?admin=true',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
     document.getElementById('tbody').innerHTML=!coaches.length
-      ?'<tr><td colspan="5" class="empty">No coaches yet.</td></tr>'
+      ?'<tr><td colspan="6" class="empty">No coaches yet.</td></tr>'
       :coaches.map(c=>`<tr>
+          <td style="padding:8px 10px;">${avatarHtml(c,38)}</td>
           <td><div style="font-weight:600">${esc(c.name)}</div>${c.bio?`<div style="font-size:.78rem;color:var(--gray-400)">${esc(c.bio.slice(0,50))}…</div>`:''}</td>
-          <td style="color:var(--gray-600)">${esc(c.email)}</td>
+          <td style="color:var(--gray-600);">${esc(c.email)}${c.phone?`<div style="font-size:.78rem;color:var(--gray-400);">${esc(c.phone)}</div>`:''}</td>
           <td>${esc(c.specialty||'—')}</td>
           <td><span class="badge badge-${c.active?'active':'inactive'}">${c.active?'Active':'Inactive'}</span></td>
           <td><div class="actions">
             <button class="btn btn-ghost btn-sm" onclick="openModal(${c.id})">Edit</button>
+            <button class="btn btn-ghost btn-sm" onclick="openAvail(${c.id})">Schedule</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--teal);border-color:var(--teal);" onclick="sendWelcome(${c.id},this)">Welcome</button>
             <button class="btn btn-ghost btn-sm" style="color:${c.active?'var(--red)':'var(--green)'};border-color:${c.active?'var(--red)':'var(--green)'};" onclick="toggle(${c.id},${!c.active})">${c.active?'Deactivate':'Activate'}</button>
           </div></td>
         </tr>`).join('');
   } catch(e){ showToast('Error: '+e.message); }
 }
 
+function avatarHtml(c,size){
+  const s=`width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0;`;
+  if(c.avatar_url) return `<img src="${esc(c.avatar_url)}" style="${s}" alt="${esc(c.name)}">`;
+  const bg='#0d9488'; const col='#fff';
+  return `<div style="${s}background:${bg};color:${col};font-size:${Math.round(size*.38)}px;font-weight:700;display:flex;align-items:center;justify-content:center;">${initials(c.name)}</div>`;
+}
+
+function initials(name){ return (name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
+
+// ── Add / Edit Modal ─────────────────────────────────────────────────────────
+
 function openModal(id){
-  editId=id||null;
+  editId=id||null; photoDataUrl=null;
   document.getElementById('modal-err').style.display='none';
   document.getElementById('modal-title').textContent=id?'Edit Coach':'Add Coach';
   document.getElementById('save-btn').textContent=id?'Save Changes':'Add Coach';
-  if(id){ const c=coaches.find(x=>x.id===id); document.getElementById('f-name').value=c.name; document.getElementById('f-email').value=c.email; document.getElementById('f-spec').value=c.specialty||''; document.getElementById('f-bio').value=c.bio||''; }
-  else { ['f-name','f-email','f-spec','f-bio'].forEach(i=>document.getElementById(i).value=''); }
-  document.getElementById('modal-backdrop').style.display='flex'; document.getElementById('f-name').focus();
+  document.getElementById('photo-input').value='';
+  if(id){
+    const c=coaches.find(x=>x.id===id);
+    document.getElementById('f-name').value=c.name;
+    document.getElementById('f-email').value=c.email;
+    document.getElementById('f-phone').value=c.phone||'';
+    document.getElementById('f-spec').value=c.specialty||'';
+    document.getElementById('f-bio').value=c.bio||'';
+    setPhotoPreview(c.avatar_url||null, c.name);
+  } else {
+    ['f-name','f-email','f-phone','f-spec','f-bio'].forEach(i=>document.getElementById(i).value='');
+    setPhotoPreview(null, '');
+  }
+  document.getElementById('modal-backdrop').style.display='flex';
+  document.getElementById('f-name').focus();
 }
+
 function closeModal(){ document.getElementById('modal-backdrop').style.display='none'; }
 function closeOuter(e){ if(e.target===document.getElementById('modal-backdrop'))closeModal(); }
 
+function setPhotoPreview(url, name){
+  const preview=document.getElementById('photo-preview');
+  const initEl=document.getElementById('photo-initials');
+  const removeBtn=document.getElementById('remove-photo-btn');
+  if(url){
+    preview.innerHTML=`<img src="${esc(url)}" style="width:72px;height:72px;object-fit:cover;" alt="">`;
+    removeBtn.style.display='';
+  } else {
+    preview.innerHTML=`<span id="photo-initials">${initials(name)||'?'}</span>`;
+    removeBtn.style.display='none';
+  }
+}
+
+function updateInitials(){
+  const name=document.getElementById('f-name').value;
+  if(!photoDataUrl){
+    const el=document.getElementById('photo-initials');
+    if(el) el.textContent=initials(name)||'?';
+  }
+}
+
+function removePhoto(){
+  photoDataUrl=null;
+  const name=document.getElementById('f-name').value;
+  setPhotoPreview(null, name);
+}
+
+function handlePhoto(event){
+  const file=event.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.getElementById('resize-canvas');
+      canvas.width=200; canvas.height=200;
+      const ctx=canvas.getContext('2d');
+      // crop to square from center
+      const side=Math.min(img.width,img.height);
+      const sx=(img.width-side)/2, sy=(img.height-side)/2;
+      ctx.drawImage(img,sx,sy,side,side,0,0,200,200);
+      photoDataUrl=canvas.toDataURL('image/jpeg',0.75);
+      document.getElementById('photo-preview').innerHTML=`<img src="${photoDataUrl}" style="width:72px;height:72px;object-fit:cover;" alt="">`;
+      document.getElementById('remove-photo-btn').style.display='';
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 async function save(){
-  const name=document.getElementById('f-name').value.trim(), email=document.getElementById('f-email').value.trim();
+  const name=document.getElementById('f-name').value.trim();
+  const email=document.getElementById('f-email').value.trim();
   if(!name||!email){ showErr('Name and email required.'); return; }
   const btn=document.getElementById('save-btn'); btn.disabled=true; btn.textContent='Saving…';
   try {
-    const body={name,email,specialty:document.getElementById('f-spec').value||null,bio:document.getElementById('f-bio').value||null};
-    if(editId) body.id=editId;
+    const body={
+      name, email,
+      phone:document.getElementById('f-phone').value.trim()||null,
+      specialty:document.getElementById('f-spec').value||null,
+      bio:document.getElementById('f-bio').value||null,
+    };
+    if(editId){ body.id=editId; }
+    // include avatar only if changed (new upload or explicit remove)
+    if(photoDataUrl!==null){ body.avatar_url=photoDataUrl; }
+    else if(editId && document.getElementById('remove-photo-btn').style.display==='none'){
+      const c=coaches.find(x=>x.id===editId);
+      if(c?.avatar_url) body.avatar_url=null; // was removed
+    }
     const r=await fetch('/api/coaches',{method:editId?'PUT':'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify(body)});
     if(!r.ok){ showErr((await r.json()).error||'Save failed'); return; }
     closeModal(); showToast(editId?'Coach updated':'Coach added'); load();
   } catch(e){ showErr(e.message); } finally{ btn.disabled=false; btn.textContent=editId?'Save Changes':'Add Coach'; }
 }
+
+// ── Welcome ──────────────────────────────────────────────────────────────────
+
+async function sendWelcome(id, btn){
+  btn.disabled=true; btn.textContent='Sending…';
+  try {
+    const r=await fetch('/api/welcome-coach',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+      body:JSON.stringify({coach_id:id})
+    });
+    const data=await r.json();
+    if(!r.ok){ showToast(data.error||'Welcome failed'); return; }
+    const c=coaches.find(x=>x.id===id);
+    document.getElementById('wm-email').textContent=data.email||c?.email||'';
+    document.getElementById('wm-pass').textContent=data.temp_password;
+    const hasErr=!!(data.email_error);
+    const noKey=!data.email_sent&&!hasErr;
+    document.getElementById('wm-no-key').style.display=noKey?'':'none';
+    document.getElementById('wm-email-err').style.display=hasErr?'':'none';
+    if(hasErr) document.getElementById('wm-email-err-msg').textContent=data.email_error;
+    document.getElementById('copy-btn').textContent='Copy';
+    document.getElementById('welcome-modal').style.display='flex';
+  } catch(e){ showToast('Error: '+e.message); } finally { btn.disabled=false; btn.textContent='Welcome'; }
+}
+
+function closeWelcomeModal(){ document.getElementById('welcome-modal').style.display='none'; }
+function closeWelcomeOuter(e){ if(e.target===document.getElementById('welcome-modal'))closeWelcomeModal(); }
+
+function copyTempPass(){
+  const pass=document.getElementById('wm-pass').textContent;
+  navigator.clipboard.writeText(pass).then(()=>{
+    const btn=document.getElementById('copy-btn'); btn.textContent='Copied!';
+    setTimeout(()=>btn.textContent='Copy',1800);
+  }).catch(()=>{ showToast('Copy failed — select text manually'); });
+}
+
+// ── Toggle active ────────────────────────────────────────────────────────────
 
 async function toggle(id,active){
   try {
@@ -111,8 +325,94 @@ async function toggle(id,active){
     showToast(active?'Activated':'Deactivated'); load();
   } catch(e){ showToast('Error: '+e.message); }
 }
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 function showErr(m){ const e=document.getElementById('modal-err'); e.textContent=m; e.style.display=''; }
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Availability Management ────────────────────────────────────────────────
+let avCoachId=null, avail=[], avYear=0, avMonth=0;
+const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function openAvail(id){
+  const c=coaches.find(x=>x.id===id); avCoachId=id;
+  document.getElementById('avail-title').textContent=c.name+' — Monthly Schedule';
+  const now=new Date(); avYear=now.getFullYear(); avMonth=now.getMonth()+1;
+  document.getElementById('avail-modal').style.display='flex';
+  loadAvail();
+}
+function closeAvail(){ document.getElementById('avail-modal').style.display='none'; }
+function closeAvailOuter(e){ if(e.target===document.getElementById('avail-modal'))closeAvail(); }
+function prevAvMonth(){ avMonth--; if(avMonth<1){avMonth=12;avYear--;} loadAvail(); }
+function nextAvMonth(){ avMonth++; if(avMonth>12){avMonth=1;avYear++;} loadAvail(); }
+
+async function loadAvail(){
+  const ms=`${avYear}-${String(avMonth).padStart(2,'0')}`;
+  document.getElementById('avail-month-label').textContent=MN[avMonth-1]+' '+avYear;
+  document.getElementById('avail-body').innerHTML='<div style="padding:20px;text-align:center;color:var(--gray-400);">Loading…</div>';
+  try {
+    avail=await fetch(`/api/coach-availability?admin=true&coach_id=${avCoachId}&month=${ms}`,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+    renderAvail();
+  } catch(e){ showToast('Error: '+e.message); }
+}
+
+function renderAvail(){
+  const byDow={};
+  avail.forEach(a=>{ (byDow[a.day_of_week]=byDow[a.day_of_week]||[]).push(a); });
+  document.getElementById('avail-body').innerHTML=DAYS.map((day,dow)=>{
+    const slots=byDow[dow]||[];
+    const chips=slots.map(s=>`<span style="display:inline-flex;align-items:center;gap:4px;background:var(--green-light);color:#065f46;border-radius:99px;padding:3px 10px;font-size:.82rem;">${fmtT(s.start_time)}–${fmtT(s.end_time)}<button onclick="removeSlot(${s.id})" style="background:none;border:none;cursor:pointer;color:#065f46;font-size:1.1rem;line-height:1;padding:0 2px;">&times;</button></span>`).join('');
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--gray-100);">
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <div style="width:90px;font-weight:600;font-size:.88rem;padding-top:6px;flex-shrink:0;">${day}</div>
+        <div style="flex:1;">
+          <div id="chips-${dow}" style="display:flex;flex-wrap:wrap;gap:6px;min-height:28px;">${chips||'<span style="color:var(--gray-400);font-size:.82rem;line-height:28px;">No availability set</span>'}</div>
+          <div id="af-${dow}" style="display:none;margin-top:8px;align-items:center;gap:8px;flex-wrap:wrap;">
+            <input type="time" id="as-${dow}" style="border:1px solid var(--gray-200);border-radius:6px;padding:5px 8px;font-size:.85rem;">
+            <span style="color:var(--gray-400);">to</span>
+            <input type="time" id="ae-${dow}" style="border:1px solid var(--gray-200);border-radius:6px;padding:5px 8px;font-size:.85rem;">
+            <button class="btn btn-primary btn-sm" onclick="saveSlot(${dow})">Save</button>
+            <button class="btn btn-ghost btn-sm" onclick="hideAdd(${dow})">Cancel</button>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="showAdd(${dow})">+ Add</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showAdd(dow){ const el=document.getElementById('af-'+dow); el.style.display='flex'; document.getElementById('as-'+dow).focus(); }
+function hideAdd(dow){ document.getElementById('af-'+dow).style.display='none'; }
+
+async function saveSlot(dow){
+  const start=document.getElementById('as-'+dow).value;
+  const end=document.getElementById('ae-'+dow).value;
+  if(!start||!end){ showToast('Enter start and end time'); return; }
+  if(start>=end){ showToast('End time must be after start time'); return; }
+  const pad2=n=>String(n).padStart(2,'0');
+  const fd=`${avYear}-${pad2(avMonth)}-01`;
+  const ld=`${avYear}-${pad2(avMonth)}-${pad2(new Date(avYear,avMonth,0).getDate())}`;
+  try {
+    const r=await fetch('/api/coach-availability',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+      body:JSON.stringify({coach_id:avCoachId,day_of_week:dow,start_time:start,end_time:end,effective_from:fd,effective_to:ld})
+    });
+    if(!r.ok){ showToast((await r.json()).error||'Error saving'); return; }
+    showToast('Availability added for '+MN[avMonth-1]); loadAvail();
+  } catch(e){ showToast('Error: '+e.message); }
+}
+
+async function removeSlot(id){
+  try {
+    await fetch('/api/coach-availability?id='+id,{method:'DELETE',headers:{Authorization:'Bearer '+authToken}});
+    showToast('Removed'); loadAvail();
+  } catch(e){ showToast('Error: '+e.message); }
+}
+
+function fmtT(t){ const [h,m]=t.split(':').map(Number); return `${h%12||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`; }
 </script>
 </body></html>

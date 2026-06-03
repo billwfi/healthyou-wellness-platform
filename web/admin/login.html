@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Sign In — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <style>
+    body { background: var(--teal); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .login-card {
+      background: #fff; border-radius: 12px; padding: 44px 40px; width: 100%;
+      max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,.25); text-align: center;
+    }
+    .login-card img { height: 48px; width: auto; margin-bottom: 20px; }
+    .login-card h1 { font-size: 1.3rem; font-weight: 700; color: var(--gray-800); margin-bottom: 6px; }
+    .login-card p { font-size: .88rem; color: var(--gray-400); margin-bottom: 28px; }
+    .login-divider { border: none; border-top: 1px solid var(--gray-200); margin: 24px 0; }
+  </style>
+</head>
+<body>
+<div class="login-card">
+  <img src="/assets/img/hylogo.png" alt="Healthyou"/>
+  <h1>Admin Portal</h1>
+  <p>Sign in to manage the wellness platform.</p>
+
+  <button class="btn btn-primary" style="width:100%;padding:12px;font-size:.95rem;" id="signin-btn" onclick="netlifyIdentity.open()">
+    Sign In
+  </button>
+
+  <div id="redirecting" style="display:none;margin-top:16px;font-size:.85rem;color:var(--gray-400);">
+    Signing in… redirecting to dashboard.
+  </div>
+
+  <hr class="login-divider"/>
+
+  <div class="demo-hint">
+    <div class="demo-hint-label">Demo Access</div>
+    <div class="demo-hint-row"><strong>Email:</strong><code>demo@healthyou.com</code></div>
+    <div class="demo-hint-row"><strong>Password:</strong><code>Demo1234!</code></div>
+  </div>
+</div>
+
+<script>
+netlifyIdentity.on('init', u => {
+  if (u) redirect();
+});
+netlifyIdentity.on('login', () => {
+  netlifyIdentity.close();
+  redirect();
+});
+
+function redirect() {
+  document.getElementById('signin-btn').style.display = 'none';
+  document.getElementById('redirecting').style.display = '';
+  const next = new URLSearchParams(location.search).get('next') || '/admin/';
+  location.href = next;
+}
+</script>
+</body>
+</html>
