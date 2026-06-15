@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Umbraco Content — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <style>
+    .umb-layout { display:grid; grid-template-columns: 380px 1fr; gap:18px; align-items:start; }
+    .umb-tree { max-height:72vh; overflow:auto; }
+    .umb-node { padding:5px 8px; border-radius:6px; cursor:pointer; font-size:.86rem; display:flex; align-items:center; gap:6px; }
+    .umb-node:hover { background:var(--gray-100,#f1f3f5); }
+    .umb-node.active { background:#e7f0fe; font-weight:600; }
+    .umb-toggle { width:14px; display:inline-block; text-align:center; color:var(--gray-400); }
+    .umb-children { margin-left:14px; border-left:1px solid #eef0f2; }
+    .umb-ct { font-size:.7rem; color:var(--gray-400); margin-left:auto; }
+    .umb-prop { border-top:1px solid #eef0f2; padding:10px 0; }
+    .umb-prop:first-child { border-top:0; }
+    .umb-prop-alias { font-size:.72rem; text-transform:uppercase; letter-spacing:.03em; color:var(--gray-400); }
+    .umb-prop-val { font-size:.88rem; white-space:pre-wrap; word-break:break-word; }
+    .umb-prop-val pre { background:#f7f8fa; padding:8px; border-radius:6px; overflow:auto; max-height:280px; font-size:.78rem; }
+    .umb-meta { font-size:.8rem; color:var(--gray-400); }
+    .umb-badge { display:inline-block; font-size:.7rem; padding:1px 8px; border-radius:99px; }
+  </style>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo.png" alt="Healthyou"></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <div class="sidebar-section" style="margin-top:12px;">Users</div>
+    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <a href="/admin/organizations.html" class="sidebar-item">Organizations</a>
+    <div class="sidebar-section" style="margin-top:12px;">Programs</div>
+    <a href="/admin/events.html" class="sidebar-item">Screening Events</a>
+    <div class="sidebar-section" style="margin-top:12px;">Communication</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+    <a href="/admin/umbraco.html" class="sidebar-item active">Umbraco</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/settings.html" class="sidebar-item">System Settings</a>
+    <div class="sidebar-section" style="margin-top:12px;">Portals</div>
+    <a href="/coach/" class="sidebar-item">Coach Portal →</a>
+    <a href="/screener/" class="sidebar-item">Screener Portal →</a>
+    <a href="/book/" class="sidebar-item">Booking Page →</a>
+  </nav>
+</aside>
+
+<main class="container has-sidebar">
+  <div id="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div>
+        <h1 class="page-title" style="margin-bottom:2px;">Umbraco Content</h1>
+        <p style="color:var(--gray-400);font-size:.88rem;">
+          Content imported from <strong>cosreachyourpeak.com</strong>’s Umbraco CMS.
+          <span id="umb-count"></span>
+        </p>
+      </div>
+      <div class="search-bar" style="max-width:280px;">
+        <input type="text" id="search-input" placeholder="Search content…" oninput="onSearch()"/>
+      </div>
+    </div>
+
+    <div class="umb-layout">
+      <div class="card umb-tree" id="tree"><div class="empty" style="padding:20px;">Loading…</div></div>
+      <div class="card" id="detail" style="min-height:60vh;">
+        <div class="empty" style="padding:40px;color:var(--gray-400);">Select a content item to view its details.</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+<script>
+let authToken = null;
+let nodes = [];                 // flat list
+const byId = new Map();         // umb_id -> node
+const childrenOf = new Map();   // parent_id -> [nodes]
+let activeId = null;
+
+netlifyIdentity.on('init',  u => { if (u) { authToken = u.token.access_token; boot(u); } else { location.href = '/admin/login.html'; } });
+netlifyIdentity.on('login', u => { authToken = u.token.access_token; boot(u); });
+netlifyIdentity.on('logout',() => { location.href = '/admin/login.html'; });
+
+function boot(user) {
+  document.getElementById('content').style.display = '';
+  document.getElementById('header-name').textContent = user.user_metadata?.full_name || user.email;
+  load();
+}
+
+async function load() {
+  try {
+    const r = await fetch('/api/umbraco-content', { headers: { Authorization: 'Bearer '+authToken } });
+    nodes = await r.json();
+    if (!Array.isArray(nodes)) throw new Error(nodes.error || 'load failed');
+    byId.clear(); childrenOf.clear();
+    for (const n of nodes) {
+      byId.set(n.umb_id, n);
+      if (!childrenOf.has(n.parent_id)) childrenOf.set(n.parent_id, []);
+      childrenOf.get(n.parent_id).push(n);
+    }
+    document.getElementById('umb-count').textContent = `${nodes.length} items.`;
+    renderTree();
+  } catch(e) { showToast('Error loading content: '+e.message); document.getElementById('tree').innerHTML = '<div class="empty" style="padding:20px;">Failed to load.</div>'; }
+}
+
+// Roots = nodes whose parent isn't in our set (the start node's parent is -1 / 1328)
+function roots() {
+  return nodes.filter(n => !byId.has(n.parent_id)).sort(cmp);
+}
+function cmp(a,b){ return (a.sort_order-b.sort_order) || a.name.localeCompare(b.name); }
+
+function renderTree() {
+  const el = document.getElementById('tree');
+  const r = roots();
+  if (!r.length) { el.innerHTML = '<div class="empty" style="padding:20px;">No content.</div>'; return; }
+  el.innerHTML = r.map(n => nodeHtml(n, false)).join('');
+}
+
+function nodeHtml(n, expanded) {
+  const kids = (childrenOf.get(n.umb_id) || []).sort(cmp);
+  const hasKids = kids.length > 0;
+  const toggle = hasKids ? (expanded ? '▾' : '▸') : '';
+  let html = `<div>
+    <div class="umb-node ${n.umb_id===activeId?'active':''}" data-id="${n.umb_id}">
+      <span class="umb-toggle" onclick="toggleNode(event, ${n.umb_id})">${toggle}</span>
+      <span onclick="openNode(${n.umb_id})" style="flex:1;">${esc(n.name)}${n.published?'':' <em style="color:#c08">(draft)</em>'}</span>
+      <span class="umb-ct">${esc(n.content_type||'')}</span>
+    </div>`;
+  if (hasKids && expanded) {
+    html += `<div class="umb-children" id="kids-${n.umb_id}">${kids.map(k => nodeHtml(k, false)).join('')}</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+const expandedSet = new Set();
+function toggleNode(ev, id) {
+  ev.stopPropagation();
+  if (expandedSet.has(id)) expandedSet.delete(id); else expandedSet.add(id);
+  rerender();
+}
+function rerender() {
+  // Re-render whole tree honoring expandedSet
+  function render(n) {
+    const kids = (childrenOf.get(n.umb_id) || []).sort(cmp);
+    const hasKids = kids.length > 0;
+    const exp = expandedSet.has(n.umb_id);
+    const toggle = hasKids ? (exp ? '▾' : '▸') : '';
+    let h = `<div><div class="umb-node ${n.umb_id===activeId?'active':''}">
+        <span class="umb-toggle" onclick="toggleNode(event, ${n.umb_id})">${toggle}</span>
+        <span onclick="openNode(${n.umb_id})" style="flex:1;">${esc(n.name)}${n.published?'':' <em style="color:#c08">(draft)</em>'}</span>
+        <span class="umb-ct">${esc(n.content_type||'')}</span></div>`;
+    if (hasKids && exp) h += `<div class="umb-children">${kids.map(render).join('')}</div>`;
+    return h + `</div>`;
+  }
+  document.getElementById('tree').innerHTML = roots().map(render).join('');
+}
+
+function onSearch() {
+  const q = (document.getElementById('search-input').value||'').toLowerCase().trim();
+  if (!q) { rerender(); return; }
+  const hits = nodes.filter(n => n.name && n.name.toLowerCase().includes(q)).slice(0, 300);
+  const el = document.getElementById('tree');
+  if (!hits.length) { el.innerHTML = '<div class="empty" style="padding:20px;">No matches.</div>'; return; }
+  el.innerHTML = hits.map(n => `<div class="umb-node ${n.umb_id===activeId?'active':''}" onclick="openNode(${n.umb_id})">
+      <span style="flex:1;">${esc(n.name)}</span><span class="umb-ct">${esc(n.content_type||'')}</span></div>`).join('');
+}
+
+async function openNode(id) {
+  activeId = id;
+  const d = document.getElementById('detail');
+  d.innerHTML = '<div class="empty" style="padding:40px;">Loading…</div>';
+  try {
+    const r = await fetch('/api/umbraco-content/'+id, { headers: { Authorization: 'Bearer '+authToken } });
+    const n = await r.json();
+    renderDetail(n);
+  } catch(e) { d.innerHTML = '<div class="empty" style="padding:40px;">Failed to load item.</div>'; }
+  if (!document.getElementById('search-input').value) rerender();
+}
+
+function renderDetail(n) {
+  const props = n.properties || {};
+  const keys = Object.keys(props);
+  const propsHtml = keys.length ? keys.map(k => {
+    let v = props[k];
+    let body;
+    if (typeof v === 'string') body = `<div class="umb-prop-val">${esc(v)}</div>`;
+    else body = `<div class="umb-prop-val"><pre>${esc(JSON.stringify(v, null, 2))}</pre></div>`;
+    return `<div class="umb-prop"><div class="umb-prop-alias">${esc(k)}</div>${body}</div>`;
+  }).join('') : '<p class="umb-meta">No editable properties.</p>';
+
+  document.getElementById('detail').innerHTML = `
+    <div style="padding:6px 4px 14px;border-bottom:1px solid #eef0f2;margin-bottom:14px;">
+      <h2 style="margin:0 0 6px;font-size:1.25rem;">${esc(n.name)}</h2>
+      <div class="umb-meta">
+        <span class="umb-badge" style="background:${n.published?'#e3f6e8':'#fde7ef'};color:${n.published?'#1a7f37':'#c0185b'};">${n.published?'Published':'Draft'}</span>
+        &nbsp;·&nbsp; ${esc(n.content_type||'')}
+        &nbsp;·&nbsp; id ${n.umb_id}
+        ${n.update_date?`&nbsp;·&nbsp; updated ${fmtDate(n.update_date)}`:''}
+      </div>
+      ${n.url?`<div class="umb-meta" style="margin-top:6px;">URL: <a href="https://www.cosreachyourpeak.com${esc(n.url)}" target="_blank">${esc(n.url)}</a></div>`:''}
+    </div>
+    ${propsHtml}`;
+}
+
+function fmtDate(s){ const d=new Date((s||'').replace(' ','T')); return isNaN(d)?s:d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function esc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+</script>
+</body>
+</html>

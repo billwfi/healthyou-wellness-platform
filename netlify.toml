@@ -98,6 +98,16 @@
   status = 200
 
 [[redirects]]
+  from = "/api/umbraco-content/*"
+  to = "/.netlify/functions/umbraco-content/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/umbraco-content"
+  to = "/.netlify/functions/umbraco-content"
+  status = 200
+
+[[redirects]]
   from = "/api/settings"
   to = "/.netlify/functions/settings"
   status = 200

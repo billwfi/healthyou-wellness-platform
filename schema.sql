@@ -310,3 +310,27 @@ CREATE TABLE IF NOT EXISTS event_registrations (
 );
 CREATE INDEX IF NOT EXISTS idx_event_reg_event       ON event_registrations(event_id);
 CREATE INDEX IF NOT EXISTS idx_event_reg_participant ON event_registrations(participant_id);
+
+-- ── Umbraco Content (imported from cosreachyourpeak.com) ──────────────────────
+-- Communication › Umbraco. Full content tree pulled from the Umbraco CMS and
+-- stored here so it can be browsed/searched inside the admin portal.
+CREATE TABLE IF NOT EXISTS umbraco_content (
+  id            SERIAL PRIMARY KEY,
+  umb_id        INTEGER UNIQUE,           -- Umbraco node id
+  umb_key       TEXT,                     -- Umbraco GUID key
+  udi           TEXT,                     -- umb://document/{guid}
+  name          TEXT NOT NULL,
+  content_type  TEXT,                     -- document type alias (e.g. pageGlobal)
+  parent_id     INTEGER,                  -- Umbraco parent node id (-1 for root)
+  tree_path     TEXT,                     -- comma path e.g. -1,1328,1330
+  level         INTEGER,                  -- depth in the tree
+  sort_order    INTEGER,
+  published     BOOLEAN DEFAULT true,
+  update_date   TIMESTAMPTZ,              -- last edit date in Umbraco
+  properties    JSONB DEFAULT '{}',       -- { alias: value } of every editor property
+  raw           JSONB DEFAULT '{}',       -- full GetById payload (lossless)
+  imported_at   TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_umbraco_parent  ON umbraco_content(parent_id);
+CREATE INDEX IF NOT EXISTS idx_umbraco_type     ON umbraco_content(content_type);
+CREATE INDEX IF NOT EXISTS idx_umbraco_name     ON umbraco_content(name);
