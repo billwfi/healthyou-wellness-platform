@@ -100,9 +100,19 @@ function boot(user) {
   load();
 }
 
+// Always send a fresh JWT — currentUser().jwt() auto-refreshes an expired access token
+// so we never send a stale token (which the API would reject as Unauthorized).
+async function freshToken() {
+  const u = netlifyIdentity.currentUser();
+  if (!u) { location.href = '/admin/login.html'; throw new Error('Not signed in'); }
+  try { authToken = await u.jwt(); } catch { authToken = u.token && u.token.access_token; }
+  return authToken;
+}
+
 async function load() {
   try {
-    const r = await fetch('/api/umbraco-content', { headers: { Authorization: 'Bearer '+authToken } });
+    const t = await freshToken();
+    const r = await fetch('/api/umbraco-content', { headers: { Authorization: 'Bearer '+t } });
     nodes = await r.json();
     if (!Array.isArray(nodes)) throw new Error(nodes.error || 'load failed');
     byId.clear(); childrenOf.clear();
@@ -184,7 +194,8 @@ async function openNode(id) {
   const d = document.getElementById('detail');
   d.innerHTML = '<div class="empty" style="padding:40px;">Loading…</div>';
   try {
-    const r = await fetch('/api/umbraco-content/'+id, { headers: { Authorization: 'Bearer '+authToken } });
+    const t = await freshToken();
+    const r = await fetch('/api/umbraco-content/'+id, { headers: { Authorization: 'Bearer '+t } });
     const n = await r.json();
     renderDetail(n);
   } catch(e) { d.innerHTML = '<div class="empty" style="padding:40px;">Failed to load item.</div>'; }
