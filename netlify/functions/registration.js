@@ -13,9 +13,9 @@ exports.handler = async (event, context) => {
     try {
       const r = await db.query(
         `SELECT e.id, e.name, e.event_date, e.location, e.event_type, e.status,
-                o.name AS org_name
+                o.GroupName AS org_name
            FROM screening_events e
-           LEFT JOIN organizations o ON o.id=e.org_id
+           LEFT JOIN iStrata.dbo.is_groups o ON o.id=e.org_id
           WHERE e.id=$1`,
         [event_id]
       );

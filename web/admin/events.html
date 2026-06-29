@@ -21,7 +21,7 @@
     <div class="sidebar-section" style="margin-top:12px;">Users</div>
     <a href="/admin/participants.html" class="sidebar-item">Participants</a>
     <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
-    <a href="/admin/organizations.html" class="sidebar-item">Organizations</a>
+    <a href="/admin/groups.html" class="sidebar-item">Groups</a>
     <div class="sidebar-section" style="margin-top:12px;">Programs</div>
     <a href="/admin/events.html" class="sidebar-item active">Screening Events</a>
     <div class="sidebar-section" style="margin-top:12px;">Communication</div>
@@ -56,7 +56,7 @@
       <div class="card" style="padding:0;overflow:hidden;">
         <table class="data-table">
           <thead><tr>
-            <th>Event</th><th>Date</th><th>Organization</th><th>Type</th>
+            <th>Event</th><th>Date</th><th>Group</th><th>Type</th>
             <th style="text-align:center;">Registered</th><th style="text-align:center;">Screened</th>
             <th>Status</th><th style="width:140px;">Actions</th>
           </tr></thead>
@@ -303,7 +303,7 @@
     <div class="form-grid full">
       <div class="form-group"><label>Event Name *</label><input id="em-name" type="text" placeholder="Q1 Wellness Screening"/></div>
       <div class="form-group"><label>Event Date *</label><input id="em-date" type="date"/></div>
-      <div class="form-group"><label>Organization</label><select id="em-org"><option value="">— none —</option></select></div>
+      <div class="form-group"><label>Group</label><select id="em-org"><option value="">— none —</option></select></div>
       <div class="form-group"><label>Type</label>
         <select id="em-type">
           <option value="onsite">On-site</option>
@@ -359,7 +359,7 @@ netlifyIdentity.on('logout',()=>{ location.href='/admin/login.html'; });
 async function boot(u) {
   document.getElementById('content').style.display='';
   document.getElementById('header-name').textContent=u.user_metadata?.full_name||u.email;
-  orgs=await fetch('/api/organizations',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+  orgs=await fetch('/api/groups',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
   const sel=document.getElementById('em-org');
   orgs.forEach(o=>sel.add(new Option(o.name,o.id)));
   load();

@@ -48,7 +48,7 @@
     <div class="sidebar-section" style="margin-top:12px;">Users</div>
     <a href="/admin/participants.html" class="sidebar-item">Participants</a>
     <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
-    <a href="/admin/organizations.html" class="sidebar-item active">Organizations</a>
+    <a href="/admin/groups.html" class="sidebar-item active">Groups</a>
     <div class="sidebar-section" style="margin-top:12px;">Programs</div>
     <a href="/admin/events.html" class="sidebar-item">Screening Events</a>
     <div class="sidebar-section" style="margin-top:12px;">Communication</div>
@@ -293,7 +293,7 @@ async function boot(user) {
   document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
   const hdr={Authorization:'Bearer '+authToken};
   [org, contacts, locations] = await Promise.all([
-    fetch('/api/organizations',{headers:hdr}).then(r=>r.json()).then(list=>list.find(o=>o.id===orgId)),
+    fetch('/api/groups',{headers:hdr}).then(r=>r.json()).then(list=>list.find(o=>o.id===orgId)),
     fetch(`/api/org-contacts?org_id=${orgId}`,{headers:hdr}).then(r=>r.json()),
     fetch(`/api/org-locations?org_id=${orgId}`,{headers:hdr}).then(r=>r.json()),
   ]);
@@ -589,11 +589,9 @@ async function saveOrg() {
   if(!name||!slug){ showErr('om-err','Name and slug required'); return; }
   const btn=document.getElementById('om-btn'); btn.disabled=true; btn.textContent='Saving…';
   try {
-    const r=await fetch('/api/organizations',{method:'PUT',
+    const r=await fetch('/api/groups',{method:'PUT',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
-      body:JSON.stringify({id:orgId,name,slug,
-        contact_name:document.getElementById('om-cname').value||null,
-        contact_email:document.getElementById('om-cemail').value||null})});
+      body:JSON.stringify({id:orgId,name,slug})});
     if(!r.ok){ showErr('om-err',(await r.json()).error||'Save failed'); return; }
     org={...org,...await r.json()}; renderOrgHeader();
     closeModal('org-modal'); showToast('Organization updated');

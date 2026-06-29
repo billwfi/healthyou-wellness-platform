@@ -14,7 +14,7 @@ exports.handler = async (event, context) => {
     if (qs.id) {
       try {
         const r = await db.query(
-          `SELECT p.*, o.name AS org_name,
+          `SELECT p.*, o.GroupName AS org_name,
                   c.name AS coach_name,
                   (SELECT * FROM biometric_results br WHERE br.participant_id=p.id
                      ORDER BY br.screened_at DESC FOR JSON PATH) AS biometrics,
@@ -23,7 +23,7 @@ exports.handler = async (event, context) => {
                   (SELECT * FROM coaching_sessions cs WHERE cs.participant_id=p.id
                      ORDER BY cs.scheduled_at DESC FOR JSON PATH) AS sessions
              FROM participants p
-             LEFT JOIN organizations o ON o.id=p.org_id
+             LEFT JOIN iStrata.dbo.is_groups o ON o.id=p.org_id
              LEFT JOIN coaches c ON c.id=p.assigned_coach_id
             WHERE p.id=$1`,
           [qs.id]
@@ -50,10 +50,10 @@ exports.handler = async (event, context) => {
       const r = await db.query(
         `SELECT p.id, p.first_name, p.last_name, p.email, p.department,
                 p.active, p.created_at,
-                o.name AS org_name,
+                o.GroupName AS org_name,
                 c.name AS coach_name
            FROM participants p
-           LEFT JOIN organizations o ON o.id=p.org_id
+           LEFT JOIN iStrata.dbo.is_groups o ON o.id=p.org_id
            LEFT JOIN coaches c ON c.id=p.assigned_coach_id
           WHERE ${conditions.join(' AND ')}
           ORDER BY p.last_name, p.first_name`,

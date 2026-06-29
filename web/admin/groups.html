@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Groups — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo.png" alt="HealthYou"></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <div class="sidebar-section" style="margin-top:12px;">Users</div>
+    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <a href="/admin/groups.html" class="sidebar-item active">Groups</a>
+    <div class="sidebar-section" style="margin-top:12px;">Programs</div>
+    <a href="/admin/events.html" class="sidebar-item">Screening Events</a>
+    <div class="sidebar-section" style="margin-top:12px;">Communication</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+    <a href="/admin/umbraco.html" class="sidebar-item">Umbraco</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/settings.html" class="sidebar-item">System Settings</a>
+    <div class="sidebar-section" style="margin-top:12px;">Portals</div>
+    <a href="/coach/" class="sidebar-item">Coach Portal →</a>
+    <a href="/screener/" class="sidebar-item">Screener Portal →</a>
+    <a href="/book/" class="sidebar-item">Booking Page →</a>
+  </nav>
+</aside>
+<main class="container has-sidebar">
+  <div id="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div><h1 class="page-title" style="margin-bottom:2px;">Groups</h1><p style="color:var(--gray-400);font-size:.88rem;">Employer groups from iStrata.</p></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div class="search-bar" style="width:220px;"><input id="search" type="text" placeholder="Search group or ID…" oninput="render()"/></div>
+        <button class="btn btn-primary" onclick="openModal()">+ Add Group</button>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table class="data-table">
+        <thead><tr><th>Group</th><th>Group ID</th><th>Location</th><th>Status</th><th style="width:170px;">Actions</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<div id="modal-backdrop" class="modal-backdrop" style="display:none;" onclick="closeOuter(event)">
+  <div class="modal modal-lg">
+    <div class="modal-title" id="modal-title">Add Group</div>
+    <div class="form-grid" style="gap:14px;">
+      <div class="form-group span-2"><label>Group Name *</label><input id="f-name" type="text" placeholder="Acme Corp"/></div>
+      <div class="form-group"><label>Group ID</label><input id="f-slug" type="text" placeholder="e.g. SDCACME"/></div>
+      <div class="form-group"><label>Status</label><select id="f-status"><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+      <div class="form-group span-2"><label>Address 1</label><input id="f-address1" type="text"/></div>
+      <div class="form-group span-2"><label>Address 2</label><input id="f-address2" type="text"/></div>
+      <div class="form-group"><label>City</label><input id="f-city" type="text"/></div>
+      <div class="form-group"><label>State</label><input id="f-state" type="text" maxlength="2" placeholder="CO"/></div>
+      <div class="form-group"><label>Zip</label><input id="f-zip" type="text"/></div>
+      <div class="form-group"><label>Phone</label><input id="f-phone" type="tel"/></div>
+      <div class="form-group span-2"><label>Email Addresses</label><input id="f-email" type="text"/></div>
+      <div class="form-group"><label>Effective Date</label><input id="f-effective_date" type="date"/></div>
+      <div class="form-group"><label>PEPM Rate</label><input id="f-pepm_rate" type="number" step="0.01" min="0"/></div>
+      <div class="form-group"><label>OP Group Code</label><input id="f-op_group_code" type="text"/></div>
+      <div class="form-group"><label>Industry</label><input id="f-industry" type="text"/></div>
+    </div>
+    <div id="modal-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="save-btn" onclick="save()">Add Group</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, groups=[], editId=null;
+const FIELDS=['name','slug','address1','address2','city','state','zip','phone','email','effective_date','pepm_rate','op_group_code','industry'];
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} else { location.href='/admin/login.html'; } });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ location.href='/admin/login.html'; });
+
+async function boot(user) {
+  document.getElementById('content').style.display='';
+  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+  load();
+}
+
+async function load() {
+  try {
+    const r=await fetch('/api/groups',{headers:{Authorization:'Bearer '+authToken}});
+    groups=await r.json();
+    if(!Array.isArray(groups)) groups=[];
+    render();
+  } catch(e){ showToast('Error: '+e.message); }
+}
+
+function render() {
+  const q=(document.getElementById('search').value||'').toLowerCase();
+  const rows=groups.filter(o=>!q || (o.name||'').toLowerCase().includes(q) || (o.slug||'').toLowerCase().includes(q));
+  document.getElementById('tbody').innerHTML=!rows.length
+    ?'<tr><td colspan="5" class="empty">No groups found.</td></tr>'
+    :rows.map(o=>`<tr>
+        <td><strong>${esc(o.name)}</strong></td>
+        <td style="color:var(--gray-600);font-family:monospace;font-size:.85rem;">${esc(o.slug||'—')}</td>
+        <td style="font-size:.85rem;">${esc([o.city,o.state].filter(Boolean).join(', ')||'—')}</td>
+        <td><span class="badge badge-${o.active?'active':'inactive'}">${esc(o.status||(o.active?'Active':'Inactive'))}</span></td>
+        <td><div class="actions">
+          <a href="/admin/organization.html?id=${o.id}" class="btn btn-primary btn-sm">Open</a>
+          <button class="btn btn-ghost btn-sm" onclick="openModal(${o.id})">Edit</button>
+          <button class="btn btn-ghost btn-sm" style="color:${o.active?'var(--red)':'var(--green)'};border-color:${o.active?'var(--red)':'var(--green)'};" onclick="setStatus(${o.id},'${o.active?'Inactive':'Active'}')">${o.active?'Deactivate':'Activate'}</button>
+        </div></td>
+      </tr>`).join('');
+}
+
+function openModal(id) {
+  editId=id||null;
+  document.getElementById('modal-err').style.display='none';
+  document.getElementById('modal-title').textContent=id?'Edit Group':'Add Group';
+  document.getElementById('save-btn').textContent=id?'Save Changes':'Add Group';
+  if(id){ const o=groups.find(x=>x.id===id);
+    FIELDS.forEach(f=>{ const el=document.getElementById('f-'+f); if(el) el.value=o[f]==null?'':o[f]; });
+    document.getElementById('f-status').value=o.status||(o.active?'Active':'Inactive');
+  } else {
+    FIELDS.forEach(f=>{ const el=document.getElementById('f-'+f); if(el) el.value=''; });
+    document.getElementById('f-status').value='Active';
+  }
+  document.getElementById('modal-backdrop').style.display='flex';
+}
+function closeModal(){ document.getElementById('modal-backdrop').style.display='none'; }
+function closeOuter(e){ if(e.target===document.getElementById('modal-backdrop'))closeModal(); }
+
+async function save() {
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){ showErr('Group name is required.'); return; }
+  const btn=document.getElementById('save-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const body={ status:document.getElementById('f-status').value };
+    FIELDS.forEach(f=>{ const v=document.getElementById('f-'+f).value; body[f]=v===''?null:v; });
+    if(editId) body.id=editId;
+    const r=await fetch('/api/groups',{ method:editId?'PUT':'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken}, body:JSON.stringify(body) });
+    if(!r.ok){ showErr((await r.json()).error||'Save failed'); return; }
+    closeModal(); showToast(editId?'Updated':'Added'); load();
+  } catch(e){ showErr(e.message); }
+  finally{ btn.disabled=false; btn.textContent=editId?'Save Changes':'Add Group'; }
+}
+
+async function setStatus(id, status) {
+  try {
+    const r=await fetch('/api/groups',{ method:'PUT', headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken}, body:JSON.stringify({id,status}) });
+    if(!r.ok) throw new Error((await r.json()).error);
+    showToast(status==='Active'?'Activated':'Deactivated'); load();
+  } catch(e){ showToast('Error: '+e.message); }
+}
+
+function showErr(m){ const e=document.getElementById('modal-err'); e.textContent=m; e.style.display=''; }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>

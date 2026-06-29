@@ -15,7 +15,7 @@ exports.handler = async (event, context) => {
       db.query(`SELECT
         (SELECT COUNT(*) FROM participants WHERE active=1)           AS total_participants,
         (SELECT COUNT(*) FROM coaches WHERE active=1)               AS total_coaches,
-        (SELECT COUNT(*) FROM organizations WHERE active=1)         AS total_organizations,
+        (SELECT COUNT(*) FROM iStrata.dbo.is_groups WHERE GroupStatus='Active') AS total_groups,
         (SELECT COUNT(*) FROM screening_events)                        AS total_events,
         (SELECT COUNT(*) FROM biometric_results)                       AS total_screenings,
         (SELECT COUNT(*) FROM coaching_sessions WHERE status='scheduled'

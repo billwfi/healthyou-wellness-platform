@@ -24,7 +24,7 @@
     <div class="sidebar-section" style="margin-top:12px;">Users</div>
     <a href="/admin/participants.html" class="sidebar-item">Participants</a>
     <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
-    <a href="/admin/organizations.html" class="sidebar-item">Organizations</a>
+    <a href="/admin/groups.html" class="sidebar-item">Groups</a>
 
     <div class="sidebar-section" style="margin-top:12px;">Programs</div>
     <a href="/admin/events.html" class="sidebar-item">Screening Events</a>
@@ -57,7 +57,7 @@
     <div class="stats-grid" style="margin-bottom:32px;" id="stats-grid">
       <a href="/admin/participants.html" class="stat-card"><div class="stat-icon">👥</div><div class="stat-value" id="s-participants">—</div><div class="stat-label">Participants</div></a>
       <a href="/admin/coaches.html" class="stat-card"><div class="stat-icon">🩺</div><div class="stat-value" id="s-coaches">—</div><div class="stat-label">Coaches</div></a>
-      <a href="/admin/organizations.html" class="stat-card"><div class="stat-icon">🏢</div><div class="stat-value" id="s-orgs">—</div><div class="stat-label">Organizations</div></a>
+      <a href="/admin/groups.html" class="stat-card"><div class="stat-icon">🏢</div><div class="stat-value" id="s-orgs">—</div><div class="stat-label">Groups</div></a>
       <a href="/admin/events.html" class="stat-card"><div class="stat-icon">📋</div><div class="stat-value" id="s-screenings">—</div><div class="stat-label">Screenings Done</div></a>
       <a href="/admin/events.html" class="stat-card"><div class="stat-icon">📅</div><div class="stat-value" id="s-sessions">—</div><div class="stat-label">Upcoming Sessions</div></a>
       <a href="/admin/events.html" class="stat-card"><div class="stat-icon">📆</div><div class="stat-value" id="s-events">—</div><div class="stat-label">Screening Events</div></a>
@@ -76,7 +76,7 @@
         <ul class="cp-tile-links">
           <li><a href="/admin/participants.html">Manage Participants</a></li>
           <li><a href="/admin/eligibility.html">Bulk Update</a></li>
-          <li><a href="/admin/organizations.html">Organizations</a></li>
+          <li><a href="/admin/groups.html">Groups</a></li>
           <li><a href="/admin/coaches.html">Coaches</a></li>
         </ul>
       </div>
@@ -132,7 +132,7 @@
         <div class="cp-tile-title">Components</div>
         <hr class="cp-tile-divider"/>
         <ul class="cp-tile-links">
-          <li><a href="/admin/organizations.html">Organizations</a></li>
+          <li><a href="/admin/groups.html">Groups</a></li>
           <li><a href="/admin/events.html">Event Calendar</a></li>
           <li><a href="/admin/library.html">Resource Library</a></li>
         </ul>
@@ -223,7 +223,7 @@ async function loadStats() {
     const d = await r.json();
     document.getElementById('s-participants').textContent = d.stats?.total_participants ?? '—';
     document.getElementById('s-coaches').textContent      = d.stats?.total_coaches ?? '—';
-    document.getElementById('s-orgs').textContent         = d.stats?.total_organizations ?? '—';
+    document.getElementById('s-orgs').textContent         = d.stats?.total_groups ?? '—';
     document.getElementById('s-screenings').textContent   = d.stats?.total_screenings ?? '—';
     document.getElementById('s-sessions').textContent     = d.stats?.upcoming_sessions ?? '—';
     document.getElementById('s-events').textContent       = d.stats?.total_events ?? '—';

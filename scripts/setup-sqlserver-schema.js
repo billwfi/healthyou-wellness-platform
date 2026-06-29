@@ -22,10 +22,11 @@ const cfg = {
 };
 
 // table, column, refTable, refColumn, intended ON DELETE
+// NOTE: the org_id FKs to dbo.organizations were removed — the app now references
+// iStrata.dbo.is_groups (a different database), and SQL Server can't enforce a
+// cross-database FK. org_id integrity is enforced in the app (Group dropdowns).
 const FKS = [
-  ['fk_participants_org',        'participants', 'org_id',            'organizations',    'id', 'SET NULL'],
   ['fk_participants_coach',      'participants', 'assigned_coach_id', 'coaches',          'id', 'SET NULL'],
-  ['fk_events_org',              'screening_events', 'org_id',        'organizations',    'id', 'SET NULL'],
   ['fk_biometrics_participant',  'biometric_results', 'participant_id','participants',    'id', 'CASCADE'],
   ['fk_biometrics_event',        'biometric_results', 'event_id',     'screening_events', 'id', 'SET NULL'],
   ['fk_biometrics_screener',     'biometric_results', 'screened_by',  'coaches',          'id', 'SET NULL'],
@@ -36,10 +37,7 @@ const FKS = [
   ['fk_goals_participant',       'goals', 'participant_id',           'participants',     'id', 'CASCADE'],
   ['fk_goals_coach',             'goals', 'coach_id',                 'coaches',          'id', 'SET NULL'],
   ['fk_availability_coach',      'coach_availability', 'coach_id',    'coaches',          'id', 'CASCADE'],
-  ['fk_contacts_org',            'org_contacts', 'org_id',            'organizations',    'id', 'CASCADE'],
-  ['fk_locations_org',           'org_locations', 'org_id',           'organizations',    'id', 'CASCADE'],
   ['fk_departments_location',    'departments', 'location_id',        'org_locations',    'id', 'CASCADE'],
-  ['fk_eligibility_org',         'eligibility', 'org_id',             'organizations',    'id', 'CASCADE'],
   ['fk_event_reg_event',         'event_registrations', 'event_id',   'screening_events', 'id', 'CASCADE'],
   ['fk_event_reg_participant',   'event_registrations', 'participant_id','participants',  'id', 'CASCADE'],
   // Schedule Setup child tables

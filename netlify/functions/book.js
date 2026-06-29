@@ -12,7 +12,7 @@ exports.handler = async (event, context) => {
     if (!org) return badRequest('org slug required');
     try {
       const { rows } = await db.query(
-        'SELECT id, name, slug FROM organizations WHERE slug=$1 AND active=1', [org]
+        "SELECT id, GroupName AS name, GroupId AS slug FROM iStrata.dbo.is_groups WHERE GroupId=$1 AND GroupStatus='Active'", [org]
       );
       if (!rows.length) return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'Organization not found' }) };
       return ok(rows[0]);
@@ -30,7 +30,7 @@ exports.handler = async (event, context) => {
       // Resolve org
       let org_id = null;
       if (org_slug) {
-        const { rows } = await db.query('SELECT id FROM organizations WHERE slug=$1', [org_slug]);
+        const { rows } = await db.query('SELECT id FROM iStrata.dbo.is_groups WHERE GroupId=$1', [org_slug]);
         if (rows.length) org_id = rows[0].id;
       }
 
