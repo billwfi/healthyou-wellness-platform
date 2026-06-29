@@ -565,6 +565,21 @@ IF COL_LENGTH('dbo.biometric_results','waist_height_category') IS NULL  ALTER TA
 GO
 IF COL_LENGTH('dbo.biometric_results','grip_strength') IS NULL          ALTER TABLE dbo.biometric_results ADD grip_strength DECIMAL(5,1);
 GO
+-- Lifestyle Risk Assessment (screener entry)
+IF COL_LENGTH('dbo.biometric_results','fruit_veg_servings') IS NULL     ALTER TABLE dbo.biometric_results ADD fruit_veg_servings INT;
+GO
+IF COL_LENGTH('dbo.biometric_results','activity_minutes') IS NULL       ALTER TABLE dbo.biometric_results ADD activity_minutes INT;
+GO
+IF COL_LENGTH('dbo.biometric_results','muscle_strengthening') IS NULL   ALTER TABLE dbo.biometric_results ADD muscle_strengthening BIT;
+GO
+IF COL_LENGTH('dbo.biometric_results','stress_level') IS NULL           ALTER TABLE dbo.biometric_results ADD stress_level INT;
+GO
+IF COL_LENGTH('dbo.biometric_results','alcohol_drinks') IS NULL         ALTER TABLE dbo.biometric_results ADD alcohol_drinks INT;
+GO
+IF COL_LENGTH('dbo.biometric_results','tobacco_use') IS NULL            ALTER TABLE dbo.biometric_results ADD tobacco_use BIT;
+GO
+IF COL_LENGTH('dbo.biometric_results','sleep_hours') IS NULL            ALTER TABLE dbo.biometric_results ADD sleep_hours DECIMAL(4,1);
+GO
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- Forms (builder) + assignment to events (shown during public registration).

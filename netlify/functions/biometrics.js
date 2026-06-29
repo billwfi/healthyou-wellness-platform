@@ -78,7 +78,9 @@ exports.handler = async (event, context) => {
       systolic_bp, diastolic_bp, heart_rate,
       total_cholesterol, hdl_cholesterol, ldl_cholesterol, triglycerides,
       blood_glucose, hba1c, notes, fasting_flag, pregnant, non_hdl, cholesterol_ratio,
-      grip_strength
+      grip_strength,
+      fruit_veg_servings, activity_minutes, muscle_strengthening, stress_level,
+      alcohol_drinks, tobacco_use, sleep_hours
     } = b;
 
     if (!participant_id) return badRequest('participant_id required');
@@ -112,9 +114,10 @@ exports.handler = async (event, context) => {
             total_cholesterol,hdl_cholesterol,ldl_cholesterol,triglycerides,cholesterol_ratio,non_hdl,
             blood_glucose,hba1c,
             waist_height_ratio,waist_height_category,fasting_flag,pregnant,grip_strength,
+            fruit_veg_servings,activity_minutes,muscle_strengthening,stress_level,alcohol_drinks,tobacco_use,sleep_hours,
             bp_risk,cholesterol_risk,glucose_risk,bmi_category,overall_risk,notes)
          OUTPUT INSERTED.*
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38)`,
         [participant_id, event_id||null, screened_by||null,
          screened_at||new Date().toISOString(),
          height_in||null, weight_lbs||null, bmi,
@@ -124,6 +127,8 @@ exports.handler = async (event, context) => {
          triglycerides||null, cholesterol_ratio ?? null, non_hdl ?? null,
          blood_glucose||null, hba1c||null,
          waist_height_ratio, waist_height_category, fasting_flag ? 1 : 0, pregnant ? 1 : 0, grip_strength ?? null,
+         fruit_veg_servings ?? null, activity_minutes ?? null, muscle_strengthening ?? null,
+         stress_level ?? null, alcohol_drinks ?? null, tobacco_use ?? null, sleep_hours ?? null,
          bp_risk, cholesterol_risk, glucose_risk, bmi_cat, overall, notes||null]
       );
       return created(r.rows[0]);
