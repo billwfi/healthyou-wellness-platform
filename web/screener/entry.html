@@ -255,7 +255,7 @@
 </main>
 <div class="toast" id="toast"></div>
 <script>
-let authToken=null, participantId=null, eventId=null;
+let authToken=null, participantId=null, eventId=null, participantSex='';
 const qs=new URLSearchParams(location.search);
 participantId=qs.get('participant_id');
 eventId=qs.get('event_id');
@@ -287,6 +287,7 @@ async function boot(user) {
     if(p.gender) meta.push(p.gender.replace('_',' '));
     if(p.org_name) meta.push(p.org_name);
     document.getElementById('p-meta').textContent=meta.join(' · ');
+    participantSex=(p.gender||'').toLowerCase();
     setAlcoholRange(p.gender);
 
     // Pre-fill height/weight from last screening if available
@@ -398,13 +399,18 @@ async function submitForm(e) {
 
 function showResults(r) {
   const tiles=[];
+  if(r.height_in) tiles.push({label:'Height',val:Number(r.height_in)+' in',risk:null});
   if(r.weight_lbs) tiles.push({label:'Weight',val:r.weight_lbs+' lbs',risk:null});
   if(r.bmi) tiles.push({label:'BMI',val:Number(r.bmi).toFixed(1),risk:r.bmi_category});
+  if(r.waist_circumference_in) tiles.push({label:'Waist',val:Number(r.waist_circumference_in)+' in',risk:null});
   if(r.waist_height_ratio) tiles.push({label:'Waist/Height',val:Number(r.waist_height_ratio).toFixed(2),risk:r.waist_height_category});
+  if(r.grip_strength) tiles.push({label:'Grip Strength',val:Number(r.grip_strength)+' lbs',risk:null});
   if(r.systolic_bp) tiles.push({label:'Blood Pressure',val:`${r.systolic_bp}/${r.diastolic_bp}`,risk:r.bp_risk});
   if(r.heart_rate) tiles.push({label:'Heart Rate',val:r.heart_rate+' bpm',risk:null});
   if(r.total_cholesterol) tiles.push({label:'Total Chol.',val:r.total_cholesterol+' mg/dL',risk:r.cholesterol_risk});
   if(r.hdl_cholesterol) tiles.push({label:'HDL',val:r.hdl_cholesterol+' mg/dL',risk:null});
+  if(r.ldl_cholesterol) tiles.push({label:'LDL',val:r.ldl_cholesterol+' mg/dL',risk:null});
+  if(r.triglycerides) tiles.push({label:'Triglycerides',val:r.triglycerides+' mg/dL',risk:null});
   if(r.non_hdl) tiles.push({label:'Non-HDL',val:r.non_hdl+' mg/dL',risk:null});
   if(r.cholesterol_ratio) tiles.push({label:'Chol. Ratio',val:Number(r.cholesterol_ratio).toFixed(1),risk:null});
   if(r.blood_glucose) tiles.push({label:'Glucose',val:r.blood_glucose+' mg/dL',risk:r.glucose_risk});
@@ -425,6 +431,11 @@ function showResults(r) {
   const riskColor={high:'var(--red)',crisis:'var(--red)',high_1:'var(--amber)',high_2:'var(--red)',elevated:'var(--amber)',borderline:'var(--amber)',very_high:'var(--red)',prediabetes:'var(--amber)',diabetes:'var(--red)',obese:'var(--red)',overweight:'var(--amber)',normal:'var(--green)',low:'var(--green)',ideal:'var(--green)'};
   const overallColor={high:'#ef4444',moderate:'#f59e0b',low:'#10b981'}[r.overall_risk]||'#6b7280';
 
+  const ms=metSyndrome(r, participantSex);
+  const msColor = ms.metCount>=3?'var(--red)':ms.metCount===2?'var(--amber)':'var(--green)';
+  const msBg    = ms.metCount>=3?'var(--red-light)':ms.metCount===2?'var(--amber-light)':'var(--teal-bg)';
+  const msLabel = ms.metCount>=3?'Metabolic syndrome present (≥3 criteria)':ms.metCount===2?'At risk — 2 of 5 criteria':'Low risk';
+
   document.getElementById('results-summary').innerHTML=`
     <div style="text-align:center;margin-bottom:20px;">
       <div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;">Overall Risk</div>
@@ -436,6 +447,16 @@ function showResults(r) {
         <div class="result-tile-label">${t.label}</div>
       </div>`).join('')}
     </div>
+    ${ms.measured?`
+    <div style="margin-top:20px;padding:14px 16px;border:1px solid ${msColor};border-radius:8px;background:${msBg};">
+      <div style="font-size:.8rem;color:var(--gray-500);text-transform:uppercase;letter-spacing:.05em;">Metabolic Syndrome Score</div>
+      <div style="font-size:1.5rem;font-weight:800;color:${msColor};">${ms.metCount} / 5 criteria</div>
+      <div style="font-size:.84rem;font-weight:600;color:${msColor};margin-bottom:8px;">${msLabel}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 20px;font-size:.8rem;">
+        ${ms.crit.map(c=>`<div style="display:flex;gap:6px;align-items:center;"><span style="color:${c.met?'var(--red)':'var(--green)'};font-weight:700;width:12px;">${c.met?'✓':'·'}</span><span style="color:var(--gray-600);">${esc(c.name)}</span></div>`).join('')}
+      </div>
+      ${ms.measured<5?`<div style="margin-top:8px;font-size:.74rem;color:var(--gray-400);">Based on ${ms.measured} of 5 measured criteria.</div>`:''}
+    </div>`:''}
     ${lifeRows.length?`
     <div style="margin-top:22px;">
       <div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Lifestyle Risk Assessment</div>
@@ -464,6 +485,20 @@ function setAlcoholRange(gender){
   lifeLabel('alcohol');
 }
 function radioVal(name){ const r=document.querySelector('input[name="'+name+'"]:checked'); return r?(r.value==='1'):null; }
+
+// Metabolic Syndrome (harmonized NCEP ATP III): syndrome present when >=3 of 5
+// criteria are met. Waist and HDL thresholds are sex-specific.
+function metSyndrome(r, sex){
+  const female=(sex||'').startsWith('f');
+  const crit=[];
+  if(r.waist_circumference_in!=null) crit.push({name:`Waist ≥${female?35:40} in`, met:Number(r.waist_circumference_in)>=(female?35:40)});
+  if(r.triglycerides!=null)          crit.push({name:'Triglycerides ≥150', met:Number(r.triglycerides)>=150});
+  if(r.hdl_cholesterol!=null)        crit.push({name:`HDL <${female?50:40}`, met:Number(r.hdl_cholesterol)<(female?50:40)});
+  if(r.systolic_bp!=null||r.diastolic_bp!=null)
+                                     crit.push({name:'BP ≥130/85', met:(Number(r.systolic_bp)>=130||Number(r.diastolic_bp)>=85)});
+  if(r.blood_glucose!=null)          crit.push({name:'Glucose ≥100', met:Number(r.blood_glucose)>=100});
+  return { measured:crit.length, metCount:crit.filter(c=>c.met).length, crit };
+}
 function fmtDate(d){ return d?new Date(d.includes('T')?d:d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''; }
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
