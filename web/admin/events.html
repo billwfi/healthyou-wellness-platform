@@ -85,6 +85,7 @@
         <button class="tab event-tab active" data-tab="overview" onclick="switchEventTab('overview',this)">Overview</button>
         <button class="tab event-tab" data-tab="participants" onclick="switchEventTab('participants',this)">Participants</button>
         <button class="tab event-tab" data-tab="registration" onclick="switchEventTab('registration',this)">Registration Link</button>
+        <button class="tab event-tab" data-tab="setup" onclick="switchEventTab('setup',this)">Setup</button>
       </div>
 
       <!-- Overview tab -->
@@ -172,6 +173,124 @@
         </div>
       </div>
 
+      <!-- Setup tab (AppointmentQuest-style Schedule Setup) -->
+      <div id="et-setup" style="display:none;">
+        <div class="tabs" style="margin-bottom:18px;">
+          <button class="tab setup-tab active" data-stab="general"       onclick="switchSetupTab('general',this)">General</button>
+          <button class="tab setup-tab" data-stab="settings"             onclick="switchSetupTab('settings',this)">Settings</button>
+          <button class="tab setup-tab" data-stab="hours"                onclick="switchSetupTab('hours',this)">Business Hours</button>
+          <button class="tab setup-tab" data-stab="availability"         onclick="switchSetupTab('availability',this)">Availability</button>
+          <button class="tab setup-tab" data-stab="notifications"        onclick="switchSetupTab('notifications',this)">Notifications</button>
+          <button class="tab setup-tab" data-stab="payments"             onclick="switchSetupTab('payments',this)">Payments</button>
+        </div>
+
+        <!-- General -->
+        <div id="st-general">
+          <div class="card">
+            <div class="card-title">Schedule</div>
+            <div class="form-grid full" style="gap:14px;">
+              <div class="form-group"><label>Schedule Name</label><input id="su-name" type="text" disabled style="background:var(--gray-50);"/><span style="font-size:.72rem;color:var(--gray-400);">Edit the name via “Edit Event”.</span></div>
+              <div class="form-group"><label>Description</label><textarea id="su-description" rows="4" placeholder="Eligibility, location details…"></textarea></div>
+              <div class="form-group"><label>Custom Form</label><input id="su-custom_form" type="text" placeholder="e.g. RYP Questions"/></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Appointments</div>
+            <div id="su-appt-matrix"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Status</div>
+            <div style="display:flex;gap:24px;align-items:center;font-size:.9rem;">
+              <label style="display:flex;gap:6px;align-items:center;"><input type="radio" name="su-status" value="active"> Active</label>
+              <label style="display:flex;gap:6px;align-items:center;"><input type="radio" name="su-status" value="suspended"> Suspended</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings -->
+        <div id="st-settings" style="display:none;">
+          <div class="card">
+            <div class="card-title">General Settings</div>
+            <div class="form-grid" style="gap:14px;">
+              <div class="form-group"><label>Concurrent Limit (per customer)</label><input id="su-concurrent_limit" type="number" min="1" value="1"/></div>
+              <div class="form-group"><label>Service Location Selection</label>
+                <select id="su-service_location_selection"><option value="required">Required</option><option value="optional">Optional</option></select></div>
+              <div class="form-group"><label>Valid From</label><input id="su-valid_from" type="date"/></div>
+              <div class="form-group"><label>Valid To</label><input id="su-valid_to" type="date"/></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Service Locations</div>
+            <div id="su-locations"><span style="font-size:.84rem;color:var(--gray-400);">Loading…</span></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Reservation Rules</div>
+            <div id="su-rules-matrix" style="overflow-x:auto;"></div>
+          </div>
+        </div>
+
+        <!-- Business Hours -->
+        <div id="st-hours" style="display:none;">
+          <div class="card" style="padding:0;overflow:hidden;">
+            <table class="data-table"><thead><tr><th style="width:120px;">Week Day</th><th>Business Hours</th></tr></thead>
+              <tbody id="su-hours-body"></tbody></table>
+          </div>
+        </div>
+
+        <!-- Availability -->
+        <div id="st-availability" style="display:none;">
+          <div class="card">
+            <div class="card-title">Availability</div>
+            <div class="form-grid" style="gap:14px;">
+              <div class="form-group"><label>Appointment Interval (min)</label><input id="su-appointment_interval_min" type="number" min="5" step="5" value="30"/></div>
+              <div class="form-group"><label>Service Duration (min)</label><input id="su-service_duration_min" type="number" min="5" step="5" value="30"/></div>
+              <div class="form-group"><label>Service Duration</label><select id="su-service_duration_flexible"><option value="0">Fixed</option><option value="1">Flexible</option></select></div>
+              <div class="form-group"><label>Overlap</label><select id="su-overlap_allowed"><option value="0">Prevented</option><option value="1">Allowed</option></select></div>
+              <div class="form-group"><label>Group Scheduling</label><select id="su-group_scheduling"><option value="0">Disabled</option><option value="1">Enabled</option></select></div>
+              <div class="form-group"><label>Capacity</label><select id="su-capacity_uniform"><option value="1">Uniform</option><option value="0">Variable</option></select></div>
+              <div class="form-group"><label>Uniform Capacity</label><input id="su-uniform_capacity" type="number" min="0" value="1"/></div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px;">
+              <button class="btn btn-ghost btn-sm" onclick="genAvailGrid()">Apply to Time Table</button>
+              <button class="btn btn-ghost btn-sm" onclick="makeUniform()">Make it Uniform</button>
+            </div>
+          </div>
+          <div class="card" style="padding:0;overflow:auto;">
+            <table class="data-table" id="su-avail-grid"><tbody><tr><td class="empty">Set business hours, then “Apply to Time Table”.</td></tr></tbody></table>
+          </div>
+        </div>
+
+        <!-- Notifications -->
+        <div id="st-notifications" style="display:none;">
+          <div class="card">
+            <div class="card-title">Staff Notification Recipients</div>
+            <div id="su-recipients"><span style="font-size:.84rem;color:var(--gray-400);">Loading…</span></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Customer Notifications</div>
+            <label style="display:flex;gap:8px;align-items:center;font-size:.9rem;"><input type="checkbox" id="su-notify_customers"> Enable customer e-mail notifications for internal appointments</label>
+          </div>
+        </div>
+
+        <!-- Payments -->
+        <div id="st-payments" style="display:none;">
+          <div class="card">
+            <div class="card-title">Payments</div>
+            <label style="display:flex;gap:8px;align-items:center;font-size:.9rem;margin-bottom:12px;"><input type="checkbox" id="su-payment_required"> Payment required</label>
+            <div class="form-grid" style="gap:14px;">
+              <div class="form-group"><label>Amount (USD)</label><input id="su-payment_amount" type="number" min="0" step="0.01"/></div>
+              <div class="form-group span-2"><label>Payment Instructions</label><textarea id="su-payment_instructions" rows="3"></textarea></div>
+            </div>
+            <p style="font-size:.76rem;color:var(--gray-400);margin-top:10px;">Payments is a placeholder pending the AppointmentQuest Payments spec.</p>
+          </div>
+        </div>
+
+        <div class="save-bar">
+          <span id="setup-saved" style="font-size:.84rem;color:var(--teal);display:none;">Saved!</span>
+          <button class="btn btn-primary" onclick="saveSetup()">Save Schedule Setup</button>
+        </div>
+      </div><!-- /et-setup -->
+
     </div><!-- /view-detail -->
 
   </div><!-- /content -->
@@ -228,6 +347,7 @@
 <script>
 let authToken=null, events=[], orgs=[], editEventId=null;
 let activeEvent=null, ptLoaded=false;
+let suState=null, suLocations=[], suCoaches=[], suLoaded=false;
 let ptParsed=[], ptOffset=0, ptTotal=0, ptSearchTimer=null;
 const PT_LIMIT=50;
 const STATUS_OPTS=['scheduled','in_progress','completed','cancelled'];
@@ -281,7 +401,7 @@ function renderList() {
 function openEvent(id) {
   activeEvent=events.find(e=>e.id===id);
   if(!activeEvent) return;
-  ptLoaded=false; ptParsed=[];
+  ptLoaded=false; ptParsed=[]; suLoaded=false; suState=null;
 
   document.getElementById('ev-name').textContent=activeEvent.name;
   document.getElementById('ev-status-badge').innerHTML=`<span class="badge badge-${activeEvent.status}">${activeEvent.status.replace('_',' ')}</span>`;
@@ -302,7 +422,7 @@ function openEvent(id) {
 
   document.querySelectorAll('.event-tab').forEach(t=>t.classList.remove('active'));
   document.querySelector('[data-tab="overview"]').classList.add('active');
-  ['overview','participants','registration'].forEach(t=>
+  ['overview','participants','registration','setup'].forEach(t=>
     document.getElementById('et-'+t).style.display=t==='overview'?'':'none'
   );
   loadOverview();
@@ -317,11 +437,12 @@ function backToList() {
 function switchEventTab(tab, el) {
   document.querySelectorAll('.event-tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  ['overview','participants','registration'].forEach(t=>
+  ['overview','participants','registration','setup'].forEach(t=>
     document.getElementById('et-'+t).style.display=t===tab?'':'none'
   );
   if(tab==='participants'&&!ptLoaded) loadParticipants(0);
   if(tab==='registration') renderRegTab();
+  if(tab==='setup'&&!suLoaded) loadSetup();
 }
 
 // ── Overview tab ──────────────────────────────────────────────────────────────
@@ -573,6 +694,213 @@ async function updateStatus(id,status) {
     showToast('Status updated');
   } catch(e){showToast('Error: '+e.message);}
 }
+
+// ── Schedule Setup (AppointmentQuest parity) ──────────────────────────────────
+function auth(){ return {Authorization:'Bearer '+authToken}; }
+function defSide(){ return { regular:true, recurring:false, rescheduling:true,
+  advance_value:0, advance_unit:'hours', window_value:24, window_unit:'months',
+  reschedule_value:0, reschedule_unit:'hours', cancel_value:0, cancel_unit:'hours',
+  auto_confirm:true, auto_cancel:true, allow_delete:true, disclosure:true }; }
+
+function normalizeRules(st){
+  st.appointment_rules = st.appointment_rules || {};
+  st.appointment_rules.internal = Object.assign(defSide(), st.appointment_rules.internal||{});
+  st.appointment_rules.external = Object.assign(defSide(), st.appointment_rules.external||{});
+}
+
+function switchSetupTab(tab, el){
+  document.querySelectorAll('.setup-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  ['general','settings','hours','availability','notifications','payments'].forEach(t=>
+    document.getElementById('st-'+t).style.display=t===tab?'':'none');
+}
+
+async function loadSetup(){
+  suLoaded=true;
+  document.getElementById('su-name').value=activeEvent.name||'';
+  try {
+    const [setup, locs, coaches] = await Promise.all([
+      fetch(`/api/event-setup?event_id=${activeEvent.id}`,{headers:auth()}).then(r=>r.json()),
+      activeEvent.org_id ? fetch(`/api/org-locations?org_id=${activeEvent.org_id}`,{headers:auth()}).then(r=>r.json()) : Promise.resolve([]),
+      fetch('/api/coaches?admin=1',{headers:auth()}).then(r=>r.json()).catch(()=>[]),
+    ]);
+    suState = setup && !setup.error ? setup : {};
+    normalizeRules(suState);
+    suState.business_hours = suState.business_hours || [];
+    suState.availability_slots = suState.availability_slots || [];
+    suState.service_location_ids = suState.service_location_ids || [];
+    suState.notification_recipients = suState.notification_recipients || [];
+    suLocations = Array.isArray(locs) ? locs : [];
+    suCoaches  = Array.isArray(coaches) ? coaches : [];
+    fillSetupForm();
+  } catch(e){ showToast('Error loading setup: '+e.message); }
+}
+
+function fillSetupForm(){
+  const v=(id,val)=>{const e=document.getElementById(id); if(e) e.value=(val==null?'':val);};
+  v('su-description',suState.description); v('su-custom_form',suState.custom_form);
+  setRadio('su-status', suState.schedule_status||'active');
+  v('su-concurrent_limit',suState.concurrent_limit==null?1:suState.concurrent_limit);
+  v('su-valid_from',suState.valid_from); v('su-valid_to',suState.valid_to);
+  selVal('su-service_location_selection',suState.service_location_selection||'required');
+  v('su-appointment_interval_min',suState.appointment_interval_min==null?30:suState.appointment_interval_min);
+  v('su-service_duration_min',suState.service_duration_min==null?30:suState.service_duration_min);
+  selVal('su-service_duration_flexible', suState.service_duration_flexible?'1':'0');
+  selVal('su-overlap_allowed', suState.overlap_allowed?'1':'0');
+  selVal('su-group_scheduling', suState.group_scheduling?'1':'0');
+  selVal('su-capacity_uniform', suState.capacity_uniform===false?'0':'1');
+  v('su-uniform_capacity',suState.uniform_capacity==null?1:suState.uniform_capacity);
+  document.getElementById('su-notify_customers').checked = suState.notify_customers!==false;
+  document.getElementById('su-payment_required').checked = !!suState.payment_required;
+  v('su-payment_amount',suState.payment_amount); v('su-payment_instructions',suState.payment_instructions);
+  renderApptMatrix(); renderRulesMatrix(); renderLocations(); renderHours(); renderRecipients(); renderAvailGrid();
+}
+
+function setRule(side,key,val){ suState.appointment_rules[side][key]=val; }
+function setRuleNum(side,key,val){ suState.appointment_rules[side][key]=Number(val)||0; }
+
+function renderApptMatrix(){
+  const rows=[['regular','Regular'],['recurring','Recurring'],['rescheduling','Rescheduling']];
+  const cell=(side,key)=>{ const val=suState.appointment_rules[side][key];
+    return `<td><label style="margin-right:10px;"><input type="radio" name="ar-${side}-${key}" ${val?'checked':''} onchange="setRule('${side}','${key}',true)"> Allowed</label>`+
+           `<label><input type="radio" name="ar-${side}-${key}" ${!val?'checked':''} onchange="setRule('${side}','${key}',false)"> NOT Allowed</label></td>`; };
+  document.getElementById('su-appt-matrix').innerHTML =
+    `<table class="data-table"><thead><tr><th></th><th>Internal</th><th>External</th></tr></thead><tbody>`+
+    rows.map(([k,lbl])=>`<tr><td><strong>${lbl}</strong></td>${cell('internal',k)}${cell('external',k)}</tr>`).join('')+`</tbody></table>`;
+}
+
+function renderRulesMatrix(){
+  const numIn=(s,k)=>{const val=suState.appointment_rules[s][k]; return `<input type="number" min="0" style="width:64px;" value="${val==null?0:val}" onchange="setRuleNum('${s}','${k}',this.value)">`;};
+  const unitSel=(s,k)=>{const val=suState.appointment_rules[s][k]; return `<select onchange="setRule('${s}','${k}',this.value)">`+['hours','days','months'].map(u=>`<option value="${u}" ${val===u?'selected':''}>${u}</option>`).join('')+`</select>`;};
+  const yn=(s,k)=>{const val=suState.appointment_rules[s][k]; return `<label style="margin-right:8px;"><input type="radio" name="rr-${s}-${k}" ${val?'checked':''} onchange="setRule('${s}','${k}',true)">Yes</label>`+
+    `<label><input type="radio" name="rr-${s}-${k}" ${!val?'checked':''} onchange="setRule('${s}','${k}',false)">No</label>`;};
+  const rrows=[
+    ['Reservation Advance', s=>numIn(s,'advance_value')+' '+unitSel(s,'advance_unit')],
+    ['Reservation Window',  s=>numIn(s,'window_value')+' '+unitSel(s,'window_unit')],
+    ['Rescheduling Deadline',s=>numIn(s,'reschedule_value')+' '+unitSel(s,'reschedule_unit')],
+    ['Cancellation Deadline',s=>numIn(s,'cancel_value')+' '+unitSel(s,'cancel_unit')],
+    ['Auto Confirm', s=>yn(s,'auto_confirm')],
+    ['Auto Cancel',  s=>yn(s,'auto_cancel')],
+    ['Allow Appointment Delete', s=>yn(s,'allow_delete')],
+    ['Reservation Disclosure', s=>yn(s,'disclosure')],
+  ];
+  document.getElementById('su-rules-matrix').innerHTML =
+    `<table class="data-table"><thead><tr><th></th><th>Internal</th><th>External</th></tr></thead><tbody>`+
+    rrows.map(([lbl,fn])=>`<tr><td><strong>${lbl}</strong></td><td>${fn('internal')}</td><td>${fn('external')}</td></tr>`).join('')+`</tbody></table>`;
+}
+
+function renderLocations(){
+  const c=document.getElementById('su-locations');
+  if(!activeEvent.org_id){ c.innerHTML='<span style="font-size:.84rem;color:var(--gray-400);">Assign an organization to this event (Edit Event) to choose service locations.</span>'; return; }
+  if(!suLocations.length){ c.innerHTML='<span style="font-size:.84rem;color:var(--gray-400);">No locations for this organization yet. Add them under Organizations → Locations.</span>'; return; }
+  c.innerHTML=suLocations.map(l=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:.9rem;">
+    <input type="checkbox" value="${l.id}" ${suState.service_location_ids.includes(l.id)?'checked':''}> ${esc(l.name)}${l.city?` <span style="color:var(--gray-400);font-size:.8rem;">(${esc(l.city)})</span>`:''}</label>`).join('');
+}
+
+const SU_DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function dayOpenBlocks(d){ return suState.business_hours.filter(h=>h.day_of_week===d && h.is_open); }
+function hoursOpen(d){ suState.business_hours.push({day_of_week:d,is_open:true,from_time:'08:00',to_time:'16:00'}); renderHours(); }
+function hoursSplit(d){ suState.business_hours.push({day_of_week:d,is_open:true,from_time:'13:00',to_time:'16:00'}); renderHours(); }
+function hoursTime(d,bi,which,val){ const b=dayOpenBlocks(d)[bi]; if(b){ if(which==='from') b.from_time=val; else b.to_time=val; } }
+function hoursClose(d,bi){ const b=dayOpenBlocks(d)[bi]; const i=suState.business_hours.indexOf(b); if(i>=0) suState.business_hours.splice(i,1); renderHours(); }
+function renderHours(){
+  document.getElementById('su-hours-body').innerHTML=SU_DAYS.map((dn,d)=>{
+    const blocks=dayOpenBlocks(d);
+    if(!blocks.length) return `<tr><td><strong>${dn}</strong></td><td style="display:flex;justify-content:space-between;align-items:center;">
+      <span style="color:var(--gray-400);">Closed for Business</span><button class="btn btn-ghost btn-sm" onclick="hoursOpen(${d})">Open</button></td></tr>`;
+    return `<tr><td><strong>${dn}</strong></td><td>`+blocks.map((b,bi)=>`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+      From <input type="time" value="${b.from_time||'08:00'}" onchange="hoursTime(${d},${bi},'from',this.value)">
+      To <input type="time" value="${b.to_time||'16:00'}" onchange="hoursTime(${d},${bi},'to',this.value)">
+      <button class="btn btn-ghost btn-sm" onclick="hoursClose(${d},${bi})">Close</button>
+      <button class="btn btn-ghost btn-sm" onclick="hoursSplit(${d})">Split</button></div>`).join('')+`</td></tr>`;
+  }).join('');
+}
+
+function suTimeToMin(t){ const [h,m]=t.split(':').map(Number); return h*60+m; }
+function suMinToTime(x){ return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0'); }
+function genAvailGrid(){
+  const interval=parseInt(document.getElementById('su-appointment_interval_min').value)||30;
+  const uni=parseInt(document.getElementById('su-uniform_capacity').value)||1;
+  const existing={}; suState.availability_slots.forEach(s=>existing[s.day_of_week+'|'+s.start_time]=s.capacity);
+  const slots=[];
+  for(let d=0;d<7;d++){
+    dayOpenBlocks(d).forEach(b=>{
+      if(!b.from_time||!b.to_time) return;
+      const from=suTimeToMin(b.from_time), to=suTimeToMin(b.to_time);
+      for(let t=from; t<to; t+=interval){
+        const st=suMinToTime(t), key=d+'|'+st;
+        slots.push({day_of_week:d,start_time:st,capacity: existing[key]!=null?existing[key]:uni});
+      }
+    });
+  }
+  suState.availability_slots=slots; renderAvailGrid();
+}
+function setSlotCap(d,t,val){ const s=suState.availability_slots.find(x=>x.day_of_week===d&&x.start_time===t); if(s) s.capacity=parseInt(val)||0; }
+function makeUniform(){ const uni=parseInt(document.getElementById('su-uniform_capacity').value)||1; suState.availability_slots.forEach(s=>s.capacity=uni); renderAvailGrid(); }
+function renderAvailGrid(){
+  const grid=document.getElementById('su-avail-grid'), slots=suState.availability_slots;
+  if(!slots.length){ grid.innerHTML='<tbody><tr><td class="empty">Set business hours, then “Apply to Time Table”.</td></tr></tbody>'; return; }
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const times=[...new Set(slots.map(s=>s.start_time))].sort();
+  const map={}; slots.forEach(s=>map[s.day_of_week+'|'+s.start_time]=s);
+  grid.innerHTML='<thead><tr><th>Time</th>'+days.map(d=>`<th style="text-align:center;">${d}</th>`).join('')+'</tr></thead><tbody>'+
+    times.map(t=>`<tr><td>${t}</td>`+[0,1,2,3,4,5,6].map(d=>{ const s=map[d+'|'+t];
+      return `<td style="text-align:center;">`+(s?`<input type="number" min="0" style="width:54px;" value="${s.capacity==null?1:s.capacity}" onchange="setSlotCap(${d},'${t}',this.value)">`:'')+`</td>`;
+    }).join('')+'</tr>').join('')+'</tbody>';
+}
+
+function renderRecipients(){
+  const c=document.getElementById('su-recipients');
+  if(!suCoaches.length){ c.innerHTML='<span style="font-size:.84rem;color:var(--gray-400);">No staff users found.</span>'; return; }
+  const sel=new Set(suState.notification_recipients.map(r=>(r.email||'').toLowerCase()));
+  c.innerHTML=suCoaches.map(co=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:.9rem;">
+    <input type="checkbox" data-email="${esc(co.email||'')}" data-name="${esc(co.name||'')}" ${sel.has((co.email||'').toLowerCase())?'checked':''}> ${esc(co.name||'')} <span style="color:var(--gray-400);font-size:.8rem;">${esc(co.email||'')}</span></label>`).join('');
+}
+
+async function saveSetup(){
+  if(!suState) return;
+  const num=id=>{const v=document.getElementById(id).value; return v===''?null:Number(v);};
+  const val=id=>{const v=document.getElementById(id).value; return v===''?null:v;};
+  const locIds=[...document.querySelectorAll('#su-locations input[type=checkbox]:checked')].map(c=>parseInt(c.value));
+  const recips=[...document.querySelectorAll('#su-recipients input[type=checkbox]:checked')].map(c=>({name:c.dataset.name,email:c.dataset.email}));
+  const body={
+    event_id:activeEvent.id,
+    description:val('su-description'), custom_form:val('su-custom_form'),
+    schedule_status:getRadio('su-status')||'active',
+    concurrent_limit:num('su-concurrent_limit'),
+    valid_from:val('su-valid_from'), valid_to:val('su-valid_to'),
+    service_location_selection:document.getElementById('su-service_location_selection').value,
+    appointment_interval_min:num('su-appointment_interval_min'),
+    service_duration_min:num('su-service_duration_min'),
+    service_duration_flexible:document.getElementById('su-service_duration_flexible').value==='1',
+    overlap_allowed:document.getElementById('su-overlap_allowed').value==='1',
+    group_scheduling:document.getElementById('su-group_scheduling').value==='1',
+    capacity_uniform:document.getElementById('su-capacity_uniform').value==='1',
+    uniform_capacity:num('su-uniform_capacity'),
+    notify_customers:document.getElementById('su-notify_customers').checked,
+    payment_required:document.getElementById('su-payment_required').checked,
+    payment_amount:num('su-payment_amount'),
+    payment_instructions:val('su-payment_instructions'),
+    appointment_rules:suState.appointment_rules,
+    business_hours:suState.business_hours,
+    availability_slots:suState.availability_slots,
+    service_location_ids:locIds,
+    notification_recipients:recips,
+  };
+  try{
+    const r=await fetch('/api/event-setup',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+authToken},body:JSON.stringify(body)});
+    if(!r.ok){ showToast('Error: '+((await r.json()).error||'Save failed')); return; }
+    suState=await r.json(); normalizeRules(suState);
+    suState.business_hours=suState.business_hours||[]; suState.availability_slots=suState.availability_slots||[];
+    suState.service_location_ids=suState.service_location_ids||[]; suState.notification_recipients=suState.notification_recipients||[];
+    const saved=document.getElementById('setup-saved'); saved.style.display=''; setTimeout(()=>saved.style.display='none',2500);
+    showToast('Schedule setup saved');
+  }catch(e){ showToast('Error: '+e.message); }
+}
+
+function setRadio(name,val){ document.querySelectorAll(`input[name="${name}"]`).forEach(r=>r.checked=(r.value===val)); }
+function getRadio(name){ const r=document.querySelector(`input[name="${name}"]:checked`); return r?r.value:null; }
+function selVal(id,val){ const e=document.getElementById(id); if(e) e.value=val; }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtDate(d){ return d?new Date(d.length>10?d:d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—'; }

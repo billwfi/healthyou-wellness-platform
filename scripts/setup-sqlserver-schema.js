@@ -42,6 +42,12 @@ const FKS = [
   ['fk_eligibility_org',         'eligibility', 'org_id',             'organizations',    'id', 'CASCADE'],
   ['fk_event_reg_event',         'event_registrations', 'event_id',   'screening_events', 'id', 'CASCADE'],
   ['fk_event_reg_participant',   'event_registrations', 'participant_id','participants',  'id', 'CASCADE'],
+  // Schedule Setup child tables
+  ['fk_event_hours_event',       'event_business_hours', 'event_id',  'screening_events', 'id', 'CASCADE'],
+  ['fk_event_slots_event',       'event_availability_slots', 'event_id','screening_events','id', 'CASCADE'],
+  ['fk_event_svcloc_event',      'event_service_locations', 'event_id','screening_events','id', 'CASCADE'],
+  ['fk_event_svcloc_location',   'event_service_locations', 'location_id','org_locations','id', 'CASCADE'],
+  ['fk_event_notif_event',       'event_notification_recipients', 'event_id','screening_events','id','CASCADE'],
 ];
 
 (async () => {

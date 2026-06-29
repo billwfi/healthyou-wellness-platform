@@ -45,3 +45,23 @@ targeting the existing **`hy_datawarehouse`** database on `64.27.41.252` (schema
 ## Local development
 
 `.env` (gitignored) holds the local `MSSQL_*` values; run `netlify dev` as usual.
+
+## Schedule Setup (AppointmentQuest parity)
+
+The screening-event "Schedule Setup" feature **extends** `screening_events` rather than adding a
+new concept. Applied idempotently by `npm run db:setup`:
+
+- **New `screening_events` columns** (all additive, guarded by `IF COL_LENGTH(...) IS NULL`):
+  General (`description`, `custom_form`, `schedule_status`, `capacity_type`), Settings
+  (`concurrent_limit`, `valid_from`, `valid_to`, `service_location_selection`), Availability
+  (`appointment_interval_min`, `service_duration_min`, `service_duration_flexible`,
+  `overlap_allowed`, `group_scheduling`, `capacity_uniform`, `uniform_capacity`),
+  Notifications (`notify_customers`), Payments (`payment_required`, `payment_amount`,
+  `payment_instructions`), and `appointment_rules NVARCHAR(MAX)` (JSON: the internal/external
+  matrix — regular/recurring/rescheduling allowed, advance/window, reschedule/cancel deadlines,
+  auto-confirm/cancel, allow-delete, disclosure).
+- **New child tables** (FK → `screening_events` ON DELETE CASCADE): `event_business_hours`
+  (split shifts), `event_availability_slots` (per-slot capacity grid), `event_service_locations`
+  (→ `org_locations`), `event_notification_recipients`.
+- **API**: `netlify/functions/event-setup.js` (`GET`/`PUT ?event_id=`), transactional, partial-
+  body friendly. **UI**: a "Setup" tab in `web/admin/events.html` with six sub-tabs.

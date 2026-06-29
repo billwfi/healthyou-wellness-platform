@@ -398,3 +398,104 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_umbraco_type')         
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_umbraco_name')            CREATE INDEX idx_umbraco_name            ON dbo.umbraco_content(name);
 GO
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- Schedule Setup (AppointmentQuest parity) — additive columns on screening_events
+-- plus event_* child tables. All guarded so this file stays idempotent.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- General
+IF COL_LENGTH('dbo.screening_events','description') IS NULL                ALTER TABLE dbo.screening_events ADD description NVARCHAR(MAX);
+GO
+IF COL_LENGTH('dbo.screening_events','custom_form') IS NULL                ALTER TABLE dbo.screening_events ADD custom_form NVARCHAR(255);
+GO
+IF COL_LENGTH('dbo.screening_events','schedule_status') IS NULL            ALTER TABLE dbo.screening_events ADD schedule_status NVARCHAR(20) DEFAULT 'active';
+GO
+IF COL_LENGTH('dbo.screening_events','capacity_type') IS NULL              ALTER TABLE dbo.screening_events ADD capacity_type NVARCHAR(50) DEFAULT 'capacity';
+GO
+-- Settings
+IF COL_LENGTH('dbo.screening_events','concurrent_limit') IS NULL           ALTER TABLE dbo.screening_events ADD concurrent_limit INT DEFAULT 1;
+GO
+IF COL_LENGTH('dbo.screening_events','valid_from') IS NULL                 ALTER TABLE dbo.screening_events ADD valid_from DATE;
+GO
+IF COL_LENGTH('dbo.screening_events','valid_to') IS NULL                   ALTER TABLE dbo.screening_events ADD valid_to DATE;
+GO
+IF COL_LENGTH('dbo.screening_events','service_location_selection') IS NULL ALTER TABLE dbo.screening_events ADD service_location_selection NVARCHAR(20) DEFAULT 'required';
+GO
+-- Availability
+IF COL_LENGTH('dbo.screening_events','appointment_interval_min') IS NULL   ALTER TABLE dbo.screening_events ADD appointment_interval_min INT DEFAULT 30;
+GO
+IF COL_LENGTH('dbo.screening_events','service_duration_min') IS NULL       ALTER TABLE dbo.screening_events ADD service_duration_min INT DEFAULT 30;
+GO
+IF COL_LENGTH('dbo.screening_events','service_duration_flexible') IS NULL  ALTER TABLE dbo.screening_events ADD service_duration_flexible BIT DEFAULT 0;
+GO
+IF COL_LENGTH('dbo.screening_events','overlap_allowed') IS NULL            ALTER TABLE dbo.screening_events ADD overlap_allowed BIT DEFAULT 0;
+GO
+IF COL_LENGTH('dbo.screening_events','group_scheduling') IS NULL           ALTER TABLE dbo.screening_events ADD group_scheduling BIT DEFAULT 0;
+GO
+IF COL_LENGTH('dbo.screening_events','capacity_uniform') IS NULL           ALTER TABLE dbo.screening_events ADD capacity_uniform BIT DEFAULT 1;
+GO
+IF COL_LENGTH('dbo.screening_events','uniform_capacity') IS NULL           ALTER TABLE dbo.screening_events ADD uniform_capacity INT;
+GO
+-- Notifications
+IF COL_LENGTH('dbo.screening_events','notify_customers') IS NULL           ALTER TABLE dbo.screening_events ADD notify_customers BIT DEFAULT 1;
+GO
+-- Payments
+IF COL_LENGTH('dbo.screening_events','payment_required') IS NULL           ALTER TABLE dbo.screening_events ADD payment_required BIT DEFAULT 0;
+GO
+IF COL_LENGTH('dbo.screening_events','payment_amount') IS NULL             ALTER TABLE dbo.screening_events ADD payment_amount DECIMAL(10,2);
+GO
+IF COL_LENGTH('dbo.screening_events','payment_instructions') IS NULL       ALTER TABLE dbo.screening_events ADD payment_instructions NVARCHAR(MAX);
+GO
+-- Internal/External appointment-rules matrix (JSON blob)
+IF COL_LENGTH('dbo.screening_events','appointment_rules') IS NULL          ALTER TABLE dbo.screening_events ADD appointment_rules NVARCHAR(MAX);
+GO
+
+-- ── Business Hours (multiple rows per day = "Split") ──────────────────────────
+IF OBJECT_ID('dbo.event_business_hours','U') IS NULL
+CREATE TABLE dbo.event_business_hours (
+  id          INT IDENTITY(1,1) PRIMARY KEY,
+  event_id    INT NOT NULL,
+  day_of_week INT NOT NULL,          -- 0=Sun … 6=Sat
+  is_open     BIT DEFAULT 0,
+  from_time   TIME,
+  to_time     TIME,
+  sort_order  INT DEFAULT 0
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_event_hours_event') CREATE INDEX idx_event_hours_event ON dbo.event_business_hours(event_id);
+GO
+
+-- ── Availability slots (per time-slot capacity grid) ──────────────────────────
+IF OBJECT_ID('dbo.event_availability_slots','U') IS NULL
+CREATE TABLE dbo.event_availability_slots (
+  id          INT IDENTITY(1,1) PRIMARY KEY,
+  event_id    INT NOT NULL,
+  day_of_week INT NOT NULL,
+  start_time  TIME NOT NULL,
+  capacity    INT DEFAULT 1
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_event_slots_event') CREATE INDEX idx_event_slots_event ON dbo.event_availability_slots(event_id);
+GO
+
+-- ── Service locations (link to org_locations) ─────────────────────────────────
+IF OBJECT_ID('dbo.event_service_locations','U') IS NULL
+CREATE TABLE dbo.event_service_locations (
+  event_id    INT NOT NULL,
+  location_id INT NOT NULL,
+  CONSTRAINT pk_event_service_locations PRIMARY KEY (event_id, location_id)
+);
+GO
+
+-- ── Notification recipients (staff) ───────────────────────────────────────────
+IF OBJECT_ID('dbo.event_notification_recipients','U') IS NULL
+CREATE TABLE dbo.event_notification_recipients (
+  id       INT IDENTITY(1,1) PRIMARY KEY,
+  event_id INT NOT NULL,
+  name     NVARCHAR(255),
+  email    NVARCHAR(255)
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_event_notif_event') CREATE INDEX idx_event_notif_event ON dbo.event_notification_recipients(event_id);
+GO
