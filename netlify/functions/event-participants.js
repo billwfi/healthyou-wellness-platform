@@ -14,29 +14,34 @@ exports.handler = async (event, context) => {
     const { event_id, search, limit = '100', offset = '0' } = qs;
     if (!event_id) return badRequest('event_id required');
     try {
-      const searchFilter = search ? `AND (CONCAT(p.first_name,' ',p.last_name) ILIKE $2 OR p.email ILIKE $2)` : '';
+      // Unified list: admin/CSV participants (event_registrations) + public
+      // appointment registrations (event_appointments), both searchable.
+      const searchClause = search ? `WHERE (CONCAT(u.first_name,' ',u.last_name) ILIKE $2 OR u.email ILIKE $2)` : '';
       const vals = search ? [event_id, `%${search}%`] : [event_id];
       const lim = parseInt(limit), off = parseInt(offset);
-
+      const inner = `(
+        SELECT p.id AS participant_id, CAST(NULL AS INT) AS appointment_id,
+               p.first_name, p.last_name, p.email, p.phone, p.employee_id, p.department,
+               CAST(er.status AS NVARCHAR(50)) AS status,
+               CAST(NULL AS varchar(10)) AS appointment_date, CAST(NULL AS varchar(5)) AS appointment_time,
+               br.id AS bio_id, br.overall_risk, CAST('participant' AS varchar(12)) AS kind
+          FROM event_registrations er
+          JOIN participants p ON p.id=er.participant_id
+          LEFT JOIN biometric_results br ON br.participant_id=p.id AND br.event_id=er.event_id
+         WHERE er.event_id=$1
+        UNION ALL
+        SELECT CAST(NULL AS INT), a.id,
+               a.first_name, a.last_name, a.email, a.phone,
+               CAST(NULL AS NVARCHAR(100)), CAST(NULL AS NVARCHAR(255)),
+               CAST(a.status AS NVARCHAR(50)),
+               CONVERT(varchar(10), a.appointment_date, 23), CONVERT(varchar(5), a.appointment_time, 108),
+               CAST(NULL AS INT), CAST(NULL AS NVARCHAR(50)), CAST('appointment' AS varchar(12))
+          FROM event_appointments a WHERE a.event_id=$1
+      ) u`;
       const [rowsRes, countRes] = await Promise.all([
-        db.query(
-          `SELECT p.id, p.first_name, p.last_name, p.email, p.employee_id, p.department, p.phone,
-                  er.id AS reg_id, er.registered_at, er.registration_source, er.status AS reg_status,
-                  br.id AS bio_id, br.screened_at, br.overall_risk, br.bmi, br.systolic_bp, br.diastolic_bp
-             FROM event_registrations er
-             JOIN participants p ON p.id=er.participant_id
-             LEFT JOIN biometric_results br ON br.participant_id=p.id AND br.event_id=er.event_id
-            WHERE er.event_id=$1 ${searchFilter}
-            ORDER BY p.last_name, p.first_name
-            OFFSET ${off} ROWS FETCH NEXT ${lim} ROWS ONLY`,
-          vals
-        ),
-        db.query(
-          `SELECT COUNT(*) AS count FROM event_registrations er
-             JOIN participants p ON p.id=er.participant_id
-            WHERE er.event_id=$1 ${searchFilter}`,
-          vals
-        ),
+        db.query(`SELECT * FROM ${inner} ${searchClause}
+                  ORDER BY last_name, first_name OFFSET ${off} ROWS FETCH NEXT ${lim} ROWS ONLY`, vals),
+        db.query(`SELECT COUNT(*) AS count FROM ${inner} ${searchClause}`, vals),
       ]);
       return ok({ total: parseInt(countRes.rows[0].count), records: rowsRes.rows });
     } catch (e) { return serverError(e); }
