@@ -40,12 +40,12 @@ const FKS = [
   ['fk_departments_location',    'departments', 'location_id',        'org_locations',    'id', 'CASCADE'],
   ['fk_event_reg_event',         'event_registrations', 'event_id',   'screening_events', 'id', 'CASCADE'],
   ['fk_event_reg_participant',   'event_registrations', 'participant_id','participants',  'id', 'CASCADE'],
-  // Schedule Setup child tables
-  ['fk_event_hours_event',       'event_business_hours', 'event_id',  'screening_events', 'id', 'CASCADE'],
-  ['fk_event_slots_event',       'event_availability_slots', 'event_id','screening_events','id', 'CASCADE'],
-  ['fk_event_svcloc_event',      'event_service_locations', 'event_id','screening_events','id', 'CASCADE'],
-  ['fk_event_svcloc_location',   'event_service_locations', 'location_id','org_locations','id', 'CASCADE'],
-  ['fk_event_notif_event',       'event_notification_recipients', 'event_id','screening_events','id','CASCADE'],
+  // Event container → per-location model. The Setup child tables are keyed by
+  // location_id (event_locations), not event_id.
+  ['fk_event_locations_event',   'event_locations', 'event_id',       'screening_events', 'id', 'CASCADE'],
+  ['fk_event_hours_loc',         'event_business_hours', 'location_id', 'event_locations', 'id', 'CASCADE'],
+  ['fk_event_slots_loc',         'event_availability_slots', 'location_id','event_locations','id','CASCADE'],
+  ['fk_event_notif_loc',         'event_notification_recipients', 'location_id','event_locations','id','CASCADE'],
 ];
 
 (async () => {

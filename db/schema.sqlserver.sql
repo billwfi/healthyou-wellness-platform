@@ -451,11 +451,68 @@ GO
 IF COL_LENGTH('dbo.screening_events','appointment_rules') IS NULL          ALTER TABLE dbo.screening_events ADD appointment_rules NVARCHAR(MAX);
 GO
 
--- ── Business Hours (multiple rows per day = "Split") ──────────────────────────
+-- ════════════════════════════════════════════════════════════════════════════
+-- Event container + per-location model (medallus-style). screening_events is a
+-- container (Group + start/end dates + public_slug); each event_locations row is
+-- a first-class location carrying its OWN full AppointmentQuest Setup. The
+-- per-event Setup columns above are deprecated (kept, unused). The child tables
+-- below (business hours / availability / notification recipients) are keyed by
+-- location_id, not event_id.
+-- ════════════════════════════════════════════════════════════════════════════
+IF COL_LENGTH('dbo.screening_events','start_date') IS NULL   ALTER TABLE dbo.screening_events ADD start_date DATE;
+GO
+IF COL_LENGTH('dbo.screening_events','end_date') IS NULL     ALTER TABLE dbo.screening_events ADD end_date DATE;
+GO
+IF COL_LENGTH('dbo.screening_events','public_slug') IS NULL  ALTER TABLE dbo.screening_events ADD public_slug NVARCHAR(40);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='uq_events_public_slug')
+CREATE UNIQUE INDEX uq_events_public_slug ON dbo.screening_events(public_slug) WHERE public_slug IS NOT NULL;
+GO
+
+IF OBJECT_ID('dbo.event_locations','U') IS NULL
+CREATE TABLE dbo.event_locations (
+  id               INT IDENTITY(1,1) PRIMARY KEY,
+  event_id         INT NOT NULL,
+  name             NVARCHAR(255) NOT NULL,
+  address          NVARCHAR(MAX),
+  city             NVARCHAR(100),
+  state            NVARCHAR(50),
+  zip              NVARCHAR(20),
+  phone            NVARCHAR(50),
+  sort_order       INT DEFAULT 0,
+  max_participants INT,
+  -- Full AppointmentQuest Setup, per location (mirrors the event-setup scalars)
+  description                NVARCHAR(MAX),
+  custom_form                NVARCHAR(255),
+  schedule_status            NVARCHAR(20) DEFAULT 'active',
+  capacity_type              NVARCHAR(50) DEFAULT 'capacity',
+  concurrent_limit           INT DEFAULT 1,
+  valid_from                 DATE,
+  valid_to                   DATE,
+  service_location_selection NVARCHAR(20) DEFAULT 'required',
+  appointment_interval_min   INT DEFAULT 30,
+  service_duration_min       INT DEFAULT 30,
+  service_duration_flexible  BIT DEFAULT 0,
+  overlap_allowed            BIT DEFAULT 0,
+  group_scheduling           BIT DEFAULT 0,
+  capacity_uniform           BIT DEFAULT 1,
+  uniform_capacity           INT,
+  notify_customers           BIT DEFAULT 1,
+  payment_required           BIT DEFAULT 0,
+  payment_amount             DECIMAL(10,2),
+  payment_instructions       NVARCHAR(MAX),
+  appointment_rules          NVARCHAR(MAX),
+  created_at       DATETIME2(3) DEFAULT SYSUTCDATETIME()
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_event_locations_event') CREATE INDEX idx_event_locations_event ON dbo.event_locations(event_id);
+GO
+
+-- ── Business Hours (multiple rows per day = "Split"), per location ────────────
 IF OBJECT_ID('dbo.event_business_hours','U') IS NULL
 CREATE TABLE dbo.event_business_hours (
   id          INT IDENTITY(1,1) PRIMARY KEY,
-  event_id    INT NOT NULL,
+  location_id INT NOT NULL,
   day_of_week INT NOT NULL,          -- 0=Sun … 6=Sat
   is_open     BIT DEFAULT 0,
   from_time   TIME,
@@ -463,41 +520,32 @@ CREATE TABLE dbo.event_business_hours (
   sort_order  INT DEFAULT 0
 );
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_event_hours_event') CREATE INDEX idx_event_hours_event ON dbo.event_business_hours(event_id);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_event_hours_loc') CREATE INDEX idx_event_hours_loc ON dbo.event_business_hours(location_id);
 GO
 
--- ── Availability slots (per time-slot capacity grid) ──────────────────────────
+-- ── Availability slots (per time-slot capacity grid), per location ────────────
 IF OBJECT_ID('dbo.event_availability_slots','U') IS NULL
 CREATE TABLE dbo.event_availability_slots (
   id          INT IDENTITY(1,1) PRIMARY KEY,
-  event_id    INT NOT NULL,
+  location_id INT NOT NULL,
   day_of_week INT NOT NULL,
   start_time  TIME NOT NULL,
   capacity    INT DEFAULT 1
 );
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_event_slots_event') CREATE INDEX idx_event_slots_event ON dbo.event_availability_slots(event_id);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_event_slots_loc') CREATE INDEX idx_event_slots_loc ON dbo.event_availability_slots(location_id);
 GO
 
--- ── Service locations (link to org_locations) ─────────────────────────────────
-IF OBJECT_ID('dbo.event_service_locations','U') IS NULL
-CREATE TABLE dbo.event_service_locations (
-  event_id    INT NOT NULL,
-  location_id INT NOT NULL,
-  CONSTRAINT pk_event_service_locations PRIMARY KEY (event_id, location_id)
-);
-GO
-
--- ── Notification recipients (staff) ───────────────────────────────────────────
+-- ── Notification recipients (staff), per location ─────────────────────────────
 IF OBJECT_ID('dbo.event_notification_recipients','U') IS NULL
 CREATE TABLE dbo.event_notification_recipients (
-  id       INT IDENTITY(1,1) PRIMARY KEY,
-  event_id INT NOT NULL,
-  name     NVARCHAR(255),
-  email    NVARCHAR(255)
+  id          INT IDENTITY(1,1) PRIMARY KEY,
+  location_id INT NOT NULL,
+  name        NVARCHAR(255),
+  email       NVARCHAR(255)
 );
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_event_notif_event') CREATE INDEX idx_event_notif_event ON dbo.event_notification_recipients(event_id);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_event_notif_loc') CREATE INDEX idx_event_notif_loc ON dbo.event_notification_recipients(location_id);
 GO
 
 -- ════════════════════════════════════════════════════════════════════════════

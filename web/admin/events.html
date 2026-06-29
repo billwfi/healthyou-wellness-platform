@@ -56,11 +56,11 @@
       <div class="card" style="padding:0;overflow:hidden;">
         <table class="data-table">
           <thead><tr>
-            <th>Event</th><th>Date</th><th>Group</th><th>Type</th>
-            <th style="text-align:center;">Registered</th><th style="text-align:center;">Screened</th>
-            <th>Status</th><th style="width:140px;">Actions</th>
+            <th>Event</th><th>Dates</th><th>Group</th>
+            <th style="text-align:center;">Locations</th><th style="text-align:center;">Registered</th>
+            <th>Status</th><th style="width:160px;">Actions</th>
           </tr></thead>
-          <tbody id="tbody"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+          <tbody id="tbody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -85,7 +85,7 @@
         <button class="tab event-tab active" data-tab="overview" onclick="switchEventTab('overview',this)">Overview</button>
         <button class="tab event-tab" data-tab="participants" onclick="switchEventTab('participants',this)">Participants</button>
         <button class="tab event-tab" data-tab="registration" onclick="switchEventTab('registration',this)">Registration Link</button>
-        <button class="tab event-tab" data-tab="setup" onclick="switchEventTab('setup',this)">Setup</button>
+        <button class="tab event-tab" data-tab="locations" onclick="switchEventTab('locations',this)">Locations</button>
       </div>
 
       <!-- Overview tab -->
@@ -173,8 +173,29 @@
         </div>
       </div>
 
-      <!-- Setup tab (AppointmentQuest-style Schedule Setup) -->
+      <!-- Locations tab -->
+      <div id="et-locations" style="display:none;">
+        <div id="loc-list-view">
+          <div class="section-header" style="margin-bottom:14px;">
+            <h3>Locations <span id="loc-count" style="font-size:.8rem;font-weight:400;color:var(--gray-400);"></span></h3>
+            <button class="btn btn-primary btn-sm" onclick="openLocationModal()">+ Add Location</button>
+          </div>
+          <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:14px;">Each location has its own dates, time slots, and full schedule setup. Open a location to configure it.</p>
+          <div class="card" style="padding:0;overflow:hidden;">
+            <table class="data-table">
+              <thead><tr><th>Location</th><th>City / State</th><th style="text-align:center;">Max</th><th style="width:220px;">Actions</th></tr></thead>
+              <tbody id="loc-tbody"><tr><td colspan="4" class="empty">No locations yet. Add one to configure its schedule.</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Per-location Schedule Setup (AppointmentQuest-style) -->
       <div id="et-setup" style="display:none;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+          <button class="btn btn-ghost btn-sm" onclick="backToLocations()">← Locations</button>
+          <strong id="loc-setup-name" style="font-size:1rem;"></strong>
+        </div>
         <div class="tabs" style="margin-bottom:18px;">
           <button class="tab setup-tab active" data-stab="general"       onclick="switchSetupTab('general',this)">General</button>
           <button class="tab setup-tab" data-stab="settings"             onclick="switchSetupTab('settings',this)">Settings</button>
@@ -189,7 +210,7 @@
           <div class="card">
             <div class="card-title">Schedule</div>
             <div class="form-grid full" style="gap:14px;">
-              <div class="form-group"><label>Schedule Name</label><input id="su-name" type="text" disabled style="background:var(--gray-50);"/><span style="font-size:.72rem;color:var(--gray-400);">Edit the name via “Edit Event”.</span></div>
+              <div class="form-group"><label>Location</label><input id="su-name" type="text" disabled style="background:var(--gray-50);"/><span style="font-size:.72rem;color:var(--gray-400);">Edit the location details from the Locations list.</span></div>
               <div class="form-group"><label>Description</label><textarea id="su-description" rows="4" placeholder="Eligibility, location details…"></textarea></div>
               <div class="form-group"><label>Custom Form</label><input id="su-custom_form" type="text" placeholder="e.g. RYP Questions"/></div>
             </div>
@@ -218,10 +239,6 @@
               <div class="form-group"><label>Valid From</label><input id="su-valid_from" type="date"/></div>
               <div class="form-group"><label>Valid To</label><input id="su-valid_to" type="date"/></div>
             </div>
-          </div>
-          <div class="card">
-            <div class="card-title">Service Locations</div>
-            <div id="su-locations"><span style="font-size:.84rem;color:var(--gray-400);">Loading…</span></div>
           </div>
           <div class="card">
             <div class="card-title">Reservation Rules</div>
@@ -300,24 +317,40 @@
 <div id="event-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'event-modal')">
   <div class="modal">
     <div class="modal-title" id="em-title">New Screening Event</div>
-    <div class="form-grid full">
-      <div class="form-group"><label>Event Name *</label><input id="em-name" type="text" placeholder="Q1 Wellness Screening"/></div>
-      <div class="form-group"><label>Event Date *</label><input id="em-date" type="date"/></div>
-      <div class="form-group"><label>Group</label><select id="em-org"><option value="">— none —</option></select></div>
-      <div class="form-group"><label>Type</label>
-        <select id="em-type">
-          <option value="onsite">On-site</option>
-          <option value="virtual">Virtual</option>
-          <option value="self_reported">Self-Reported</option>
-        </select>
-      </div>
-      <div class="form-group span-2"><label>Location</label><input id="em-loc" type="text" placeholder="Building A, Room 101"/></div>
+    <div class="form-grid" style="gap:14px;">
+      <div class="form-group span-2"><label>Event Name *</label><input id="em-name" type="text" placeholder="Q3 Wellness Drive"/></div>
+      <div class="form-group span-2"><label>Group</label><select id="em-org"><option value="">— none —</option></select></div>
+      <div class="form-group"><label>Start Date *</label><input id="em-start" type="date"/></div>
+      <div class="form-group"><label>End Date</label><input id="em-end" type="date"/></div>
+      <div class="form-group span-2"><label>Description</label><textarea id="em-desc" rows="2" placeholder="Eligibility, overview…"></textarea></div>
       <div class="form-group span-2"><label>Notes</label><textarea id="em-notes" rows="2"></textarea></div>
     </div>
     <div id="em-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('event-modal')">Cancel</button>
       <button class="btn btn-primary" id="em-btn" onclick="saveEvent()">Create Event</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add / Edit Location Modal -->
+<div id="location-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'location-modal')">
+  <div class="modal">
+    <div class="modal-title" id="lm-title">Add Location</div>
+    <div class="form-grid" style="gap:14px;">
+      <div class="form-group span-2"><label>Location Name *</label><input id="lm-name" type="text" placeholder="CAB - City Administration Bldg."/></div>
+      <div class="form-group span-2"><label>Address</label><input id="lm-address" type="text"/></div>
+      <div class="form-group"><label>City</label><input id="lm-city" type="text"/></div>
+      <div class="form-group"><label>State</label><input id="lm-state" type="text" maxlength="2" placeholder="CO"/></div>
+      <div class="form-group"><label>Zip</label><input id="lm-zip" type="text"/></div>
+      <div class="form-group"><label>Phone</label><input id="lm-phone" type="tel"/></div>
+      <div class="form-group"><label>Max Participants</label><input id="lm-max" type="number" min="0" placeholder="unlimited"/></div>
+      <div class="form-group"><label>Prefill from group location</label><select id="lm-prefill"><option value="">— none —</option></select></div>
+    </div>
+    <div id="lm-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('location-modal')">Cancel</button>
+      <button class="btn btn-primary" id="lm-btn" onclick="saveLocation()">Add Location</button>
     </div>
   </div>
 </div>
@@ -347,7 +380,9 @@
 <script>
 let authToken=null, events=[], orgs=[], editEventId=null;
 let activeEvent=null, ptLoaded=false;
-let suState=null, suLocations=[], suCoaches=[], suLoaded=false;
+let suState=null, suCoaches=[], suLoaded=false;
+let activeLocations=[], activeLocation=null, groupLocations=[], editLocationId=null;
+function eventDateRange(e){ const s=e.start_date?fmtDate(e.start_date):''; const en=e.end_date?fmtDate(e.end_date):''; return s&&en&&s!==en?`${s} – ${en}`:(s||en||(e.event_date?fmtDate(e.event_date):'')); }
 let ptParsed=[], ptOffset=0, ptTotal=0, ptSearchTimer=null;
 const PT_LIMIT=50;
 const STATUS_OPTS=['scheduled','in_progress','completed','cancelled'];
@@ -374,17 +409,13 @@ async function load() {
 
 function renderList() {
   document.getElementById('tbody').innerHTML=!events.length
-    ?'<tr><td colspan="8" class="empty">No events yet. Create one to get started.</td></tr>'
+    ?'<tr><td colspan="7" class="empty">No events yet. Create one to get started.</td></tr>'
     :events.map(e=>`<tr>
-        <td>
-          <strong style="cursor:pointer;color:var(--teal);" onclick="openEvent(${e.id})">${esc(e.name)}</strong>
-          ${e.location?`<br><span style="font-size:.78rem;color:var(--gray-400);">${esc(e.location)}</span>`:''}
-        </td>
-        <td>${fmtDate(e.event_date)}</td>
+        <td><strong style="cursor:pointer;color:var(--teal);" onclick="openEvent(${e.id})">${esc(e.name)}</strong></td>
+        <td style="font-size:.84rem;">${eventDateRange(e)||'—'}</td>
         <td>${esc(e.org_name||'—')}</td>
-        <td><span class="badge badge-${e.event_type}">${e.event_type.replace('_',' ')}</span></td>
+        <td style="text-align:center;font-weight:600;">${e.location_count||0}</td>
         <td style="text-align:center;font-weight:600;">${e.registered_count||0}</td>
-        <td style="text-align:center;font-weight:600;">${e.screened_count||0}</td>
         <td>
           <select onchange="updateStatus(${e.id},this.value)" class="btn btn-ghost btn-sm" style="padding:3px 8px;">
             ${STATUS_OPTS.map(s=>`<option value="${s}"${s===e.status?' selected':''}>${s.replace('_',' ')}</option>`).join('')}
@@ -405,26 +436,28 @@ function openEvent(id) {
 
   document.getElementById('ev-name').textContent=activeEvent.name;
   document.getElementById('ev-status-badge').innerHTML=`<span class="badge badge-${activeEvent.status}">${activeEvent.status.replace('_',' ')}</span>`;
-  document.getElementById('ev-type-badge').innerHTML=`<span class="badge badge-${activeEvent.event_type}">${activeEvent.event_type.replace('_',' ')}</span>`;
-  const meta=[];
-  if(activeEvent.event_date) meta.push(fmtDate(activeEvent.event_date));
-  if(activeEvent.location) meta.push(activeEvent.location);
-  if(activeEvent.org_name) meta.push(activeEvent.org_name);
+  document.getElementById('ev-type-badge').innerHTML='';
+  const dr=eventDateRange(activeEvent);
+  const meta=[]; if(dr) meta.push(dr); if(activeEvent.org_name) meta.push(activeEvent.org_name);
   document.getElementById('ev-meta').textContent=meta.join(' · ');
 
   document.getElementById('ov-registered').textContent=activeEvent.registered_count||0;
   document.getElementById('ov-screened').textContent=activeEvent.screened_count||0;
-  document.getElementById('ov-date').textContent=activeEvent.event_date?fmtDate(activeEvent.event_date):'—';
-  document.getElementById('ov-location').textContent=activeEvent.location||'TBD';
+  document.getElementById('ov-date').textContent=dr||'—';
+  const lc=activeEvent.location_count||0;
+  document.getElementById('ov-location').textContent=lc+' location'+(lc===1?'':'s');
 
   document.getElementById('view-list').style.display='none';
   document.getElementById('view-detail').style.display='';
 
   document.querySelectorAll('.event-tab').forEach(t=>t.classList.remove('active'));
   document.querySelector('[data-tab="overview"]').classList.add('active');
-  ['overview','participants','registration','setup'].forEach(t=>
+  ['overview','participants','registration','locations'].forEach(t=>
     document.getElementById('et-'+t).style.display=t==='overview'?'':'none'
   );
+  document.getElementById('et-setup').style.display='none';
+  document.getElementById('loc-list-view').style.display='';
+  activeLocation=null;
   loadOverview();
 }
 
@@ -437,12 +470,13 @@ function backToList() {
 function switchEventTab(tab, el) {
   document.querySelectorAll('.event-tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  ['overview','participants','registration','setup'].forEach(t=>
+  ['overview','participants','registration','locations'].forEach(t=>
     document.getElementById('et-'+t).style.display=t===tab?'':'none'
   );
+  document.getElementById('et-setup').style.display='none';
+  if(tab==='locations'){ document.getElementById('loc-list-view').style.display=''; loadLocations(); }
   if(tab==='participants'&&!ptLoaded) loadParticipants(0);
   if(tab==='registration') renderRegTab();
-  if(tab==='setup'&&!suLoaded) loadSetup();
 }
 
 // ── Overview tab ──────────────────────────────────────────────────────────────
@@ -626,7 +660,7 @@ async function removeParticipant(participantId) {
 
 // ── Registration tab ──────────────────────────────────────────────────────────
 function renderRegTab() {
-  const regUrl=`${location.origin}/register/?event=${activeEvent.id}`;
+  const regUrl=`${location.origin}/register/?e=${activeEvent.public_slug||activeEvent.id}`;
   document.getElementById('reg-link').value=regUrl;
   document.getElementById('reg-link-open').href=regUrl;
 }
@@ -648,30 +682,31 @@ function openEventModal(id) {
   document.getElementById('em-title').textContent=id?'Edit Event':'New Screening Event';
   document.getElementById('em-btn').textContent=id?'Save Changes':'Create Event';
   document.getElementById('em-err').style.display='none';
+  const d=s=>(s?String(s).split('T')[0]:'');
   if(id){
     const ev=events.find(x=>x.id===id);
     document.getElementById('em-name').value=ev.name;
-    document.getElementById('em-date').value=ev.event_date?.split('T')[0]||ev.event_date;
     document.getElementById('em-org').value=ev.org_id||'';
-    document.getElementById('em-type').value=ev.event_type;
-    document.getElementById('em-loc').value=ev.location||'';
+    document.getElementById('em-start').value=d(ev.start_date||ev.event_date);
+    document.getElementById('em-end').value=d(ev.end_date);
+    document.getElementById('em-desc').value=ev.description||'';
     document.getElementById('em-notes').value=ev.notes||'';
   } else {
-    ['em-name','em-date','em-loc','em-notes'].forEach(i=>document.getElementById(i).value='');
-    document.getElementById('em-org').value=''; document.getElementById('em-type').value='onsite';
+    ['em-name','em-start','em-end','em-desc','em-notes'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('em-org').value='';
   }
   document.getElementById('event-modal').style.display='flex';
 }
 
 async function saveEvent() {
-  const name=document.getElementById('em-name').value.trim(), date=document.getElementById('em-date').value;
-  if(!name||!date){showErr('em-err','Name and date are required.');return;}
+  const name=document.getElementById('em-name').value.trim(), start=document.getElementById('em-start').value;
+  if(!name||!start){showErr('em-err','Name and start date are required.');return;}
   const btn=document.getElementById('em-btn'); btn.disabled=true; btn.textContent='Saving…';
   try {
-    const body={name,event_date:date,
+    const body={name,start_date:start,
+      end_date:document.getElementById('em-end').value||null,
       org_id:document.getElementById('em-org').value||null,
-      event_type:document.getElementById('em-type').value,
-      location:document.getElementById('em-loc').value||null,
+      description:document.getElementById('em-desc').value||null,
       notes:document.getElementById('em-notes').value||null};
     if(editEventId) body.id=editEventId;
     const r=await fetch('/api/events',{method:editEventId?'PUT':'POST',
@@ -683,9 +718,9 @@ async function saveEvent() {
       activeEvent=events.find(e=>e.id===editEventId);
       if(activeEvent) openEvent(activeEvent.id);
     } else if(!editEventId && saved?.id) {
-      // New event: jump straight into its Setup so all schedule details can be configured.
+      // New event: open it on the Locations tab to add locations + per-location setup.
       const ne=events.find(e=>e.id===saved.id);
-      if(ne){ openEvent(ne.id); const st=document.querySelector('[data-tab="setup"]'); if(st) switchEventTab('setup', st); }
+      if(ne){ openEvent(ne.id); const lt=document.querySelector('[data-tab="locations"]'); if(lt) switchEventTab('locations', lt); }
     }
   } catch(e){showErr('em-err',e.message);}
   finally{btn.disabled=false;}
@@ -700,8 +735,104 @@ async function updateStatus(id,status) {
   } catch(e){showToast('Error: '+e.message);}
 }
 
-// ── Schedule Setup (AppointmentQuest parity) ──────────────────────────────────
+// ── Locations tab ─────────────────────────────────────────────────────────────
 function auth(){ return {Authorization:'Bearer '+authToken}; }
+
+async function loadLocations(){
+  try {
+    activeLocations = await fetch(`/api/event-locations?event_id=${activeEvent.id}`,{headers:auth()}).then(r=>r.json());
+    if(!Array.isArray(activeLocations)) activeLocations=[];
+  } catch(e){ activeLocations=[]; }
+  renderLocationList();
+}
+
+function renderLocationList(){
+  document.getElementById('loc-count').textContent = activeLocations.length ? `(${activeLocations.length})` : '';
+  const tb=document.getElementById('loc-tbody');
+  tb.innerHTML = !activeLocations.length
+    ? '<tr><td colspan="4" class="empty">No locations yet. Add one to configure its schedule.</td></tr>'
+    : activeLocations.map(l=>`<tr>
+        <td><strong>${esc(l.name)}</strong>${l.address?`<br><span style="font-size:.78rem;color:var(--gray-400);">${esc(l.address)}</span>`:''}</td>
+        <td style="font-size:.85rem;">${esc([l.city,l.state].filter(Boolean).join(', ')||'—')}</td>
+        <td style="text-align:center;">${l.max_participants??'∞'}</td>
+        <td><div class="actions">
+          <button class="btn btn-primary btn-sm" onclick="openLocationSetup(${l.id})">Setup</button>
+          <button class="btn btn-ghost btn-sm" onclick="openLocationModal(${l.id})">Edit</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);" onclick="deleteLocation(${l.id})">Del</button>
+        </div></td>
+      </tr>`).join('');
+}
+
+function openLocationModal(id){
+  editLocationId=id||null;
+  document.getElementById('lm-title').textContent=id?'Edit Location':'Add Location';
+  document.getElementById('lm-btn').textContent=id?'Save Changes':'Add Location';
+  document.getElementById('lm-err').style.display='none';
+  const fields=['name','address','city','state','zip','phone','max'];
+  // prefill dropdown from the event's group locations
+  const pf=document.getElementById('lm-prefill'); pf.innerHTML='<option value="">— none —</option>';
+  const fillPrefill=()=>{ groupLocations.forEach(g=>pf.add(new Option(g.name+(g.city?` (${g.city})`:''), g.id))); };
+  if(activeEvent.org_id && !groupLocations.length){
+    fetch(`/api/org-locations?org_id=${activeEvent.org_id}`,{headers:auth()}).then(r=>r.json()).then(g=>{ groupLocations=Array.isArray(g)?g:[]; fillPrefill(); }).catch(()=>{});
+  } else fillPrefill();
+  pf.onchange=()=>{ const g=groupLocations.find(x=>String(x.id)===pf.value); if(g){ set('lm-name',g.name); set('lm-address',g.address); set('lm-city',g.city); set('lm-state',g.state); set('lm-zip',g.zip); set('lm-phone',g.phone); } };
+  if(id){ const l=activeLocations.find(x=>x.id===id);
+    set('lm-name',l.name); set('lm-address',l.address); set('lm-city',l.city); set('lm-state',l.state);
+    set('lm-zip',l.zip); set('lm-phone',l.phone); set('lm-max',l.max_participants);
+  } else { fields.forEach(f=>set('lm-'+f,'')); }
+  document.getElementById('location-modal').style.display='flex';
+}
+function set(id,v){ const e=document.getElementById(id); if(e) e.value=(v==null?'':v); }
+
+async function saveLocation(){
+  const name=document.getElementById('lm-name').value.trim();
+  if(!name){ showErr('lm-err','Location name is required.'); return; }
+  const btn=document.getElementById('lm-btn'); btn.disabled=true; btn.textContent='Saving…';
+  const maxv=document.getElementById('lm-max').value;
+  const body={ event_id:activeEvent.id, name,
+    address:document.getElementById('lm-address').value||null,
+    city:document.getElementById('lm-city').value||null,
+    state:document.getElementById('lm-state').value||null,
+    zip:document.getElementById('lm-zip').value||null,
+    phone:document.getElementById('lm-phone').value||null,
+    max_participants:maxv===''?null:parseInt(maxv) };
+  if(editLocationId) body.id=editLocationId;
+  try{
+    const r=await fetch('/api/event-locations',{method:editLocationId?'PUT':'POST',
+      headers:{'Content-Type':'application/json',Authorization:'Bearer '+authToken},body:JSON.stringify(body)});
+    if(!r.ok){ showErr('lm-err',(await r.json()).error||'Save failed'); return; }
+    closeModal('location-modal'); showToast(editLocationId?'Location updated':'Location added'); await loadLocations();
+  }catch(e){ showErr('lm-err',e.message); }
+  finally{ btn.disabled=false; btn.textContent=editLocationId?'Save Changes':'Add Location'; }
+}
+
+async function deleteLocation(id){
+  if(!confirm('Delete this location and its schedule setup?')) return;
+  try{
+    await fetch(`/api/event-locations?id=${id}`,{method:'DELETE',headers:auth()});
+    showToast('Location deleted'); loadLocations();
+  }catch(e){ showToast('Error: '+e.message); }
+}
+
+function openLocationSetup(id){
+  activeLocation=activeLocations.find(l=>l.id===id);
+  if(!activeLocation) return;
+  document.getElementById('loc-setup-name').textContent=activeLocation.name;
+  document.getElementById('loc-list-view').style.display='none';
+  document.getElementById('et-setup').style.display='';
+  // reset to General sub-tab
+  document.querySelectorAll('.setup-tab').forEach((t,i)=>t.classList.toggle('active',i===0));
+  ['general','settings','hours','availability','notifications','payments'].forEach((t,i)=>
+    document.getElementById('st-'+t).style.display=i===0?'':'none');
+  loadSetup(activeLocation);
+}
+function backToLocations(){
+  document.getElementById('et-setup').style.display='none';
+  document.getElementById('loc-list-view').style.display='';
+  activeLocation=null;
+}
+
+// ── Schedule Setup (AppointmentQuest parity), per location ────────────────────
 function defSide(){ return { regular:true, recurring:false, rescheduling:true,
   advance_value:0, advance_unit:'hours', window_value:24, window_unit:'months',
   reschedule_value:0, reschedule_unit:'hours', cancel_value:0, cancel_unit:'hours',
@@ -720,22 +851,18 @@ function switchSetupTab(tab, el){
     document.getElementById('st-'+t).style.display=t===tab?'':'none');
 }
 
-async function loadSetup(){
-  suLoaded=true;
-  document.getElementById('su-name').value=activeEvent.name||'';
+async function loadSetup(location){
+  document.getElementById('su-name').value=location.name||'';
   try {
-    const [setup, locs, coaches] = await Promise.all([
-      fetch(`/api/event-setup?event_id=${activeEvent.id}`,{headers:auth()}).then(r=>r.json()),
-      activeEvent.org_id ? fetch(`/api/org-locations?org_id=${activeEvent.org_id}`,{headers:auth()}).then(r=>r.json()) : Promise.resolve([]),
+    const [setup, coaches] = await Promise.all([
+      fetch(`/api/event-setup?location_id=${location.id}`,{headers:auth()}).then(r=>r.json()),
       fetch('/api/coaches?admin=1',{headers:auth()}).then(r=>r.json()).catch(()=>[]),
     ]);
     suState = setup && !setup.error ? setup : {};
     normalizeRules(suState);
     suState.business_hours = suState.business_hours || [];
     suState.availability_slots = suState.availability_slots || [];
-    suState.service_location_ids = suState.service_location_ids || [];
     suState.notification_recipients = suState.notification_recipients || [];
-    suLocations = Array.isArray(locs) ? locs : [];
     suCoaches  = Array.isArray(coaches) ? coaches : [];
     fillSetupForm();
   } catch(e){ showToast('Error loading setup: '+e.message); }
@@ -758,7 +885,7 @@ function fillSetupForm(){
   document.getElementById('su-notify_customers').checked = suState.notify_customers!==false;
   document.getElementById('su-payment_required').checked = !!suState.payment_required;
   v('su-payment_amount',suState.payment_amount); v('su-payment_instructions',suState.payment_instructions);
-  renderApptMatrix(); renderRulesMatrix(); renderLocations(); renderHours(); renderRecipients(); renderAvailGrid();
+  renderApptMatrix(); renderRulesMatrix(); renderHours(); renderRecipients(); renderAvailGrid();
 }
 
 function setRule(side,key,val){ suState.appointment_rules[side][key]=val; }
@@ -792,14 +919,6 @@ function renderRulesMatrix(){
   document.getElementById('su-rules-matrix').innerHTML =
     `<table class="data-table"><thead><tr><th></th><th>Internal</th><th>External</th></tr></thead><tbody>`+
     rrows.map(([lbl,fn])=>`<tr><td><strong>${lbl}</strong></td><td>${fn('internal')}</td><td>${fn('external')}</td></tr>`).join('')+`</tbody></table>`;
-}
-
-function renderLocations(){
-  const c=document.getElementById('su-locations');
-  if(!activeEvent.org_id){ c.innerHTML='<span style="font-size:.84rem;color:var(--gray-400);">Assign an organization to this event (Edit Event) to choose service locations.</span>'; return; }
-  if(!suLocations.length){ c.innerHTML='<span style="font-size:.84rem;color:var(--gray-400);">No locations for this organization yet. Add them under Organizations → Locations.</span>'; return; }
-  c.innerHTML=suLocations.map(l=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:.9rem;">
-    <input type="checkbox" value="${l.id}" ${suState.service_location_ids.includes(l.id)?'checked':''}> ${esc(l.name)}${l.city?` <span style="color:var(--gray-400);font-size:.8rem;">(${esc(l.city)})</span>`:''}</label>`).join('');
 }
 
 const SU_DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -866,10 +985,9 @@ async function saveSetup(){
   if(!suState) return;
   const num=id=>{const v=document.getElementById(id).value; return v===''?null:Number(v);};
   const val=id=>{const v=document.getElementById(id).value; return v===''?null:v;};
-  const locIds=[...document.querySelectorAll('#su-locations input[type=checkbox]:checked')].map(c=>parseInt(c.value));
   const recips=[...document.querySelectorAll('#su-recipients input[type=checkbox]:checked')].map(c=>({name:c.dataset.name,email:c.dataset.email}));
   const body={
-    event_id:activeEvent.id,
+    location_id:activeLocation.id,
     description:val('su-description'), custom_form:val('su-custom_form'),
     schedule_status:getRadio('su-status')||'active',
     concurrent_limit:num('su-concurrent_limit'),
@@ -889,7 +1007,6 @@ async function saveSetup(){
     appointment_rules:suState.appointment_rules,
     business_hours:suState.business_hours,
     availability_slots:suState.availability_slots,
-    service_location_ids:locIds,
     notification_recipients:recips,
   };
   try{
@@ -897,7 +1014,7 @@ async function saveSetup(){
     if(!r.ok){ showToast('Error: '+((await r.json()).error||'Save failed')); return; }
     suState=await r.json(); normalizeRules(suState);
     suState.business_hours=suState.business_hours||[]; suState.availability_slots=suState.availability_slots||[];
-    suState.service_location_ids=suState.service_location_ids||[]; suState.notification_recipients=suState.notification_recipients||[];
+    suState.notification_recipients=suState.notification_recipients||[];
     const saved=document.getElementById('setup-saved'); saved.style.display=''; setTimeout(()=>saved.style.display='none',2500);
     showToast('Schedule setup saved');
   }catch(e){ showToast('Error: '+e.message); }
