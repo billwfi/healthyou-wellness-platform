@@ -580,6 +580,10 @@ IF COL_LENGTH('dbo.biometric_results','tobacco_use') IS NULL            ALTER TA
 GO
 IF COL_LENGTH('dbo.biometric_results','sleep_hours') IS NULL            ALTER TABLE dbo.biometric_results ADD sleep_hours DECIMAL(4,1);
 GO
+-- One screening record per participant per event (ad-hoc null-event rows exempt)
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='ux_bio_participant_event' AND object_id=OBJECT_ID('dbo.biometric_results'))
+  CREATE UNIQUE INDEX ux_bio_participant_event ON dbo.biometric_results(participant_id,event_id) WHERE event_id IS NOT NULL;
+GO
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- Forms (builder) + assignment to events (shown during public registration).

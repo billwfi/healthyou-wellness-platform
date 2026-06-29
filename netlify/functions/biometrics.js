@@ -105,33 +105,69 @@ exports.handler = async (event, context) => {
     const bmi_cat         = bmiCategory(bmi);
     const overall         = overallRisk(bp_risk, cholesterol_risk, glucose_risk, bmi_cat);
 
+    // Column → value map: single source of truth for both insert and update.
+    const cols = {
+      screened_by: screened_by || null,
+      screened_at: screened_at || new Date().toISOString(),
+      height_in: height_in || null,
+      weight_lbs: weight_lbs || null,
+      bmi,
+      waist_circumference_in: waist_circumference_in || null,
+      body_fat_pct: body_fat_pct || null,
+      systolic_bp: systolic_bp || null,
+      diastolic_bp: diastolic_bp || null,
+      heart_rate: heart_rate || null,
+      total_cholesterol: total_cholesterol || null,
+      hdl_cholesterol: hdl_cholesterol || null,
+      ldl_cholesterol: ldl_cholesterol || null,
+      triglycerides: triglycerides || null,
+      cholesterol_ratio: cholesterol_ratio ?? null,
+      non_hdl: non_hdl ?? null,
+      blood_glucose: blood_glucose || null,
+      hba1c: hba1c || null,
+      waist_height_ratio,
+      waist_height_category,
+      fasting_flag: fasting_flag ? 1 : 0,
+      pregnant: pregnant ? 1 : 0,
+      grip_strength: grip_strength ?? null,
+      fruit_veg_servings: fruit_veg_servings ?? null,
+      activity_minutes: activity_minutes ?? null,
+      muscle_strengthening: muscle_strengthening ?? null,
+      stress_level: stress_level ?? null,
+      alcohol_drinks: alcohol_drinks ?? null,
+      tobacco_use: tobacco_use ?? null,
+      sleep_hours: sleep_hours ?? null,
+      bp_risk, cholesterol_risk, glucose_risk,
+      bmi_category: bmi_cat,
+      overall_risk: overall,
+      notes: notes || null,
+    };
+    const keys = Object.keys(cols);
+
     try {
-      const r = await db.query(
-        `INSERT INTO biometric_results
-           (participant_id,event_id,screened_by,screened_at,
-            height_in,weight_lbs,bmi,waist_circumference_in,body_fat_pct,
-            systolic_bp,diastolic_bp,heart_rate,
-            total_cholesterol,hdl_cholesterol,ldl_cholesterol,triglycerides,cholesterol_ratio,non_hdl,
-            blood_glucose,hba1c,
-            waist_height_ratio,waist_height_category,fasting_flag,pregnant,grip_strength,
-            fruit_veg_servings,activity_minutes,muscle_strengthening,stress_level,alcohol_drinks,tobacco_use,sleep_hours,
-            bp_risk,cholesterol_risk,glucose_risk,bmi_category,overall_risk,notes)
-         OUTPUT INSERTED.*
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38)`,
-        [participant_id, event_id||null, screened_by||null,
-         screened_at||new Date().toISOString(),
-         height_in||null, weight_lbs||null, bmi,
-         waist_circumference_in||null, body_fat_pct||null,
-         systolic_bp||null, diastolic_bp||null, heart_rate||null,
-         total_cholesterol||null, hdl_cholesterol||null, ldl_cholesterol||null,
-         triglycerides||null, cholesterol_ratio ?? null, non_hdl ?? null,
-         blood_glucose||null, hba1c||null,
-         waist_height_ratio, waist_height_category, fasting_flag ? 1 : 0, pregnant ? 1 : 0, grip_strength ?? null,
-         fruit_veg_servings ?? null, activity_minutes ?? null, muscle_strengthening ?? null,
-         stress_level ?? null, alcohol_drinks ?? null, tobacco_use ?? null, sleep_hours ?? null,
-         bp_risk, cholesterol_risk, glucose_risk, bmi_cat, overall, notes||null]
+      // One screening record per participant per event: update in place when it
+      // already exists, otherwise insert. (Ad-hoc screenings with no event_id
+      // always insert a new row.)
+      if (event_id) {
+        const setClause = keys.map((k, i) => `${k}=$${i + 3}`).join(',');
+        const upd = await db.query(
+          `UPDATE biometric_results SET ${setClause}
+             OUTPUT INSERTED.*
+           WHERE participant_id=$1 AND event_id=$2`,
+          [participant_id, event_id, ...keys.map(k => cols[k])]
+        );
+        if (upd.rows.length) return ok(upd.rows[0]);
+      }
+
+      const insKeys = ['participant_id', 'event_id', ...keys];
+      const insVals = [participant_id, event_id || null, ...keys.map(k => cols[k])];
+      const placeholders = insKeys.map((_, i) => `$${i + 1}`).join(',');
+      const ins = await db.query(
+        `INSERT INTO biometric_results (${insKeys.join(',')})
+         OUTPUT INSERTED.* VALUES (${placeholders})`,
+        insVals
       );
-      return created(r.rows[0]);
+      return created(ins.rows[0]);
     } catch (e) { return serverError(e); }
   }
 

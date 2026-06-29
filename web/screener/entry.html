@@ -290,12 +290,20 @@ async function boot(user) {
     participantSex=(p.gender||'').toLowerCase();
     setAlcoholRange(p.gender);
 
-    // Pre-fill height/weight from last screening if available
-    if(p.biometrics?.[0]){
-      const last=p.biometrics[0];
-      if(last.height_in) document.getElementById('f-height').value=last.height_in;
-      if(last.weight_lbs) document.getElementById('f-weight').value=last.weight_lbs;
-      calcBmi();
+    // If this participant already has a record for THIS event, load it for
+    // editing. Otherwise carry height/weight forward from their last screening.
+    if(p.biometrics?.length){
+      const recForEvent = eventId
+        ? p.biometrics.find(b=>String(b.event_id)===String(eventId))
+        : p.biometrics[0];
+      if(recForEvent){
+        prefillRecord(recForEvent);
+      } else {
+        const last=p.biometrics[0];
+        if(last.height_in) document.getElementById('f-height').value=last.height_in;
+        if(last.weight_lbs) document.getElementById('f-weight').value=last.weight_lbs;
+        calcBmi();
+      }
     }
   } catch(e){ showToast('Error loading participant'); }
 }
@@ -485,6 +493,28 @@ function setAlcoholRange(gender){
   lifeLabel('alcohol');
 }
 function radioVal(name){ const r=document.querySelector('input[name="'+name+'"]:checked'); return r?(r.value==='1'):null; }
+function checkRadio(name,val){ const r=document.querySelector('input[name="'+name+'"][value="'+val+'"]'); if(r) r.checked=true; }
+
+// Load a previously saved biometric record back into the form for editing.
+function prefillRecord(b){
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el&&v!=null&&v!=='') el.value=v; };
+  set('f-height',b.height_in); set('f-weight',b.weight_lbs); set('f-waist',b.waist_circumference_in);
+  set('f-grip',b.grip_strength);
+  set('f-sys',b.systolic_bp); set('f-dia',b.diastolic_bp); set('f-hr',b.heart_rate);
+  set('f-tchol',b.total_cholesterol); set('f-hdl',b.hdl_cholesterol); set('f-ldl',b.ldl_cholesterol);
+  set('f-trig',b.triglycerides); set('f-nonhdl',b.non_hdl); set('f-cratio',b.cholesterol_ratio);
+  set('f-glucose',b.blood_glucose); set('f-hba1c',b.hba1c);
+  set('f-notes',b.notes);
+  document.getElementById('f-fasting').checked=!!b.fasting_flag;
+  document.getElementById('f-pregnant').checked=!!b.pregnant;
+  set('f-fruitveg',b.fruit_veg_servings); set('f-activity',b.activity_minutes);
+  set('f-stress',b.stress_level); set('f-alcohol',b.alcohol_drinks); set('f-sleep',b.sleep_hours);
+  if(b.muscle_strengthening!=null) checkRadio('f-muscle', b.muscle_strengthening?'1':'0');
+  if(b.tobacco_use!=null) checkRadio('f-tobacco', b.tobacco_use?'1':'0');
+  // recompute derived fields + slider labels
+  calcBmi(); calcWhr(); checkBp();
+  ['fruitveg','activity','stress','alcohol','sleep'].forEach(lifeLabel);
+}
 
 // Metabolic Syndrome (harmonized NCEP ATP III): syndrome present when >=3 of 5
 // criteria are met. Waist and HDL thresholds are sex-specific.
