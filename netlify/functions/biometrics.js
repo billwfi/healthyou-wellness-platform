@@ -54,7 +54,7 @@ exports.handler = async (event, context) => {
         q = 'SELECT * FROM biometric_results WHERE participant_id=$1 ORDER BY screened_at DESC';
         vals = [qs.participant_id];
       } else if (qs.event_id) {
-        q = `SELECT br.*, p.first_name, p.last_name, p.email
+        q = `SELECT br.*, p.first_name, p.last_name, p.email, p.gender, p.date_of_birth, p.employee_id, p.department
                FROM biometric_results br
                JOIN participants p ON p.id=br.participant_id
               WHERE br.event_id=$1 ORDER BY p.last_name`;

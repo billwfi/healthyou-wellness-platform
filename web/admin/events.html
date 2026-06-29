@@ -8,6 +8,12 @@
   <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <style id="report-css">
+    .result-preview-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-top:10px; }
+    .result-tile { text-align:center; padding:10px; background:#fff; border-radius:6px; border:1px solid var(--teal-light); }
+    .result-tile-val { font-size:1.2rem; font-weight:700; color:var(--gray-800); }
+    .result-tile-label { font-size:.7rem; color:var(--gray-400); margin-top:2px; }
+  </style>
 </head>
 <body>
 <header class="header">
@@ -108,8 +114,8 @@
             <button class="btn btn-ghost btn-sm" onclick="switchEventTab('participants',document.querySelector('[data-tab=participants]'))">View All →</button>
           </div>
           <table class="data-table">
-            <thead><tr><th>Participant</th><th>Screened</th><th>BMI</th><th>BP</th><th>Risk</th></tr></thead>
-            <tbody id="ov-screenings-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+            <thead><tr><th>Participant</th><th>Screened</th><th>BMI</th><th>BP</th><th>Risk</th><th style="width:90px;text-align:right;">Report</th></tr></thead>
+            <tbody id="ov-screenings-tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -339,6 +345,24 @@
   </div>
 </div>
 
+<!-- Screening Report Modal -->
+<div id="report-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'report-modal')">
+  <div class="modal" style="max-width:680px;">
+    <div id="report-print-area">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <img src="/assets/img/hylogo.png" alt="HealYou" style="height:30px;"/>
+        <span id="report-sub" style="font-size:.8rem;color:var(--gray-400);text-align:right;"></span>
+      </div>
+      <div class="modal-title" id="report-title" style="margin-bottom:14px;">Screening Report</div>
+      <div id="report-body"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('report-modal')">Close</button>
+      <button class="btn btn-primary" onclick="printScreeningReport()">Print / Save PDF</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add / Edit Location Modal -->
 <div id="location-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'location-modal')">
   <div class="modal">
@@ -491,19 +515,130 @@ function switchEventTab(tab, el) {
 async function loadOverview() {
   try {
     const screenings=await fetch(`/api/biometrics?event_id=${activeEvent.id}`,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+    ovScreenings=Array.isArray(screenings)?screenings:[];
     const tbody=document.getElementById('ov-screenings-tbody');
-    if(!screenings.length){
-      tbody.innerHTML='<tr><td colspan="5" class="empty">No screenings recorded for this event yet.</td></tr>';
+    if(!ovScreenings.length){
+      tbody.innerHTML='<tr><td colspan="6" class="empty">No screenings recorded for this event yet.</td></tr>';
       return;
     }
-    tbody.innerHTML=screenings.slice(0,10).map(s=>`<tr>
+    tbody.innerHTML=ovScreenings.slice(0,10).map((s,i)=>`<tr>
       <td><strong>${esc(s.last_name)}, ${esc(s.first_name)}</strong></td>
       <td style="font-size:.82rem;">${fmtDate(s.screened_at)}</td>
       <td>${s.bmi||'—'}</td>
       <td>${s.systolic_bp?s.systolic_bp+'/'+s.diastolic_bp:'—'}</td>
       <td>${s.overall_risk?`<span class="badge badge-${s.overall_risk}">${s.overall_risk}</span>`:'—'}</td>
+      <td style="text-align:right;"><button class="btn btn-ghost btn-sm" onclick="openScreeningReport(${i})">Report</button></td>
     </tr>`).join('');
   } catch(e){ showToast('Error loading screenings'); }
+}
+
+// ── Screening report (print / save) ──────────────────────────────────────────
+let ovScreenings=[];
+
+function metSyndrome(r){
+  const female=(r.gender||'').toLowerCase().startsWith('f');
+  const crit=[];
+  if(r.waist_circumference_in!=null) crit.push({name:`Waist ≥${female?35:40} in`, met:Number(r.waist_circumference_in)>=(female?35:40)});
+  if(r.triglycerides!=null)          crit.push({name:'Triglycerides ≥150', met:Number(r.triglycerides)>=150});
+  if(r.hdl_cholesterol!=null)        crit.push({name:`HDL <${female?50:40}`, met:Number(r.hdl_cholesterol)<(female?50:40)});
+  if(r.systolic_bp!=null||r.diastolic_bp!=null)
+                                     crit.push({name:'BP ≥130/85', met:(Number(r.systolic_bp)>=130||Number(r.diastolic_bp)>=85)});
+  if(r.blood_glucose!=null)          crit.push({name:'Glucose ≥100', met:Number(r.blood_glucose)>=100});
+  return { measured:crit.length, metCount:crit.filter(c=>c.met).length, crit };
+}
+
+function screeningReportHTML(r){
+  const tiles=[];
+  if(r.height_in) tiles.push(['Height',Number(r.height_in)+' in',null]);
+  if(r.weight_lbs) tiles.push(['Weight',r.weight_lbs+' lbs',null]);
+  if(r.bmi) tiles.push(['BMI',Number(r.bmi).toFixed(1),r.bmi_category]);
+  if(r.waist_circumference_in) tiles.push(['Waist',Number(r.waist_circumference_in)+' in',null]);
+  if(r.waist_height_ratio) tiles.push(['Waist/Height',Number(r.waist_height_ratio).toFixed(2),r.waist_height_category]);
+  if(r.grip_strength) tiles.push(['Grip Strength',Number(r.grip_strength)+' lbs',null]);
+  if(r.systolic_bp) tiles.push(['Blood Pressure',r.systolic_bp+'/'+r.diastolic_bp,r.bp_risk]);
+  if(r.heart_rate) tiles.push(['Heart Rate',r.heart_rate+' bpm',null]);
+  if(r.total_cholesterol) tiles.push(['Total Chol.',r.total_cholesterol+' mg/dL',r.cholesterol_risk]);
+  if(r.hdl_cholesterol) tiles.push(['HDL',r.hdl_cholesterol+' mg/dL',null]);
+  if(r.ldl_cholesterol) tiles.push(['LDL',r.ldl_cholesterol+' mg/dL',null]);
+  if(r.triglycerides) tiles.push(['Triglycerides',r.triglycerides+' mg/dL',null]);
+  if(r.non_hdl) tiles.push(['Non-HDL',r.non_hdl+' mg/dL',null]);
+  if(r.cholesterol_ratio) tiles.push(['Chol. Ratio',Number(r.cholesterol_ratio).toFixed(1),null]);
+  if(r.blood_glucose) tiles.push(['Glucose',r.blood_glucose+' mg/dL',r.glucose_risk]);
+  if(r.hba1c) tiles.push(['HbA1c',r.hba1c+'%',null]);
+
+  const riskColor={high:'var(--red)',crisis:'var(--red)',high_1:'var(--amber)',high_2:'var(--red)',elevated:'var(--amber)',borderline:'var(--amber)',very_high:'var(--red)',prediabetes:'var(--amber)',diabetes:'var(--red)',obese:'var(--red)',overweight:'var(--amber)',normal:'var(--green)',low:'var(--green)',ideal:'var(--green)'};
+  const overallColor={high:'#ef4444',moderate:'#f59e0b',low:'#10b981'}[r.overall_risk]||'#6b7280';
+
+  const female=(r.gender||'').toLowerCase().startsWith('f');
+  const lifeMax={fruitveg:5,activity:300,alcohol:female?8:15,sleep:9};
+  const lifeDisp=(key,val,suf)=>{ if(val==null) return null; let s=String(val); if(lifeMax[key]!=null&&Number(val)>=lifeMax[key]) s=lifeMax[key]+'+'; return s+(suf||''); };
+  const lifeRows=[]; const pushL=(k,v)=>{ if(v!=null&&v!=='') lifeRows.push([k,v]); };
+  pushL('Fruits & vegetables', lifeDisp('fruitveg', r.fruit_veg_servings, ' servings/day'));
+  pushL('Physical activity', lifeDisp('activity', r.activity_minutes, ' min/week'));
+  pushL('Muscle-strengthening (2+ days/wk)', r.muscle_strengthening==null?null:(r.muscle_strengthening?'Yes':'No'));
+  pushL('Stress level', r.stress_level==null?null:r.stress_level+' / 10');
+  pushL('Alcohol', lifeDisp('alcohol', r.alcohol_drinks, ' drinks/week'));
+  pushL('Tobacco / vaping / nicotine', r.tobacco_use==null?null:(r.tobacco_use?'Yes':'No'));
+  pushL('Quality sleep', lifeDisp('sleep', r.sleep_hours, ' hrs'));
+
+  const ms=metSyndrome(r);
+  const msColor = ms.metCount>=3?'var(--red)':ms.metCount===2?'var(--amber)':'var(--green)';
+  const msBg    = ms.metCount>=3?'var(--red-light)':ms.metCount===2?'var(--amber-light)':'var(--teal-bg)';
+  const msLabel = ms.metCount>=3?'Metabolic syndrome present (≥3 criteria)':ms.metCount===2?'At risk — 2 of 5 criteria':'Low risk';
+
+  return `
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;">Overall Risk</div>
+      <div style="font-size:2rem;font-weight:800;color:${overallColor};text-transform:capitalize;">${r.overall_risk||'—'}</div>
+    </div>
+    <div class="result-preview-grid">
+      ${tiles.map(t=>`<div class="result-tile" style="${t[2]&&riskColor[t[2]]?'border-color:'+riskColor[t[2]]+';':''}">
+        <div class="result-tile-val" style="${t[2]&&riskColor[t[2]]?'color:'+riskColor[t[2]]+';':''}">${esc(String(t[1]))}</div>
+        <div class="result-tile-label">${esc(t[0])}</div>
+      </div>`).join('')}
+    </div>
+    ${ms.measured?`
+    <div style="margin-top:20px;padding:14px 16px;border:1px solid ${msColor};border-radius:8px;background:${msBg};">
+      <div style="font-size:.8rem;color:var(--gray-500);text-transform:uppercase;letter-spacing:.05em;">Metabolic Syndrome Score</div>
+      <div style="font-size:1.5rem;font-weight:800;color:${msColor};">${ms.metCount} / 5 criteria</div>
+      <div style="font-size:.84rem;font-weight:600;color:${msColor};margin-bottom:8px;">${msLabel}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 20px;font-size:.8rem;">
+        ${ms.crit.map(c=>`<div style="display:flex;gap:6px;align-items:center;"><span style="color:${c.met?'var(--red)':'var(--green)'};font-weight:700;width:12px;">${c.met?'✓':'·'}</span><span style="color:var(--gray-600);">${esc(c.name)}</span></div>`).join('')}
+      </div>
+      ${ms.measured<5?`<div style="margin-top:8px;font-size:.74rem;color:var(--gray-400);">Based on ${ms.measured} of 5 measured criteria.</div>`:''}
+    </div>`:''}
+    ${lifeRows.length?`
+    <div style="margin-top:22px;">
+      <div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Lifestyle Risk Assessment</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 28px;font-size:.85rem;">
+        ${lifeRows.map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--gray-100);padding:5px 0;"><span style="color:var(--gray-600);">${esc(k)}</span><span style="font-weight:600;white-space:nowrap;">${esc(v)}</span></div>`).join('')}
+      </div>
+    </div>`:''}
+  `;
+}
+
+function openScreeningReport(i){
+  const r=ovScreenings[i]; if(!r) return;
+  document.getElementById('report-title').textContent=`${(r.first_name||'')} ${(r.last_name||'')}`.trim()+' — Screening Report';
+  const sub=[];
+  if(r.screened_at) sub.push('Screened '+fmtDate(r.screened_at));
+  if(activeEvent&&activeEvent.name) sub.push(activeEvent.name);
+  document.getElementById('report-sub').textContent=sub.join(' · ');
+  document.getElementById('report-body').innerHTML=screeningReportHTML(r);
+  document.getElementById('report-modal').style.display='flex';
+}
+
+function printScreeningReport(){
+  const area=document.getElementById('report-print-area').innerHTML;
+  const w=window.open('','_blank','width=820,height=940');
+  if(!w){ showToast('Allow pop-ups to print/save the report'); return; }
+  const reportCss=document.getElementById('report-css').innerHTML;
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Screening Report</title>'
+    +'<link rel="stylesheet" href="/assets/css/style.css"/>'
+    +'<style>body{padding:28px;background:#fff;}'+reportCss+'</style></head><body>'+area
+    +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},350);};</scr'+'ipt>'
+    +'</body></html>');
+  w.document.close();
 }
 
 // ── Participants tab ──────────────────────────────────────────────────────────
