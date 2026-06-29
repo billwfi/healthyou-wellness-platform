@@ -179,7 +179,7 @@
         <div class="form-group" style="margin-bottom:18px;">
           <label>During a typical week, how many minutes of moderate-intensity physical activity do you accumulate? <span style="font-weight:400;color:var(--gray-400);font-size:.76rem;">(hard enough to raise your heart rate or break a sweat)</span></label>
           <input id="f-activity" type="range" min="0" max="300" step="5" value="0" oninput="lifeLabel('activity')" style="width:100%;"/>
-          <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--gray-400);"><span>0</span><span>150 (2.5 hrs)</span><span>300 (5 hrs)</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--gray-400);"><span>0</span><span>150 (2.5 hrs)</span><span>300+ (5 hrs)</span></div>
           <div style="font-size:.85rem;font-weight:600;color:var(--teal);"><span id="lbl-activity">0</span> min/week</div>
         </div>
 
@@ -433,7 +433,7 @@ function lifeLabel(key){
   const el=document.getElementById('f-'+key), lbl=document.getElementById('lbl-'+key);
   if(!el||!lbl) return;
   let v=el.value;
-  if((key==='alcohol'||key==='sleep'||key==='fruitveg') && Number(v)>=Number(el.max)) v=el.max+'+';
+  if((key==='alcohol'||key==='sleep'||key==='fruitveg'||key==='activity') && Number(v)>=Number(el.max)) v=el.max+'+';
   lbl.textContent=v;
 }
 function setAlcoholRange(gender){
