@@ -677,10 +677,15 @@ async function saveEvent() {
     const r=await fetch('/api/events',{method:editEventId?'PUT':'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify(body)});
     if(!r.ok){showErr('em-err',(await r.json()).error||'Save failed');return;}
+    const saved = await r.json();
     closeModal('event-modal'); showToast(editEventId?'Event updated':'Event created'); await load();
     if(editEventId && activeEvent?.id===editEventId) {
       activeEvent=events.find(e=>e.id===editEventId);
       if(activeEvent) openEvent(activeEvent.id);
+    } else if(!editEventId && saved?.id) {
+      // New event: jump straight into its Setup so all schedule details can be configured.
+      const ne=events.find(e=>e.id===saved.id);
+      if(ne){ openEvent(ne.id); const st=document.querySelector('[data-tab="setup"]'); if(st) switchEventTab('setup', st); }
     }
   } catch(e){showErr('em-err',e.message);}
   finally{btn.disabled=false;}
