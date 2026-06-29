@@ -234,8 +234,6 @@
           <button class="tab setup-tab" data-stab="settings"             onclick="switchSetupTab('settings',this)">Settings</button>
           <button class="tab setup-tab" data-stab="hours"                onclick="switchSetupTab('hours',this)">Business Hours</button>
           <button class="tab setup-tab" data-stab="availability"         onclick="switchSetupTab('availability',this)">Availability</button>
-          <button class="tab setup-tab" data-stab="notifications"        onclick="switchSetupTab('notifications',this)">Notifications</button>
-          <button class="tab setup-tab" data-stab="payments"             onclick="switchSetupTab('payments',this)">Payments</button>
         </div>
 
         <!-- General -->
@@ -307,31 +305,6 @@
           </div>
           <div class="card" style="padding:0;overflow:auto;">
             <table class="data-table" id="su-avail-grid"><tbody><tr><td class="empty">Set business hours, then “Apply to Time Table”.</td></tr></tbody></table>
-          </div>
-        </div>
-
-        <!-- Notifications -->
-        <div id="st-notifications" style="display:none;">
-          <div class="card">
-            <div class="card-title">Staff Notification Recipients</div>
-            <div id="su-recipients"><span style="font-size:.84rem;color:var(--gray-400);">Loading…</span></div>
-          </div>
-          <div class="card">
-            <div class="card-title">Customer Notifications</div>
-            <label style="display:flex;gap:8px;align-items:center;font-size:.9rem;"><input type="checkbox" id="su-notify_customers"> Enable customer e-mail notifications for internal appointments</label>
-          </div>
-        </div>
-
-        <!-- Payments -->
-        <div id="st-payments" style="display:none;">
-          <div class="card">
-            <div class="card-title">Payments</div>
-            <label style="display:flex;gap:8px;align-items:center;font-size:.9rem;margin-bottom:12px;"><input type="checkbox" id="su-payment_required"> Payment required</label>
-            <div class="form-grid" style="gap:14px;">
-              <div class="form-group"><label>Amount (USD)</label><input id="su-payment_amount" type="number" min="0" step="0.01"/></div>
-              <div class="form-group span-2"><label>Payment Instructions</label><textarea id="su-payment_instructions" rows="3"></textarea></div>
-            </div>
-            <p style="font-size:.76rem;color:var(--gray-400);margin-top:10px;">Payments is a placeholder pending the AppointmentQuest Payments spec.</p>
           </div>
         </div>
 
@@ -903,7 +876,7 @@ function openLocationSetup(id){
   document.getElementById('et-setup').style.display='';
   // reset to General sub-tab
   document.querySelectorAll('.setup-tab').forEach((t,i)=>t.classList.toggle('active',i===0));
-  ['general','settings','hours','availability','notifications','payments'].forEach((t,i)=>
+  ['general','settings','hours','availability'].forEach((t,i)=>
     document.getElementById('st-'+t).style.display=i===0?'':'none');
   loadSetup(activeLocation);
 }
@@ -928,7 +901,7 @@ function normalizeRules(st){
 function switchSetupTab(tab, el){
   document.querySelectorAll('.setup-tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  ['general','settings','hours','availability','notifications','payments'].forEach(t=>
+  ['general','settings','hours','availability'].forEach(t=>
     document.getElementById('st-'+t).style.display=t===tab?'':'none');
 }
 
@@ -963,10 +936,7 @@ function fillSetupForm(){
   selVal('su-group_scheduling', suState.group_scheduling?'1':'0');
   selVal('su-capacity_uniform', suState.capacity_uniform===false?'0':'1');
   v('su-uniform_capacity',suState.uniform_capacity==null?1:suState.uniform_capacity);
-  document.getElementById('su-notify_customers').checked = suState.notify_customers!==false;
-  document.getElementById('su-payment_required').checked = !!suState.payment_required;
-  v('su-payment_amount',suState.payment_amount); v('su-payment_instructions',suState.payment_instructions);
-  renderApptMatrix(); renderRulesMatrix(); renderHours(); renderRecipients(); renderAvailGrid();
+  renderApptMatrix(); renderRulesMatrix(); renderHours(); renderAvailGrid();
 }
 
 function setRule(side,key,val){ suState.appointment_rules[side][key]=val; }
@@ -1054,19 +1024,10 @@ function renderAvailGrid(){
     }).join('')+'</tr>').join('')+'</tbody>';
 }
 
-function renderRecipients(){
-  const c=document.getElementById('su-recipients');
-  if(!suCoaches.length){ c.innerHTML='<span style="font-size:.84rem;color:var(--gray-400);">No staff users found.</span>'; return; }
-  const sel=new Set(suState.notification_recipients.map(r=>(r.email||'').toLowerCase()));
-  c.innerHTML=suCoaches.map(co=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:.9rem;">
-    <input type="checkbox" data-email="${esc(co.email||'')}" data-name="${esc(co.name||'')}" ${sel.has((co.email||'').toLowerCase())?'checked':''}> ${esc(co.name||'')} <span style="color:var(--gray-400);font-size:.8rem;">${esc(co.email||'')}</span></label>`).join('');
-}
-
 async function saveSetup(){
   if(!suState) return;
   const num=id=>{const v=document.getElementById(id).value; return v===''?null:Number(v);};
   const val=id=>{const v=document.getElementById(id).value; return v===''?null:v;};
-  const recips=[...document.querySelectorAll('#su-recipients input[type=checkbox]:checked')].map(c=>({name:c.dataset.name,email:c.dataset.email}));
   const body={
     location_id:activeLocation.id,
     description:val('su-description'), custom_form:val('su-custom_form'),
@@ -1081,14 +1042,9 @@ async function saveSetup(){
     group_scheduling:document.getElementById('su-group_scheduling').value==='1',
     capacity_uniform:document.getElementById('su-capacity_uniform').value==='1',
     uniform_capacity:num('su-uniform_capacity'),
-    notify_customers:document.getElementById('su-notify_customers').checked,
-    payment_required:document.getElementById('su-payment_required').checked,
-    payment_amount:num('su-payment_amount'),
-    payment_instructions:val('su-payment_instructions'),
     appointment_rules:suState.appointment_rules,
     business_hours:suState.business_hours,
     availability_slots:suState.availability_slots,
-    notification_recipients:recips,
   };
   try{
     const r=await fetch('/api/event-setup',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+authToken},body:JSON.stringify(body)});
