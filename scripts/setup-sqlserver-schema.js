@@ -46,6 +46,9 @@ const FKS = [
   ['fk_event_hours_loc',         'event_business_hours', 'location_id', 'event_locations', 'id', 'CASCADE'],
   ['fk_event_slots_loc',         'event_availability_slots', 'location_id','event_locations','id','CASCADE'],
   ['fk_event_notif_loc',         'event_notification_recipients', 'location_id','event_locations','id','CASCADE'],
+  // Forms
+  ['fk_event_forms_event',       'event_forms', 'event_id',        'screening_events', 'id', 'CASCADE'],
+  ['fk_event_forms_form',        'event_forms', 'form_id',         'forms',            'id', 'CASCADE'],
 ];
 
 (async () => {

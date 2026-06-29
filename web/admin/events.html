@@ -24,6 +24,7 @@
     <a href="/admin/groups.html" class="sidebar-item">Groups</a>
     <div class="sidebar-section" style="margin-top:12px;">Programs</div>
     <a href="/admin/events.html" class="sidebar-item active">Screening Events</a>
+    <a href="/admin/forms.html" class="sidebar-item">Forms</a>
     <div class="sidebar-section" style="margin-top:12px;">Communication</div>
     <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
     <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
@@ -86,6 +87,7 @@
         <button class="tab event-tab" data-tab="participants" onclick="switchEventTab('participants',this)">Participants</button>
         <button class="tab event-tab" data-tab="registration" onclick="switchEventTab('registration',this)">Registration Link</button>
         <button class="tab event-tab" data-tab="locations" onclick="switchEventTab('locations',this)">Locations</button>
+        <button class="tab event-tab" data-tab="forms" onclick="switchEventTab('forms',this)">Forms</button>
       </div>
 
       <!-- Overview tab -->
@@ -187,6 +189,16 @@
               <tbody id="loc-tbody"><tr><td colspan="4" class="empty">No locations yet. Add one to configure its schedule.</td></tr></tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- Forms tab -->
+      <div id="et-forms" style="display:none;">
+        <div class="card">
+          <div class="card-title">Registration Forms</div>
+          <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:14px;">Select the forms participants complete during registration for this event. Build forms under <a href="/admin/forms.html" style="color:var(--teal);">Forms</a>.</p>
+          <div id="ef-list"><span style="font-size:.85rem;color:var(--gray-400);">Loading…</span></div>
+          <div class="save-bar"><button class="btn btn-primary" onclick="saveEventForms()">Save Forms</button></div>
         </div>
       </div>
 
@@ -452,7 +464,7 @@ function openEvent(id) {
 
   document.querySelectorAll('.event-tab').forEach(t=>t.classList.remove('active'));
   document.querySelector('[data-tab="overview"]').classList.add('active');
-  ['overview','participants','registration','locations'].forEach(t=>
+  ['overview','participants','registration','locations','forms'].forEach(t=>
     document.getElementById('et-'+t).style.display=t==='overview'?'':'none'
   );
   document.getElementById('et-setup').style.display='none';
@@ -470,11 +482,12 @@ function backToList() {
 function switchEventTab(tab, el) {
   document.querySelectorAll('.event-tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  ['overview','participants','registration','locations'].forEach(t=>
+  ['overview','participants','registration','locations','forms'].forEach(t=>
     document.getElementById('et-'+t).style.display=t===tab?'':'none'
   );
   document.getElementById('et-setup').style.display='none';
   if(tab==='locations'){ document.getElementById('loc-list-view').style.display=''; loadLocations(); }
+  if(tab==='forms') loadEventForms();
   if(tab==='participants'&&!ptLoaded) loadParticipants(0);
   if(tab==='registration') renderRegTab();
 }
@@ -737,6 +750,29 @@ async function updateStatus(id,status) {
 
 // ── Locations tab ─────────────────────────────────────────────────────────────
 function auth(){ return {Authorization:'Bearer '+authToken}; }
+
+// ── Forms tab (assign forms to the event) ─────────────────────────────────────
+async function loadEventForms(){
+  try{
+    const [all, assigned] = await Promise.all([
+      fetch('/api/forms?active=1',{headers:auth()}).then(r=>r.json()),
+      fetch(`/api/event-forms?event_id=${activeEvent.id}`,{headers:auth()}).then(r=>r.json()),
+    ]);
+    const allForms=Array.isArray(all)?all:[]; const sel=new Set((Array.isArray(assigned)?assigned:[]).map(f=>f.id));
+    const c=document.getElementById('ef-list');
+    c.innerHTML = allForms.length ? allForms.map(f=>`<label style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:.9rem;">
+      <input type="checkbox" value="${f.id}" ${sel.has(f.id)?'checked':''}> ${esc(f.name)} <span style="color:var(--gray-400);font-size:.8rem;">${(f.schema_json&&f.schema_json.fields?f.schema_json.fields.length:0)} field(s)</span></label>`).join('')
+      : '<span style="font-size:.85rem;color:var(--gray-400);">No active forms yet. Create one under Forms.</span>';
+  }catch(e){ showToast('Error loading forms'); }
+}
+async function saveEventForms(){
+  const ids=[...document.querySelectorAll('#ef-list input[type=checkbox]:checked')].map(c=>parseInt(c.value));
+  try{
+    const r=await fetch('/api/event-forms',{method:'PUT',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify({event_id:activeEvent.id,form_ids:ids})});
+    if(!r.ok){ showToast('Error: '+((await r.json()).error||'Save failed')); return; }
+    showToast('Forms saved');
+  }catch(e){ showToast('Error: '+e.message); }
+}
 
 async function loadLocations(){
   try {

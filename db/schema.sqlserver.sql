@@ -563,3 +563,29 @@ IF COL_LENGTH('dbo.biometric_results','waist_height_ratio') IS NULL     ALTER TA
 GO
 IF COL_LENGTH('dbo.biometric_results','waist_height_category') IS NULL  ALTER TABLE dbo.biometric_results ADD waist_height_category NVARCHAR(20);
 GO
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- Forms (builder) + assignment to events (shown during public registration).
+-- ════════════════════════════════════════════════════════════════════════════
+IF OBJECT_ID('dbo.forms','U') IS NULL
+CREATE TABLE dbo.forms (
+  id          INT IDENTITY(1,1) PRIMARY KEY,
+  name        NVARCHAR(255) NOT NULL,
+  description NVARCHAR(MAX),
+  schema_json NVARCHAR(MAX) DEFAULT '{"fields":[]}',   -- { fields:[{key,type,label,required,options}] }
+  active      BIT DEFAULT 1,
+  created_at  DATETIME2(3) DEFAULT SYSUTCDATETIME(),
+  updated_at  DATETIME2(3) DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.event_forms','U') IS NULL
+CREATE TABLE dbo.event_forms (
+  event_id   INT NOT NULL,
+  form_id    INT NOT NULL,
+  sort_order INT DEFAULT 0,
+  CONSTRAINT pk_event_forms PRIMARY KEY (event_id, form_id)
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_event_forms_form') CREATE INDEX idx_event_forms_form ON dbo.event_forms(form_id);
+GO

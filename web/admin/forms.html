@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Forms — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo.png" alt="HealthYou"></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <div class="sidebar-section" style="margin-top:12px;">Users</div>
+    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <a href="/admin/groups.html" class="sidebar-item">Groups</a>
+    <div class="sidebar-section" style="margin-top:12px;">Programs</div>
+    <a href="/admin/events.html" class="sidebar-item">Screening Events</a>
+    <a href="/admin/forms.html" class="sidebar-item active">Forms</a>
+    <div class="sidebar-section" style="margin-top:12px;">Communication</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+    <a href="/admin/umbraco.html" class="sidebar-item">Umbraco</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/settings.html" class="sidebar-item">System Settings</a>
+  </nav>
+</aside>
+<main class="container has-sidebar">
+  <div id="content" style="display:none;">
+
+    <!-- LIST -->
+    <div id="view-list">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div><h1 class="page-title" style="margin-bottom:2px;">Forms</h1><p style="color:var(--gray-400);font-size:.88rem;">Build forms to attach to screening events; participants complete them during registration.</p></div>
+        <button class="btn btn-primary" onclick="newForm()">+ New Form</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <table class="data-table">
+          <thead><tr><th>Form</th><th style="text-align:center;">Fields</th><th>Status</th><th style="width:160px;">Actions</th></tr></thead>
+          <tbody id="tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- EDIT -->
+    <div id="view-edit" style="display:none;">
+      <button class="btn btn-ghost btn-sm" onclick="backToList()" style="margin-bottom:16px;">← Forms</button>
+      <div class="card">
+        <div class="form-grid" style="gap:14px;">
+          <div class="form-group span-2"><label>Form Name *</label><input id="fm-name" type="text" placeholder="RYP Intake Questions"/></div>
+          <div class="form-group span-2"><label>Description</label><input id="fm-desc" type="text"/></div>
+          <div class="form-group"><label>Status</label><select id="fm-active"><option value="1">Active</option><option value="0">Inactive</option></select></div>
+        </div>
+      </div>
+      <div class="section-header" style="margin-bottom:14px;">
+        <h3>Fields</h3>
+        <select id="fm-add-type" class="btn btn-ghost btn-sm" style="padding:5px 10px;width:auto;">
+          <option value="text">Text</option><option value="textarea">Paragraph</option>
+          <option value="number">Number</option><option value="date">Date</option>
+          <option value="select">Dropdown</option><option value="radio">Multiple choice</option>
+          <option value="checkbox">Checkbox (yes/no)</option><option value="file">File upload</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="addField()" style="margin-left:8px;">+ Add Field</button>
+      </div>
+      <div id="fields"></div>
+      <div class="save-bar">
+        <span id="fm-err" style="display:none;font-size:.84rem;color:var(--red);"></span>
+        <button class="btn btn-ghost" onclick="backToList()">Cancel</button>
+        <button class="btn btn-primary" id="fm-save" onclick="saveForm()">Save Form</button>
+      </div>
+    </div>
+
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, forms=[], editId=null, fields=[];
+const TYPE_LABEL={text:'Text',textarea:'Paragraph',number:'Number',date:'Date',select:'Dropdown',radio:'Multiple choice',checkbox:'Checkbox (yes/no)',file:'File upload'};
+const TYPES=Object.keys(TYPE_LABEL);
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} else { location.href='/admin/login.html'; } });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ location.href='/admin/login.html'; });
+
+async function boot(user){
+  document.getElementById('content').style.display='';
+  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+  load();
+}
+async function load(){
+  try{ forms=await fetch('/api/forms',{headers:auth()}).then(r=>r.json()); if(!Array.isArray(forms))forms=[]; renderList(); }
+  catch(e){ showToast('Error: '+e.message); }
+}
+function auth(){ return {Authorization:'Bearer '+authToken}; }
+
+function renderList(){
+  document.getElementById('tbody').innerHTML=!forms.length
+    ?'<tr><td colspan="4" class="empty">No forms yet. Create one to attach to events.</td></tr>'
+    :forms.map(f=>`<tr>
+        <td><strong>${esc(f.name)}</strong>${f.description?`<br><span style="font-size:.78rem;color:var(--gray-400);">${esc(f.description)}</span>`:''}</td>
+        <td style="text-align:center;">${(f.schema_json&&f.schema_json.fields?f.schema_json.fields.length:0)}</td>
+        <td><span class="badge badge-${f.active?'active':'inactive'}">${f.active?'Active':'Inactive'}</span></td>
+        <td><div class="actions">
+          <button class="btn btn-primary btn-sm" onclick="editForm(${f.id})">Edit</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);" onclick="delForm(${f.id})">Del</button>
+        </div></td>
+      </tr>`).join('');
+}
+
+function newForm(){ editId=null; fields=[]; fillEditor({name:'',description:'',active:1}); showEditor(); }
+function editForm(id){ const f=forms.find(x=>x.id===id); editId=id; fields=(f.schema_json&&Array.isArray(f.schema_json.fields))?JSON.parse(JSON.stringify(f.schema_json.fields)):[]; fillEditor(f); showEditor(); }
+function fillEditor(f){
+  document.getElementById('fm-name').value=f.name||'';
+  document.getElementById('fm-desc').value=f.description||'';
+  document.getElementById('fm-active').value=f.active?'1':'0';
+  document.getElementById('fm-err').style.display='none';
+  renderFields();
+}
+function showEditor(){ document.getElementById('view-list').style.display='none'; document.getElementById('view-edit').style.display=''; }
+function backToList(){ document.getElementById('view-edit').style.display='none'; document.getElementById('view-list').style.display=''; }
+
+function needsOptions(t){ return t==='select'||t==='radio'; }
+function renderFields(){
+  const c=document.getElementById('fields');
+  if(!fields.length){ c.innerHTML='<div class="card"><span style="font-size:.85rem;color:var(--gray-400);">No fields yet. Use “+ Add Field” above.</span></div>'; return; }
+  c.innerHTML=fields.map((f,i)=>`<div class="card" style="padding:14px;">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <select onchange="fld(${i},'type',this.value)" style="width:auto;">${TYPES.map(t=>`<option value="${t}" ${f.type===t?'selected':''}>${TYPE_LABEL[t]}</option>`).join('')}</select>
+      <input placeholder="Field label" value="${esc(f.label||'')}" oninput="fld(${i},'label',this.value)" style="flex:1;min-width:160px;"/>
+      <label style="font-size:.85rem;display:flex;gap:5px;align-items:center;white-space:nowrap;"><input type="checkbox" ${f.required?'checked':''} onchange="fld(${i},'required',this.checked)" style="width:auto;"> Required</label>
+      <button class="btn btn-ghost btn-sm" onclick="moveField(${i},-1)" ${i===0?'disabled':''}>↑</button>
+      <button class="btn btn-ghost btn-sm" onclick="moveField(${i},1)" ${i===fields.length-1?'disabled':''}>↓</button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="removeField(${i})">✕</button>
+    </div>
+    ${needsOptions(f.type)?`<div style="margin-top:10px;"><label style="font-size:.78rem;color:var(--gray-400);">Options (one per line)</label>
+      <textarea oninput="fldOptions(${i},this.value)" rows="3" placeholder="Option A\nOption B">${esc(optionsToText(f.options))}</textarea></div>`:''}
+  </div>`).join('');
+}
+function fld(i,k,v){ fields[i][k]=v; if(k==='type') renderFields(); }
+function fldOptions(i,text){ fields[i].options=text.split(/\n/).map(s=>s.trim()).filter(Boolean).map(l=>({value:slug(l),label:l})); }
+function optionsToText(opts){ return (opts||[]).map(o=>o.label).join('\n'); }
+function addField(){ const t=document.getElementById('fm-add-type').value; fields.push({key:'',type:t,label:'',required:false,options:[]}); renderFields(); }
+function removeField(i){ fields.splice(i,1); renderFields(); }
+function moveField(i,d){ const j=i+d; if(j<0||j>=fields.length) return; const t=fields[i]; fields[i]=fields[j]; fields[j]=t; renderFields(); }
+
+function slug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40)||'field'; }
+
+async function saveForm(){
+  const name=document.getElementById('fm-name').value.trim();
+  if(!name){ showErr('Form name is required.'); return; }
+  // finalize keys (unique) + drop empty-label fields
+  const seen={}; const out=[];
+  for(const f of fields){
+    if(!f.label || !f.label.trim()) continue;
+    let k=f.key||slug(f.label); while(seen[k]) k=k+'_2'; seen[k]=1;
+    out.push({key:k,type:f.type,label:f.label.trim(),required:!!f.required,options:needsOptions(f.type)?(f.options||[]):undefined});
+  }
+  const body={ name, description:document.getElementById('fm-desc').value||null,
+    active:document.getElementById('fm-active').value==='1', schema_json:{fields:out} };
+  if(editId) body.id=editId;
+  const btn=document.getElementById('fm-save'); btn.disabled=true; btn.textContent='Saving…';
+  try{
+    const r=await fetch('/api/forms',{method:editId?'PUT':'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify(body)});
+    if(!r.ok){ showErr((await r.json()).error||'Save failed'); return; }
+    showToast(editId?'Form updated':'Form created'); await load(); backToList();
+  }catch(e){ showErr(e.message); }
+  finally{ btn.disabled=false; btn.textContent='Save Form'; }
+}
+async function delForm(id){
+  if(!confirm('Delete this form? It will be removed from any events using it.')) return;
+  try{ await fetch(`/api/forms?id=${id}`,{method:'DELETE',headers:auth()}); showToast('Form deleted'); load(); }
+  catch(e){ showToast('Error: '+e.message); }
+}
+
+function showErr(m){ const e=document.getElementById('fm-err'); e.textContent=m; e.style.display=''; }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>
