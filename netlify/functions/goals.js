@@ -27,7 +27,7 @@ exports.handler = async (event, context) => {
     try {
       const r = await db.query(
         `INSERT INTO goals (participant_id,coach_id,title,description,category,target_date)
-         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+         OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,$6)`,
         [participant_id, coach_id||null, title, description||null,
          category||'other', target_date||null]
       );
@@ -46,7 +46,8 @@ exports.handler = async (event, context) => {
            category=COALESCE($4,category), target_date=COALESCE($5,target_date),
            status=COALESCE($6,status), progress_notes=COALESCE($7,progress_notes),
            updated_at=NOW()
-         WHERE id=$1 RETURNING *`,
+         OUTPUT INSERTED.*
+         WHERE id=$1`,
         [id, title||null, description||null, category||null,
          target_date||null, status||null, progress_notes||null]
       );

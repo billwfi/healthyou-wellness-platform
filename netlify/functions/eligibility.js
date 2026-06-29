@@ -20,11 +20,11 @@ exports.handler = async (event, context) => {
     const params = search ? [qs.org_id, `%${search}%`] : [qs.org_id];
     try {
       const [countR, dataR, statsR] = await Promise.all([
-        db.query(`SELECT COUNT(*) FROM eligibility WHERE org_id=$1 ${cond}`, params),
+        db.query(`SELECT COUNT(*) AS count FROM eligibility WHERE org_id=$1 ${cond}`, params),
         db.query(
           `SELECT * FROM eligibility WHERE org_id=$1 ${cond}
            ORDER BY last_name, first_name
-           LIMIT $${params.length+1} OFFSET $${params.length+2}`,
+           OFFSET $${params.length+2} ROWS FETCH NEXT $${params.length+1} ROWS ONLY`,
           [...params, limit, offset]
         ),
         db.query(
@@ -55,43 +55,40 @@ exports.handler = async (event, context) => {
     if (!org_id)                               return badRequest('org_id required');
     if (!Array.isArray(records) || !records.length) return badRequest('records array required');
 
-    const client = await db.connect();
     try {
-      await client.query('BEGIN');
-      await client.query('DELETE FROM eligibility WHERE org_id=$1', [org_id]);
-      let inserted = 0;
-      for (const r of records) {
-        const first = (r.first_name || '').trim();
-        const last  = (r.last_name  || '').trim();
-        if (!first && !last) continue;
-        await client.query(
-          `INSERT INTO eligibility
-             (org_id,employee_id,first_name,last_name,email,date_of_birth,
-              department,location,status,coverage_tier,effective_date,termination_date)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-          [
-            org_id,
-            r.employee_id    || null,
-            first            || null,
-            last             || null,
-            r.email          || null,
-            r.date_of_birth  || null,
-            r.department     || null,
-            r.location       || null,
-            r.status         || 'active',
-            r.coverage_tier  || null,
-            r.effective_date || null,
-            r.termination_date || null,
-          ]
-        );
-        inserted++;
-      }
-      await client.query('COMMIT');
+      const inserted = await db.withTransaction(async (q) => {
+        await q('DELETE FROM eligibility WHERE org_id=$1', [org_id]);
+        let n = 0;
+        for (const r of records) {
+          const first = (r.first_name || '').trim();
+          const last  = (r.last_name  || '').trim();
+          if (!first && !last) continue;
+          await q(
+            `INSERT INTO eligibility
+               (org_id,employee_id,first_name,last_name,email,date_of_birth,
+                department,location,status,coverage_tier,effective_date,termination_date)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+            [
+              org_id,
+              r.employee_id    || null,
+              first            || null,
+              last             || null,
+              r.email          || null,
+              r.date_of_birth  || null,
+              r.department     || null,
+              r.location       || null,
+              r.status         || 'active',
+              r.coverage_tier  || null,
+              r.effective_date || null,
+              r.termination_date || null,
+            ]
+          );
+          n++;
+        }
+        return n;
+      });
       return ok({ replaced: true, inserted });
-    } catch (e) {
-      await client.query('ROLLBACK');
-      return serverError(e);
-    } finally { client.release(); }
+    } catch (e) { return serverError(e); }
   }
 
   if (event.httpMethod === 'DELETE') {

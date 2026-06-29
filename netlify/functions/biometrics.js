@@ -60,10 +60,10 @@ exports.handler = async (event, context) => {
               WHERE br.event_id=$1 ORDER BY p.last_name`;
         vals = [qs.event_id];
       } else {
-        q = `SELECT br.*, p.first_name, p.last_name
+        q = `SELECT TOP 100 br.*, p.first_name, p.last_name
                FROM biometric_results br
                JOIN participants p ON p.id=br.participant_id
-              ORDER BY br.screened_at DESC LIMIT 100`;
+              ORDER BY br.screened_at DESC`;
       }
       const r = await db.query(q, vals);
       return ok(r.rows);
@@ -106,8 +106,8 @@ exports.handler = async (event, context) => {
             total_cholesterol,hdl_cholesterol,ldl_cholesterol,triglycerides,cholesterol_ratio,
             blood_glucose,hba1c,
             bp_risk,cholesterol_risk,glucose_risk,bmi_category,overall_risk,notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
-         RETURNING *`,
+         OUTPUT INSERTED.*
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
         [participant_id, event_id||null, screened_by||null,
          screened_at||new Date().toISOString(),
          height_in||null, weight_lbs||null, bmi,

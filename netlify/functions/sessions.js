@@ -39,7 +39,7 @@ exports.handler = async (event, context) => {
     try {
       const r = await db.query(
         `INSERT INTO coaching_sessions (participant_id,coach_id,scheduled_at,duration_minutes,session_type,intake_notes)
-         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+         OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,$6)`,
         [participant_id, coach_id||null, scheduled_at,
          duration_minutes||60, session_type||'initial', intake_notes||null]
       );
@@ -53,7 +53,7 @@ exports.handler = async (event, context) => {
     if (!id || !status) return badRequest('id and status required');
     try {
       const r = await db.query(
-        'UPDATE coaching_sessions SET status=$2 WHERE id=$1 RETURNING *', [id, status]
+        'UPDATE coaching_sessions SET status=$2 OUTPUT INSERTED.* WHERE id=$1', [id, status]
       );
       if (!r.rows.length) return notFound();
       return ok(r.rows[0]);

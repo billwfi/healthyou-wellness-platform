@@ -12,7 +12,7 @@ exports.handler = async (event, context) => {
     if (!org) return badRequest('org slug required');
     try {
       const { rows } = await db.query(
-        'SELECT id, name, slug FROM organizations WHERE slug=$1 AND active=true', [org]
+        'SELECT id, name, slug FROM organizations WHERE slug=$1 AND active=1', [org]
       );
       if (!rows.length) return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'Organization not found' }) };
       return ok(rows[0]);
@@ -43,13 +43,16 @@ exports.handler = async (event, context) => {
 
       // Upsert participant by email
       const { rows: ptRows } = await db.query(
-        `INSERT INTO participants (email, first_name, last_name, org_id)
-         VALUES ($1,$2,$3,$4)
-         ON CONFLICT (email) DO UPDATE SET
-           first_name = EXCLUDED.first_name,
-           last_name  = EXCLUDED.last_name,
-           org_id     = COALESCE(EXCLUDED.org_id, participants.org_id)
-         RETURNING id`,
+        `MERGE participants AS t
+         USING (SELECT $1 AS email, $2 AS first_name, $3 AS last_name, $4 AS org_id) AS s
+         ON t.email = s.email
+         WHEN MATCHED THEN UPDATE SET
+           first_name = s.first_name,
+           last_name  = s.last_name,
+           org_id     = COALESCE(s.org_id, t.org_id)
+         WHEN NOT MATCHED THEN INSERT (email, first_name, last_name, org_id)
+           VALUES (s.email, s.first_name, s.last_name, s.org_id)
+         OUTPUT INSERTED.id;`,
         [email.trim().toLowerCase(), first_name.trim(), last_name.trim(), org_id]
       );
       const participant_id = ptRows[0].id;
@@ -58,7 +61,7 @@ exports.handler = async (event, context) => {
       const { rows: sessionRows } = await db.query(
         `INSERT INTO coaching_sessions
            (participant_id, coach_id, scheduled_at, duration_minutes, session_type, intake_notes)
-         VALUES ($1,$2,$3,$4,'initial',$5) RETURNING *`,
+         OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,'initial',$5)`,
         [participant_id, coach_id || null, scheduled_at, duration_minutes || 60, intake_notes || null]
       );
 

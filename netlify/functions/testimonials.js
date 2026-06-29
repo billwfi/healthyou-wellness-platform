@@ -34,7 +34,7 @@ exports.handler = async (event, context) => {
       if (!b.participant_name) return badRequest('participant_name is required');
       const r = await db.query(`
         INSERT INTO testimonials (participant_name, organization, title_role, status, quote, outcome, photo_url, rating, featured, sort_order)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+        OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
         [b.participant_name, b.organization||null, b.title_role||null, b.status||'draft',
          b.quote||null, b.outcome||null, b.photo_url||null, b.rating||null,
          b.featured||false, b.sort_order||0]
@@ -49,7 +49,8 @@ exports.handler = async (event, context) => {
           participant_name=$1, organization=$2, title_role=$3, status=$4,
           quote=$5, outcome=$6, photo_url=$7, rating=$8, featured=$9, sort_order=$10,
           updated_at=NOW()
-        WHERE id=$11 RETURNING *`,
+        OUTPUT INSERTED.*
+        WHERE id=$11`,
         [b.participant_name, b.organization||null, b.title_role||null, b.status||'draft',
          b.quote||null, b.outcome||null, b.photo_url||null, b.rating||null,
          b.featured||false, b.sort_order||0, id]

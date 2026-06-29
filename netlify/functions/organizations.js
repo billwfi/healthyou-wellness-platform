@@ -21,12 +21,12 @@ exports.handler = async (event, context) => {
     if (!name || !slug) return badRequest('name and slug are required');
     try {
       const r = await db.query(
-        'INSERT INTO organizations (name,slug,contact_name,contact_email) VALUES ($1,$2,$3,$4) RETURNING *',
+        'INSERT INTO organizations (name,slug,contact_name,contact_email) OUTPUT INSERTED.* VALUES ($1,$2,$3,$4)',
         [name, slug.toLowerCase().replace(/\s+/g,'-'), contact_name||null, contact_email||null]
       );
       return created(r.rows[0]);
     } catch (e) {
-      if (e.code==='23505') return badRequest('Slug already exists');
+      if (e.number===2627 || e.number===2601) return badRequest('Slug already exists');
       return serverError(e);
     }
   }
@@ -40,7 +40,8 @@ exports.handler = async (event, context) => {
         `UPDATE organizations SET
            name=COALESCE($2,name), contact_name=COALESCE($3,contact_name),
            contact_email=COALESCE($4,contact_email), active=COALESCE($5,active)
-         WHERE id=$1 RETURNING *`,
+         OUTPUT INSERTED.*
+         WHERE id=$1`,
         [id, name||null, contact_name||null, contact_email||null, active??null]
       );
       if (!r.rows.length) return notFound();

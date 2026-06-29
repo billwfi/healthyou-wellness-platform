@@ -1,4 +1,4 @@
-const { getPool } = require('./_db');
+const { getPool, parseJson } = require('./_db');
 const { getUser, ok, badRequest, unauthorized, notFound, serverError, options } = require('./_auth');
 
 // Read-only API over the Umbraco content imported from cosreachyourpeak.com.
@@ -25,7 +25,7 @@ exports.handler = async (event, context) => {
     if (isItem) {
       const r = await db.query('SELECT * FROM umbraco_content WHERE umb_id=$1', [last]);
       if (!r.rows.length) return notFound();
-      return ok(r.rows[0]);
+      return ok(parseJson(r.rows[0], ['properties', 'raw']));
     }
 
     const qs = event.queryStringParameters || {};

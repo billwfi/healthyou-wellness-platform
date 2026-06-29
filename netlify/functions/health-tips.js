@@ -1,4 +1,4 @@
-const { getPool } = require('./_db');
+const { getPool, parseJson } = require('./_db');
 const { getUser, ok, badRequest, unauthorized, notFound, serverError, options } = require('./_auth');
 
 exports.handler = async (event, context) => {
@@ -17,7 +17,7 @@ exports.handler = async (event, context) => {
       if (isItem) {
         const r = await db.query('SELECT * FROM health_tips WHERE id=$1', [id]);
         if (!r.rows.length) return notFound();
-        return ok(r.rows[0]);
+        return ok(parseJson(r.rows[0], ['tags']));
       }
       const qs = event.queryStringParameters || {};
       let q = 'SELECT * FROM health_tips WHERE 1=1';
@@ -26,7 +26,7 @@ exports.handler = async (event, context) => {
       if (qs.category) { params.push(qs.category); q += ` AND category=$${params.length}`; }
       q += ' ORDER BY created_at DESC';
       const r = await db.query(q, params);
-      return ok(r.rows);
+      return ok(parseJson(r.rows, ['tags']));
     }
 
     if (event.httpMethod === 'POST') {
@@ -34,13 +34,13 @@ exports.handler = async (event, context) => {
       if (!b.title) return badRequest('title is required');
       const r = await db.query(`
         INSERT INTO health_tips (title, category, status, author, read_time_minutes, summary, content, image_url, tags, published_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+        OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
         [b.title, b.category||'general', b.status||'draft', b.author||null,
          b.read_time_minutes||null, b.summary||null, b.content||null, b.image_url||null,
          JSON.stringify(b.tags||[]),
          b.status === 'published' ? new Date() : null]
       );
-      return ok(r.rows[0]);
+      return ok(parseJson(r.rows[0], ['tags']));
     }
 
     if (event.httpMethod === 'PUT' && isItem) {
@@ -54,12 +54,13 @@ exports.handler = async (event, context) => {
         UPDATE health_tips SET
           title=$1, category=$2, status=$3, author=$4, read_time_minutes=$5,
           summary=$6, content=$7, image_url=$8, tags=$9, published_at=$10, updated_at=NOW()
-        WHERE id=$11 RETURNING *`,
+        OUTPUT INSERTED.*
+        WHERE id=$11`,
         [b.title, b.category||'general', b.status||'draft', b.author||null,
          b.read_time_minutes||null, b.summary||null, b.content||null, b.image_url||null,
          JSON.stringify(b.tags||[]), publishedAt, id]
       );
-      return ok(r.rows[0]);
+      return ok(parseJson(r.rows[0], ['tags']));
     }
 
     if (event.httpMethod === 'DELETE' && isItem) {

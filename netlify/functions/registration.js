@@ -40,18 +40,23 @@ exports.handler = async (event, context) => {
       const org_id = evRes.rows[0].org_id;
 
       const pRes = await db.query(
-        `INSERT INTO participants (email,first_name,last_name,org_id,employee_id,date_of_birth,gender,phone,department)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-         ON CONFLICT (email) DO UPDATE SET first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name
-         RETURNING id`,
+        `MERGE participants AS t
+         USING (SELECT $1 AS email, $2 AS first_name, $3 AS last_name, $4 AS org_id,
+                       $5 AS employee_id, $6 AS date_of_birth, $7 AS gender, $8 AS phone, $9 AS department) AS s
+         ON t.email = s.email
+         WHEN MATCHED THEN UPDATE SET first_name=s.first_name, last_name=s.last_name
+         WHEN NOT MATCHED THEN INSERT
+           (email,first_name,last_name,org_id,employee_id,date_of_birth,gender,phone,department)
+           VALUES (s.email,s.first_name,s.last_name,s.org_id,s.employee_id,s.date_of_birth,s.gender,s.phone,s.department)
+         OUTPUT INSERTED.id;`,
         [email.toLowerCase().trim(), first_name.trim(), last_name.trim(),
          org_id||null, employee_id||null, date_of_birth||null, gender||null, phone||null, department||null]
       );
 
       await db.query(
         `INSERT INTO event_registrations (event_id,participant_id,registration_source,status)
-         VALUES ($1,$2,'self','registered')
-         ON CONFLICT (event_id,participant_id) DO NOTHING`,
+         SELECT $1,$2,'self','registered'
+         WHERE NOT EXISTS (SELECT 1 FROM event_registrations WHERE event_id=$1 AND participant_id=$2)`,
         [event_id, pRes.rows[0].id]
       );
       return ok({ registered: true, participant_id: pRes.rows[0].id });

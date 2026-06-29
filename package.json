@@ -4,9 +4,14 @@
   "description": "HealYou Wellness Platform — Health Coaching & Biometric Screening",
   "private": true,
   "scripts": {
-    "import:umbraco": "node scripts/import-umbraco.js"
+    "import:umbraco": "node scripts/import-umbraco.js",
+    "db:setup": "node scripts/setup-sqlserver-schema.js",
+    "db:migrate": "node scripts/migrate-pg-to-sqlserver.js"
   },
   "dependencies": {
+    "mssql": "^11.0.1"
+  },
+  "devDependencies": {
     "pg": "^8.13.3"
   }
 }

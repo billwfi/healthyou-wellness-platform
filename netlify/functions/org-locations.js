@@ -14,11 +14,10 @@ exports.handler = async (event, context) => {
     try {
       const r = await db.query(
         `SELECT l.*,
-                COUNT(d.id) FILTER (WHERE d.active=true) AS department_count
+                (SELECT COUNT(*) FROM departments d
+                  WHERE d.location_id = l.id AND d.active = 1) AS department_count
            FROM org_locations l
-           LEFT JOIN departments d ON d.location_id = l.id
           WHERE l.org_id=$1
-          GROUP BY l.id
           ORDER BY l.name`,
         [qs.org_id]
       );
@@ -33,7 +32,7 @@ exports.handler = async (event, context) => {
     try {
       const r = await db.query(
         `INSERT INTO org_locations (org_id, name, address, city, state, zip, phone, location_type)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+         OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [org_id, name, address || null, city || null, state || null,
          zip || null, phone || null, location_type || 'office']
       );
@@ -52,7 +51,8 @@ exports.handler = async (event, context) => {
            city=COALESCE($4,city), state=COALESCE($5,state),
            zip=COALESCE($6,zip), phone=COALESCE($7,phone),
            location_type=COALESCE($8,location_type), active=COALESCE($9,active)
-         WHERE id=$1 RETURNING *`,
+         OUTPUT INSERTED.*
+         WHERE id=$1`,
         [id, name || null, address || null, city || null, state || null,
          zip || null, phone || null, location_type || null, active ?? null]
       );

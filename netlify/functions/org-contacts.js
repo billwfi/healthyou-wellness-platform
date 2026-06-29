@@ -27,7 +27,7 @@ exports.handler = async (event, context) => {
     try {
       const r = await db.query(
         `INSERT INTO org_contacts (org_id, name, title, email, phone, role)
-         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+         OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,$6)`,
         [org_id, name, title || null, email || null, phone || null, role || 'contact']
       );
       return created(r.rows[0]);
@@ -44,7 +44,8 @@ exports.handler = async (event, context) => {
            name=COALESCE($2,name), title=COALESCE($3,title),
            email=COALESCE($4,email), phone=COALESCE($5,phone),
            role=COALESCE($6,role), active=COALESCE($7,active)
-         WHERE id=$1 RETURNING *`,
+         OUTPUT INSERTED.*
+         WHERE id=$1`,
         [id, name || null, title || null, email || null, phone || null, role || null, active ?? null]
       );
       if (!r.rows.length) return notFound();

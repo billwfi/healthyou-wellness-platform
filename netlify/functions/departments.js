@@ -27,7 +27,7 @@ exports.handler = async (event, context) => {
     try {
       const r = await db.query(
         `INSERT INTO departments (location_id, name, code)
-         VALUES ($1,$2,$3) RETURNING *`,
+         OUTPUT INSERTED.* VALUES ($1,$2,$3)`,
         [location_id, name, code || null]
       );
       return created(r.rows[0]);
@@ -43,7 +43,8 @@ exports.handler = async (event, context) => {
         `UPDATE departments SET
            name=COALESCE($2,name), code=COALESCE($3,code),
            active=COALESCE($4,active)
-         WHERE id=$1 RETURNING *`,
+         OUTPUT INSERTED.*
+         WHERE id=$1`,
         [id, name || null, code || null, active ?? null]
       );
       if (!r.rows.length) return notFound();

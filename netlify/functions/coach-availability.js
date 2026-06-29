@@ -7,6 +7,17 @@ exports.handler = async (event, context) => {
   const db = getPool();
   const qs = event.queryStringParameters || {};
 
+  // SQL Server returns TIME columns as JS Date objects; coerce to 'HH:MM:SS'
+  // strings so the API matches the old PostgreSQL behaviour.
+  const fmtTimes = rows => {
+    for (const row of (Array.isArray(rows) ? rows : [rows])) {
+      if (!row) continue;
+      if (row.start_time instanceof Date) row.start_time = row.start_time.toISOString().substr(11, 8);
+      if (row.end_time   instanceof Date) row.end_time   = row.end_time.toISOString().substr(11, 8);
+    }
+    return rows;
+  };
+
   if (event.httpMethod === 'GET') {
     const { coach_id, admin, month } = qs;
     if (!coach_id) return badRequest('coach_id required');
@@ -25,7 +36,8 @@ exports.handler = async (event, context) => {
           WHERE coach_id=$1
             AND (
               effective_from IS NULL
-              OR DATE_TRUNC('month', effective_from)::date = DATE_TRUNC('month', $2::date)::date
+              OR DATEFROMPARTS(YEAR(effective_from), MONTH(effective_from), 1)
+                 = DATEFROMPARTS(YEAR(CAST($2 AS date)), MONTH(CAST($2 AS date)), 1)
             )
           ORDER BY day_of_week, start_time`;
         params = [coach_id, firstOfMonth];
@@ -34,7 +46,7 @@ exports.handler = async (event, context) => {
         // month param not used here; booking page always passes a date via available-slots instead
         query = `
           SELECT * FROM coach_availability
-          WHERE coach_id=$1 AND active=true
+          WHERE coach_id=$1 AND active=1
           ORDER BY day_of_week, start_time`;
         params = [coach_id];
       } else {
@@ -43,7 +55,7 @@ exports.handler = async (event, context) => {
         params = [coach_id];
       }
       const r = await db.query(query, params);
-      return ok(r.rows);
+      return ok(fmtTimes(r.rows));
     } catch (e) { return serverError(e); }
   }
 
@@ -61,12 +73,12 @@ exports.handler = async (event, context) => {
       const r = await db.query(
         `INSERT INTO coach_availability
            (coach_id, day_of_week, start_time, end_time, effective_from, effective_to)
-         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+         OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,$6)`,
         [coach_id, day_of_week, start_time, end_time, effective_from, effective_to]
       );
-      return created(r.rows[0]);
+      return created(fmtTimes(r.rows[0]));
     } catch (e) {
-      if (e.code === '23505') return badRequest('That time block already exists for this period');
+      if (e.number === 2627 || e.number === 2601) return badRequest('That time block already exists for this period');
       return serverError(e);
     }
   }
@@ -81,11 +93,12 @@ exports.handler = async (event, context) => {
          SET active=COALESCE($2,active),
              start_time=COALESCE($3,start_time),
              end_time=COALESCE($4,end_time)
-         WHERE id=$1 RETURNING *`,
+         OUTPUT INSERTED.*
+         WHERE id=$1`,
         [id, active ?? null, start_time || null, end_time || null]
       );
       if (!r.rows.length) return notFound();
-      return ok(r.rows[0]);
+      return ok(fmtTimes(r.rows[0]));
     } catch (e) { return serverError(e); }
   }
 

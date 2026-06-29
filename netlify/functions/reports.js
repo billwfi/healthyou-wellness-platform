@@ -13,9 +13,9 @@ exports.handler = async (event, context) => {
     const [stats, riskDist, bpAvg, recentScreenings] = await Promise.all([
       // Platform-wide counts
       db.query(`SELECT
-        (SELECT COUNT(*) FROM participants WHERE active=true)           AS total_participants,
-        (SELECT COUNT(*) FROM coaches WHERE active=true)               AS total_coaches,
-        (SELECT COUNT(*) FROM organizations WHERE active=true)         AS total_organizations,
+        (SELECT COUNT(*) FROM participants WHERE active=1)           AS total_participants,
+        (SELECT COUNT(*) FROM coaches WHERE active=1)               AS total_coaches,
+        (SELECT COUNT(*) FROM organizations WHERE active=1)         AS total_organizations,
         (SELECT COUNT(*) FROM screening_events)                        AS total_events,
         (SELECT COUNT(*) FROM biometric_results)                       AS total_screenings,
         (SELECT COUNT(*) FROM coaching_sessions WHERE status='scheduled'
@@ -29,21 +29,21 @@ exports.handler = async (event, context) => {
 
       // Average biometrics
       db.query(`SELECT
-        ROUND(AVG(bmi)::numeric,1)              AS avg_bmi,
-        ROUND(AVG(systolic_bp)::numeric,0)      AS avg_systolic,
-        ROUND(AVG(diastolic_bp)::numeric,0)     AS avg_diastolic,
-        ROUND(AVG(total_cholesterol)::numeric,0) AS avg_cholesterol,
-        ROUND(AVG(blood_glucose)::numeric,0)    AS avg_glucose,
-        ROUND(AVG(heart_rate)::numeric,0)       AS avg_heart_rate
+        ROUND(AVG(CAST(bmi AS DECIMAL(18,4))),1)              AS avg_bmi,
+        ROUND(AVG(CAST(systolic_bp AS DECIMAL(18,4))),0)      AS avg_systolic,
+        ROUND(AVG(CAST(diastolic_bp AS DECIMAL(18,4))),0)     AS avg_diastolic,
+        ROUND(AVG(CAST(total_cholesterol AS DECIMAL(18,4))),0) AS avg_cholesterol,
+        ROUND(AVG(CAST(blood_glucose AS DECIMAL(18,4))),0)    AS avg_glucose,
+        ROUND(AVG(CAST(heart_rate AS DECIMAL(18,4))),0)       AS avg_heart_rate
         FROM biometric_results`),
 
       // Most recent 10 screenings
-      db.query(`SELECT br.screened_at, br.overall_risk, br.bmi,
+      db.query(`SELECT TOP 10 br.screened_at, br.overall_risk, br.bmi,
                        br.systolic_bp, br.diastolic_bp,
                        p.first_name, p.last_name
                   FROM biometric_results br
                   JOIN participants p ON p.id=br.participant_id
-                 ORDER BY br.screened_at DESC LIMIT 10`),
+                 ORDER BY br.screened_at DESC`),
     ]);
 
     return ok({

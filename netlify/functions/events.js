@@ -45,7 +45,7 @@ exports.handler = async (event, context) => {
     if (!name || !event_date) return badRequest('name and event_date required');
     try {
       const r = await db.query(
-        'INSERT INTO screening_events (name,event_date,org_id,location,event_type,notes) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+        'INSERT INTO screening_events (name,event_date,org_id,location,event_type,notes) OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,$6)',
         [name, event_date, org_id||null, location||null, event_type||'onsite', notes||null]
       );
       return created(r.rows[0]);
@@ -63,7 +63,8 @@ exports.handler = async (event, context) => {
            org_id=COALESCE($4,org_id), location=COALESCE($5,location),
            event_type=COALESCE($6,event_type), status=COALESCE($7,status),
            notes=COALESCE($8,notes)
-         WHERE id=$1 RETURNING *`,
+         OUTPUT INSERTED.*
+         WHERE id=$1`,
         [id, name||null, event_date||null, org_id||null, location||null,
          event_type||null, status||null, notes||null]
       );

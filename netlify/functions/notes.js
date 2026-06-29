@@ -27,21 +27,17 @@ exports.handler = async (event, context) => {
     if (!session_id) return badRequest('session_id required');
     try {
       const r = await db.query(
-        `INSERT INTO coaching_notes
+        `MERGE coaching_notes AS t
+         USING (SELECT $1 AS session_id) AS s ON t.session_id = s.session_id
+         WHEN MATCHED THEN UPDATE SET
+           stage_of_change=$3, presenting_concern=$4, client_goals=$5,
+           motivational_factors=$6, barriers=$7, action_steps=$8,
+           follow_up_plan=$9, session_notes=$10, updated_at=SYSUTCDATETIME()
+         WHEN NOT MATCHED THEN INSERT
            (session_id,coach_id,stage_of_change,presenting_concern,client_goals,
             motivational_factors,barriers,action_steps,follow_up_plan,session_notes,updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
-         ON CONFLICT (session_id) DO UPDATE SET
-           stage_of_change=EXCLUDED.stage_of_change,
-           presenting_concern=EXCLUDED.presenting_concern,
-           client_goals=EXCLUDED.client_goals,
-           motivational_factors=EXCLUDED.motivational_factors,
-           barriers=EXCLUDED.barriers,
-           action_steps=EXCLUDED.action_steps,
-           follow_up_plan=EXCLUDED.follow_up_plan,
-           session_notes=EXCLUDED.session_notes,
-           updated_at=NOW()
-         RETURNING *`,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,SYSUTCDATETIME())
+         OUTPUT INSERTED.*;`,
         [session_id, coach_id||null, stage_of_change||null, presenting_concern||null,
          client_goals||null, motivational_factors||null, barriers||null,
          action_steps||null, follow_up_plan||null, session_notes||null]

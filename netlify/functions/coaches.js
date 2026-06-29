@@ -8,7 +8,7 @@ exports.handler = async (event, context) => {
   if (event.httpMethod === 'GET' && !event.queryStringParameters?.admin) {
     try {
       const r = await getPool().query(
-        'SELECT id,name,bio,specialty,avatar_url,phone FROM coaches WHERE active=true ORDER BY name'
+        'SELECT id,name,bio,specialty,avatar_url,phone FROM coaches WHERE active=1 ORDER BY name'
       );
       return ok(r.rows);
     } catch (e) { return serverError(e); }
@@ -33,12 +33,12 @@ exports.handler = async (event, context) => {
     try {
       const r = await db.query(
         `INSERT INTO coaches (name,email,bio,specialty,phone,avatar_url)
-         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+         OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,$6)`,
         [name.trim(), email.trim().toLowerCase(), bio||null, specialty||null, phone||null, avatar_url||null]
       );
       return created(r.rows[0]);
     } catch (e) {
-      if (e.code==='23505') return badRequest('Email already exists');
+      if (e.number===2627 || e.number===2601) return badRequest('Email already exists');
       return serverError(e);
     }
   }
@@ -65,7 +65,7 @@ exports.handler = async (event, context) => {
         params.push(b.avatar_url ?? null);
       }
       const r = await db.query(
-        `UPDATE coaches SET ${sets.join(',')} WHERE id=$1 RETURNING *`, params
+        `UPDATE coaches SET ${sets.join(',')} OUTPUT INSERTED.* WHERE id=$1`, params
       );
       if (!r.rows.length) return notFound();
       return ok(r.rows[0]);

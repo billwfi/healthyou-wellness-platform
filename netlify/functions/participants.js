@@ -1,4 +1,4 @@
-const { getPool } = require('./_db');
+const { getPool, parseJson } = require('./_db');
 const { getUser, ok, created, badRequest, unauthorized, notFound, serverError, options } = require('./_auth');
 
 exports.handler = async (event, context) => {
@@ -16,12 +16,12 @@ exports.handler = async (event, context) => {
         const r = await db.query(
           `SELECT p.*, o.name AS org_name,
                   c.name AS coach_name,
-                  (SELECT json_agg(br ORDER BY br.screened_at DESC)
-                     FROM biometric_results br WHERE br.participant_id=p.id) AS biometrics,
-                  (SELECT json_agg(g ORDER BY g.created_at DESC)
-                     FROM goals g WHERE g.participant_id=p.id) AS goals,
-                  (SELECT json_agg(cs ORDER BY cs.scheduled_at DESC)
-                     FROM coaching_sessions cs WHERE cs.participant_id=p.id) AS sessions
+                  (SELECT * FROM biometric_results br WHERE br.participant_id=p.id
+                     ORDER BY br.screened_at DESC FOR JSON PATH) AS biometrics,
+                  (SELECT * FROM goals g WHERE g.participant_id=p.id
+                     ORDER BY g.created_at DESC FOR JSON PATH) AS goals,
+                  (SELECT * FROM coaching_sessions cs WHERE cs.participant_id=p.id
+                     ORDER BY cs.scheduled_at DESC FOR JSON PATH) AS sessions
              FROM participants p
              LEFT JOIN organizations o ON o.id=p.org_id
              LEFT JOIN coaches c ON c.id=p.assigned_coach_id
@@ -29,7 +29,12 @@ exports.handler = async (event, context) => {
           [qs.id]
         );
         if (!r.rows.length) return notFound();
-        return ok(r.rows[0]);
+        const row = r.rows[0];
+        parseJson(row, ['biometrics', 'goals', 'sessions']);
+        row.biometrics = row.biometrics || [];
+        row.goals      = row.goals || [];
+        row.sessions   = row.sessions || [];
+        return ok(row);
       } catch (e) { return serverError(e); }
     }
 
@@ -39,7 +44,7 @@ exports.handler = async (event, context) => {
       const vals = [];
       if (qs.org_id)   { conditions.push(`p.org_id=$${vals.push(qs.org_id)}`); }
       if (qs.coach_id) { conditions.push(`p.assigned_coach_id=$${vals.push(qs.coach_id)}`); }
-      if (qs.search)   { conditions.push(`(p.first_name||' '||p.last_name ILIKE $${vals.push('%'+qs.search+'%')} OR p.email ILIKE $${vals.length})`); }
+      if (qs.search)   { conditions.push(`(CONCAT(p.first_name,' ',p.last_name) ILIKE $${vals.push('%'+qs.search+'%')} OR p.email ILIKE $${vals.length})`); }
       if (qs.active !== undefined) { conditions.push(`p.active=$${vals.push(qs.active==='true')}`); }
 
       const r = await db.query(
@@ -68,7 +73,7 @@ exports.handler = async (event, context) => {
         `INSERT INTO participants
            (email,first_name,last_name,org_id,assigned_coach_id,
             date_of_birth,gender,phone,employee_id,department)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+         OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
         [email.toLowerCase().trim(), first_name.trim(), last_name.trim(),
          org_id||null, assigned_coach_id||null,
          date_of_birth||null, gender||null, phone||null,
@@ -76,7 +81,7 @@ exports.handler = async (event, context) => {
       );
       return created(r.rows[0]);
     } catch (e) {
-      if (e.code==='23505') return badRequest('Email already registered');
+      if (e.number===2627 || e.number===2601) return badRequest('Email already registered');
       return serverError(e);
     }
   }
@@ -95,7 +100,8 @@ exports.handler = async (event, context) => {
            date_of_birth=COALESCE($7,date_of_birth), gender=COALESCE($8,gender),
            phone=COALESCE($9,phone), employee_id=COALESCE($10,employee_id),
            department=COALESCE($11,department), active=COALESCE($12,active)
-         WHERE id=$1 RETURNING *`,
+         OUTPUT INSERTED.*
+         WHERE id=$1`,
         [id, first_name||null, last_name||null, email?.toLowerCase()||null,
          org_id||null, assigned_coach_id||null, date_of_birth||null,
          gender||null, phone||null, employee_id||null, department||null, active??null]
