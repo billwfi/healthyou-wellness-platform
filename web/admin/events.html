@@ -427,7 +427,7 @@ function renderList() {
         <td style="font-size:.84rem;">${eventDateRange(e)||'—'}</td>
         <td>${esc(e.org_name||'—')}</td>
         <td style="text-align:center;font-weight:600;">${e.location_count||0}</td>
-        <td style="text-align:center;font-weight:600;">${e.registered_count||0}</td>
+        <td style="text-align:center;font-weight:600;">${e.booked_count||0}</td>
         <td>
           <select onchange="updateStatus(${e.id},this.value)" class="btn btn-ghost btn-sm" style="padding:3px 8px;">
             ${STATUS_OPTS.map(s=>`<option value="${s}"${s===e.status?' selected':''}>${s.replace('_',' ')}</option>`).join('')}
@@ -453,7 +453,7 @@ function openEvent(id) {
   const meta=[]; if(dr) meta.push(dr); if(activeEvent.org_name) meta.push(activeEvent.org_name);
   document.getElementById('ev-meta').textContent=meta.join(' · ');
 
-  document.getElementById('ov-registered').textContent=activeEvent.registered_count||0;
+  document.getElementById('ov-registered').textContent=activeEvent.booked_count||0;
   document.getElementById('ov-screened').textContent=activeEvent.screened_count||0;
   document.getElementById('ov-date').textContent=dr||'—';
   const lc=activeEvent.location_count||0;
@@ -627,7 +627,7 @@ async function uploadPtCSV() {
     ptParsed=[]; ptLoaded=false; loadParticipants(0);
     const updEvts=await fetch('/api/events',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
     events=updEvts; const ae=events.find(e=>e.id===activeEvent.id);
-    if(ae){ activeEvent=ae; document.getElementById('ov-registered').textContent=ae.registered_count||0; }
+    if(ae){ activeEvent=ae; document.getElementById('ov-registered').textContent=ae.booked_count||0; }
   } catch(e){showToast('Error: '+e.message);}
   finally{btn.disabled=false; btn.textContent='Upload Participants';}
 }

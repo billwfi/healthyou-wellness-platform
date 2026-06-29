@@ -8,7 +8,8 @@ const SELECT = `
   SELECT e.*, o.GroupName AS org_name,
          (SELECT COUNT(*) FROM event_locations el WHERE el.event_id=e.id)        AS location_count,
          (SELECT COUNT(*) FROM biometric_results br WHERE br.event_id=e.id)       AS screened_count,
-         (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id=e.id)     AS registered_count
+         (SELECT COUNT(*) FROM event_registrations er WHERE er.event_id=e.id)     AS registered_count,
+         (SELECT COUNT(*) FROM event_appointments ea WHERE ea.event_id=e.id AND ea.status='registered') AS booked_count
     FROM screening_events e
     LEFT JOIN iStrata.dbo.is_groups o ON o.id=e.org_id`;
 

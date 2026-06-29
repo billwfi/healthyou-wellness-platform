@@ -589,3 +589,55 @@ CREATE TABLE dbo.event_forms (
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_event_forms_form') CREATE INDEX idx_event_forms_form ON dbo.event_forms(form_id);
 GO
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- Public registration: an appointment booked at a specific event LOCATION + time,
+-- with the answers to the event's assigned forms and any uploaded files.
+-- ════════════════════════════════════════════════════════════════════════════
+IF OBJECT_ID('dbo.event_appointments','U') IS NULL
+CREATE TABLE dbo.event_appointments (
+  id               INT IDENTITY(1,1) PRIMARY KEY,
+  event_id         INT NOT NULL,
+  location_id      INT NOT NULL,
+  first_name       NVARCHAR(100) NOT NULL,
+  last_name        NVARCHAR(100) NOT NULL,
+  email            NVARCHAR(255),
+  phone            NVARCHAR(30),
+  appointment_date DATE,
+  appointment_time TIME,
+  status           NVARCHAR(20) DEFAULT 'registered',   -- registered | cancelled
+  magic_token      NVARCHAR(64),                        -- cancel/reschedule (Phase 4)
+  created_at       DATETIME2(3) DEFAULT SYSUTCDATETIME()
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_appt_event') CREATE INDEX idx_appt_event ON dbo.event_appointments(event_id);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_appt_slot')  CREATE INDEX idx_appt_slot  ON dbo.event_appointments(location_id, appointment_date, appointment_time, status);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='uq_appt_token')  CREATE UNIQUE INDEX uq_appt_token ON dbo.event_appointments(magic_token) WHERE magic_token IS NOT NULL;
+GO
+
+IF OBJECT_ID('dbo.event_appointment_answers','U') IS NULL
+CREATE TABLE dbo.event_appointment_answers (
+  id             INT IDENTITY(1,1) PRIMARY KEY,
+  appointment_id INT NOT NULL,
+  form_id        INT,
+  answers_json   NVARCHAR(MAX)
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_appt_ans_appt') CREATE INDEX idx_appt_ans_appt ON dbo.event_appointment_answers(appointment_id);
+GO
+
+IF OBJECT_ID('dbo.event_appointment_documents','U') IS NULL
+CREATE TABLE dbo.event_appointment_documents (
+  id             INT IDENTITY(1,1) PRIMARY KEY,
+  appointment_id INT NOT NULL,
+  field_key      NVARCHAR(100),
+  file_name      NVARCHAR(400),
+  content_type   NVARCHAR(200),
+  content        VARBINARY(MAX),
+  uploaded_at    DATETIME2(3) DEFAULT SYSUTCDATETIME()
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_appt_doc_appt') CREATE INDEX idx_appt_doc_appt ON dbo.event_appointment_documents(appointment_id);
+GO

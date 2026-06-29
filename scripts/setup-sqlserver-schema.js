@@ -49,6 +49,11 @@ const FKS = [
   // Forms
   ['fk_event_forms_event',       'event_forms', 'event_id',        'screening_events', 'id', 'CASCADE'],
   ['fk_event_forms_form',        'event_forms', 'form_id',         'forms',            'id', 'CASCADE'],
+  // Public registration appointments
+  ['fk_appt_event',              'event_appointments', 'event_id',  'screening_events', 'id', 'CASCADE'],
+  ['fk_appt_location',           'event_appointments', 'location_id','event_locations', 'id', 'NO ACTION'],
+  ['fk_appt_ans_appt',           'event_appointment_answers', 'appointment_id','event_appointments','id','CASCADE'],
+  ['fk_appt_doc_appt',           'event_appointment_documents','appointment_id','event_appointments','id','CASCADE'],
 ];
 
 (async () => {

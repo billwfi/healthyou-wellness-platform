@@ -2,139 +2,259 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Register for Health Screening — HealYou</title>
+  <title>Register — HealYou Screening</title>
   <link rel="stylesheet" href="/assets/css/style.css"/>
+  <style>
+    .wiz { max-width: 720px; margin: 0 auto; }
+    .stepper { display:flex; gap:6px; margin:20px 0 24px; flex-wrap:wrap; }
+    .stepper .s { flex:1; min-width:60px; text-align:center; font-size:.72rem; color:var(--gray-400); padding-bottom:6px; border-bottom:3px solid var(--gray-200); }
+    .stepper .s.active { color:var(--teal); border-bottom-color:var(--teal); font-weight:600; }
+    .stepper .s.done { color:var(--teal); border-bottom-color:var(--teal); }
+    .loc-opt { border:1px solid var(--gray-200); border-radius:10px; padding:14px 16px; margin-bottom:10px; cursor:pointer; }
+    .loc-opt:hover { border-color:var(--teal); }
+    .loc-opt.sel { border-color:var(--teal); box-shadow:0 0 0 1px var(--teal) inset; background:var(--teal-bg); }
+    .slot { display:inline-block; margin:4px; }
+    .slot button { min-width:74px; }
+    .map { width:100%; height:240px; border:0; border-radius:10px; margin-top:12px; }
+    .nav { display:flex; justify-content:space-between; margin-top:24px; }
+  </style>
 </head>
 <body>
 <header class="header">
-  <a class="header-logo" href="/"><img src="/assets/img/hylogo.png" alt="Healthyou"></a>
+  <a class="header-logo" href="/"><img src="/assets/img/hylogo.png" alt="HealthYou"></a>
+  <span style="font-size:.8rem;opacity:.85;">Screening Registration</span>
 </header>
-<main class="container" style="padding-top:40px;">
-  <div id="loading" style="text-align:center;padding:80px 0;color:var(--gray-400);">Loading event information…</div>
+<main class="container" style="padding-top:28px;">
+  <div class="wiz">
+    <div id="loading" class="empty">Loading…</div>
 
-  <div id="event-error" style="display:none;text-align:center;padding:80px 20px;">
-    <div style="font-size:2.5rem;margin-bottom:16px;">⚠️</div>
-    <h2 id="err-title" style="margin-bottom:8px;">Event Not Found</h2>
-    <p id="err-msg" style="color:var(--gray-400);">This registration link is invalid or the event no longer exists.</p>
-  </div>
+    <div id="wizard" style="display:none;">
+      <h1 class="page-title" id="ev-name" style="margin-bottom:2px;"></h1>
+      <p class="page-subtitle" id="ev-sub"></p>
 
-  <div id="form-container" style="display:none;max-width:560px;margin:0 auto;">
-    <div style="text-align:center;margin-bottom:32px;">
-      <h1 id="event-name" class="page-title" style="margin-bottom:6px;"></h1>
-      <p id="event-meta" class="page-subtitle" style="margin-bottom:0;"></p>
-    </div>
-    <div class="card">
-      <div class="card-title">Register for Biometric Screening</div>
-      <div class="form-grid" style="gap:14px;">
-        <div class="form-group"><label>First Name *</label><input id="f-first" type="text" placeholder="Jane" autocomplete="given-name"/></div>
-        <div class="form-group"><label>Last Name *</label><input id="f-last" type="text" placeholder="Smith" autocomplete="family-name"/></div>
-        <div class="form-group span-2"><label>Email Address *</label><input id="f-email" type="email" placeholder="jane@company.com" autocomplete="email"/></div>
-        <div class="form-group"><label>Employee ID <span style="font-weight:400;color:var(--gray-400);">(optional)</span></label><input id="f-empid" type="text" placeholder="e.g. EMP-1234"/></div>
-        <div class="form-group"><label>Department <span style="font-weight:400;color:var(--gray-400);">(optional)</span></label><input id="f-dept" type="text" placeholder="e.g. Operations"/></div>
-        <div class="form-group"><label>Date of Birth <span style="font-weight:400;color:var(--gray-400);">(optional)</span></label><input id="f-dob" type="date"/></div>
-        <div class="form-group"><label>Phone <span style="font-weight:400;color:var(--gray-400);">(optional)</span></label><input id="f-phone" type="tel" placeholder="(555) 555-5555" autocomplete="tel"/></div>
+      <div class="stepper" id="stepper"></div>
+
+      <!-- Step: location -->
+      <div class="step" id="step-location" style="display:none;">
+        <div class="card">
+          <div class="card-title">Select a location</div>
+          <div id="loc-list"></div>
+          <iframe class="map" id="loc-map" style="display:none;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+        </div>
+        <div class="nav"><span></span><button class="btn btn-primary" id="loc-next" onclick="afterLocation()" disabled>Next →</button></div>
       </div>
-      <div id="form-err" style="display:none;margin-top:12px;padding:10px 14px;background:var(--red-light);border-radius:var(--radius);font-size:.84rem;color:#991b1b;"></div>
-      <div style="margin-top:20px;">
-        <button class="btn btn-primary" style="width:100%;padding:12px;" id="submit-btn" onclick="submitReg()">Register for Screening</button>
+
+      <!-- Step: date/time -->
+      <div class="step" id="step-datetime" style="display:none;">
+        <div class="card">
+          <div class="card-title">Choose date &amp; time</div>
+          <div class="form-group" style="max-width:280px;"><label>Date</label><select id="dt-date" onchange="loadSlots()"></select></div>
+          <div id="dt-slots" style="margin-top:14px;"><span style="font-size:.85rem;color:var(--gray-400);">Pick a date to see available times.</span></div>
+        </div>
+        <div class="nav"><button class="btn btn-ghost" onclick="goStep('location')">← Back</button><button class="btn btn-primary" id="dt-next" onclick="goStep('details')" disabled>Next →</button></div>
+      </div>
+
+      <!-- Step: details -->
+      <div class="step" id="step-details" style="display:none;">
+        <div class="card">
+          <div class="card-title">Your details</div>
+          <div class="form-grid" style="gap:14px;">
+            <div class="form-group"><label>First Name *</label><input id="d-first" type="text"/></div>
+            <div class="form-group"><label>Last Name *</label><input id="d-last" type="text"/></div>
+            <div class="form-group"><label>Phone</label><input id="d-phone" type="tel"/></div>
+            <div class="form-group"><label>Email</label><input id="d-email" type="email"/></div>
+          </div>
+        </div>
+        <div class="nav"><button class="btn btn-ghost" onclick="goStep('datetime')">← Back</button><button class="btn btn-primary" onclick="afterDetails()">Next →</button></div>
+      </div>
+
+      <!-- Step: forms -->
+      <div class="step" id="step-forms" style="display:none;">
+        <div id="forms-host"></div>
+        <div class="nav"><button class="btn btn-ghost" onclick="goStep('details')">← Back</button><button class="btn btn-primary" onclick="afterForms()">Review →</button></div>
+      </div>
+
+      <!-- Step: confirm -->
+      <div class="step" id="step-confirm" style="display:none;">
+        <div class="card"><div class="card-title">Review</div><div id="review"></div></div>
+        <div id="confirm-err" style="display:none;margin-top:10px;color:var(--red);font-size:.85rem;"></div>
+        <div class="nav"><button class="btn btn-ghost" onclick="goStep('forms')">← Back</button><button class="btn btn-primary" id="submit-btn" onclick="submitReg()">Confirm Registration</button></div>
+      </div>
+
+      <!-- Step: done -->
+      <div class="step" id="step-done" style="display:none;">
+        <div class="card" style="text-align:center;border-color:var(--teal);">
+          <div style="font-size:2.4rem;">✅</div>
+          <h2 style="color:var(--teal);margin:8px 0;">You're registered!</h2>
+          <p id="done-msg" style="color:var(--gray-600);"></p>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div id="success" style="display:none;text-align:center;padding:80px 20px;">
-    <div style="width:64px;height:64px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:1.8rem;">✓</div>
-    <h2 style="color:var(--green);margin-bottom:8px;">You're registered!</h2>
-    <p id="success-msg" style="color:var(--gray-400);max-width:400px;margin:0 auto;"></p>
+    <div id="notfound" style="display:none;" class="card"><div class="empty">This registration link is not valid or the event was not found.</div></div>
   </div>
 </main>
+<div class="toast" id="toast"></div>
 <script>
-const eventId = new URLSearchParams(location.search).get('event');
-let eventData = null;
+const STEPS=[['location','Location'],['datetime','Date & Time'],['details','Details'],['forms','Forms'],['confirm','Confirm']];
+let data=null, current='location', pendingFiles=[];
+const qs=new URLSearchParams(location.search);
+const slug=qs.get('e')||qs.get('event')||qs.get('slug');
 
-async function init() {
-  if (!eventId) { showError('No Event', 'Please use the registration link provided by your organization.'); return; }
-  try {
-    const r = await fetch(`/api/registration?event_id=${eventId}`);
-    if (!r.ok) { showError('Event Not Found', 'This registration link is invalid or the event no longer exists.'); return; }
-    eventData = await r.json();
-    if (eventData.status === 'cancelled') {
-      showError('Registration Closed', 'This screening event has been cancelled.');
-      return;
+(async function init(){
+  if(!slug){ show('notfound'); return; }
+  try{
+    data=await fetch(`/api/event-register?slug=${encodeURIComponent(slug)}`).then(r=>r.ok?r.json():null);
+    if(!data){ show('notfound'); return; }
+  }catch(e){ show('notfound'); return; }
+  data.state={ location:null, date:null, time:null, details:{}, answers:[], files:[] };
+  document.getElementById('loading').style.display='none';
+  document.getElementById('wizard').style.display='';
+  document.getElementById('ev-name').textContent=data.event.name;
+  document.getElementById('ev-sub').textContent=[data.group_name, data.event.description].filter(Boolean).join(' · ');
+  if(data.locations.length===1){ selectLocation(data.locations[0].id); }
+  renderLocations();
+  goStep('location');
+})();
+
+function show(id){ document.getElementById('loading').style.display='none'; const el=document.getElementById(id); if(el) el.style.display=''; }
+function renderStepper(){
+  const idx=STEPS.findIndex(s=>s[0]===current);
+  document.getElementById('stepper').innerHTML=STEPS.map((s,i)=>`<div class="s ${i===idx?'active':(i<idx?'done':'')}">${i+1}. ${s[1]}</div>`).join('');
+}
+function goStep(step){ current=step; STEPS.concat([['done','']]).forEach(s=>{ const el=document.getElementById('step-'+s[0]); if(el) el.style.display=s[0]===step?'':'none'; }); renderStepper(); window.scrollTo(0,0); }
+
+// ── Location ──
+function renderLocations(){
+  const c=document.getElementById('loc-list');
+  if(data.locations.length<=1){ c.innerHTML=''; if(data.locations[0]) showMap(data.locations[0]); return; }
+  c.innerHTML=data.locations.map(l=>`<div class="loc-opt ${data.state.location&&data.state.location.id===l.id?'sel':''}" onclick="selectLocation(${l.id})">
+    <strong>${esc(l.name)}</strong><div style="font-size:.84rem;color:var(--gray-400);">${esc([l.address,l.city,l.state].filter(Boolean).join(', '))}</div></div>`).join('');
+}
+function selectLocation(id){
+  data.state.location=data.locations.find(l=>l.id===id);
+  document.getElementById('loc-next').disabled=false;
+  renderLocations(); showMap(data.state.location);
+}
+function showMap(l){
+  const addr=[l.name,l.address,l.city,l.state,l.zip].filter(Boolean).join(', ');
+  const m=document.getElementById('loc-map');
+  if(addr){ m.src=`https://www.google.com/maps?q=${encodeURIComponent(addr)}&output=embed`; m.style.display=''; } else m.style.display='none';
+}
+function afterLocation(){ if(!data.state.location) return; buildDates(); goStep('datetime'); }
+
+// ── Date/time ──
+function buildDates(){
+  const l=data.state.location;
+  const from=l.valid_from||data.event.start_date, to=l.valid_to||data.event.end_date||l.valid_from||data.event.start_date;
+  const open=new Set(l.open_weekdays||[]);
+  const sel=document.getElementById('dt-date'); sel.innerHTML='<option value="">— select date —</option>';
+  if(from){
+    let d=new Date(from+'T00:00:00'), end=new Date((to||from)+'T00:00:00'), n=0;
+    while(d<=end && n<160){
+      if(open.size===0 || open.has(d.getDay())){
+        const iso=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        sel.add(new Option(d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}), iso));
+      }
+      d.setDate(d.getDate()+1); n++;
     }
-    if (eventData.status === 'completed') {
-      showError('Event Completed', 'This screening event has already taken place.');
-      return;
-    }
-    document.getElementById('event-name').textContent = eventData.name;
-    const meta = [];
-    if (eventData.event_date) meta.push(fmtDate(eventData.event_date));
-    if (eventData.location) meta.push(eventData.location);
-    if (eventData.org_name) meta.push(eventData.org_name);
-    document.getElementById('event-meta').textContent = meta.join(' · ');
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('form-container').style.display = '';
-  } catch(e) {
-    showError('Error', 'Unable to load event information. Please try again.');
   }
+  document.getElementById('dt-slots').innerHTML='<span style="font-size:.85rem;color:var(--gray-400);">Pick a date to see available times.</span>';
+  document.getElementById('dt-next').disabled=true;
+}
+async function loadSlots(){
+  const date=document.getElementById('dt-date').value; data.state.date=date; data.state.time=null;
+  document.getElementById('dt-next').disabled=true;
+  const host=document.getElementById('dt-slots');
+  if(!date){ host.innerHTML=''; return; }
+  host.innerHTML='Loading…';
+  try{
+    const slots=await fetch(`/api/event-register?location_id=${data.state.location.id}&date=${date}`).then(r=>r.json());
+    if(!slots.length){ host.innerHTML='<span style="font-size:.85rem;color:var(--gray-400);">No times available for this date.</span>'; return; }
+    host.innerHTML=slots.map(s=>`<span class="slot"><button class="btn ${s.remaining>0?'btn-ghost':''}" ${s.remaining>0?`onclick="pickTime('${s.time}',this)"`:'disabled'} title="${s.remaining} left">${s.time}</button></span>`).join('');
+  }catch(e){ host.innerHTML='Error loading times.'; }
+}
+function pickTime(t,btn){ data.state.time=t; document.querySelectorAll('#dt-slots .btn').forEach(b=>b.classList.remove('btn-primary')); btn.classList.add('btn-primary'); document.getElementById('dt-next').disabled=false; }
+
+// ── Details ──
+function afterDetails(){
+  const first=document.getElementById('d-first').value.trim(), last=document.getElementById('d-last').value.trim();
+  if(!first||!last){ showToast('First and last name are required.'); return; }
+  data.state.details={ first_name:first, last_name:last, phone:document.getElementById('d-phone').value.trim()||null, email:document.getElementById('d-email').value.trim()||null };
+  renderForms(); goStep('forms');
 }
 
-function showError(title, msg) {
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('err-title').textContent = title;
-  document.getElementById('err-msg').textContent = msg;
-  document.getElementById('event-error').style.display = '';
+// ── Forms ──
+function renderForms(){
+  const host=document.getElementById('forms-host');
+  if(!data.forms.length){ host.innerHTML='<div class="card"><span style="font-size:.85rem;color:var(--gray-400);">No additional forms — continue to review.</span></div>'; return; }
+  host.innerHTML=data.forms.map(f=>`<div class="card"><div class="card-title">${esc(f.name)}</div><div class="form-grid full" style="gap:14px;">${((f.schema_json&&f.schema_json.fields)||[]).map(fl=>fieldHtml(f.id,fl)).join('')}</div></div>`).join('');
 }
-
-async function submitReg() {
-  const first = document.getElementById('f-first').value.trim();
-  const last  = document.getElementById('f-last').value.trim();
-  const email = document.getElementById('f-email').value.trim();
-  if (!first || !last || !email) { showFormErr('First name, last name, and email are required.'); return; }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showFormErr('Please enter a valid email address.'); return; }
-
-  const btn = document.getElementById('submit-btn');
-  btn.disabled = true; btn.textContent = 'Registering…';
-  document.getElementById('form-err').style.display = 'none';
-
-  try {
-    const r = await fetch('/api/registration', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        event_id: parseInt(eventId),
-        first_name: first, last_name: last, email,
-        employee_id: document.getElementById('f-empid').value || null,
-        department:  document.getElementById('f-dept').value || null,
-        date_of_birth: document.getElementById('f-dob').value || null,
-        phone: document.getElementById('f-phone').value || null,
-      })
-    });
-    if (!r.ok) {
-      const err = await r.json();
-      showFormErr(err.error || 'Registration failed. Please try again.');
-      btn.disabled = false; btn.textContent = 'Register for Screening';
-      return;
+function fieldHtml(formId,fl){
+  const id=`fld-${formId}-${fl.key}`; const req=fl.required?' *':'';
+  let inp='';
+  if(fl.type==='textarea') inp=`<textarea id="${id}" rows="3"></textarea>`;
+  else if(fl.type==='select') inp=`<select id="${id}"><option value="">— select —</option>${(fl.options||[]).map(o=>`<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</select>`;
+  else if(fl.type==='radio') inp=`<div>${(fl.options||[]).map(o=>`<label style="display:inline-flex;gap:5px;align-items:center;margin-right:14px;font-size:.9rem;"><input type="radio" name="${id}" value="${esc(o.value)}"> ${esc(o.label)}</label>`).join('')}</div>`;
+  else if(fl.type==='checkbox') inp=`<label style="display:flex;gap:8px;align-items:center;font-size:.9rem;"><input type="checkbox" id="${id}"> Yes</label>`;
+  else if(fl.type==='file') inp=`<input id="${id}" type="file" data-form="${formId}" data-key="${esc(fl.key)}" onchange="onFile(this)"/>`;
+  else if(fl.type==='number') inp=`<input id="${id}" type="number"/>`;
+  else if(fl.type==='date') inp=`<input id="${id}" type="date"/>`;
+  else inp=`<input id="${id}" type="text"/>`;
+  return `<div class="form-group span-2"><label>${esc(fl.label)}${req}</label>${inp}</div>`;
+}
+function onFile(input){
+  const file=input.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=()=>{ pendingFiles=pendingFiles.filter(f=>!(f.form_id==input.dataset.form&&f.field_key===input.dataset.key));
+    pendingFiles.push({ form_id:parseInt(input.dataset.form), field_key:input.dataset.key, name:file.name, content_type:file.type, data_base64:r.result }); };
+  r.readAsDataURL(file);
+}
+function afterForms(){
+  const answers=[]; let missing=null;
+  for(const f of data.forms){
+    const vals={};
+    for(const fl of ((f.schema_json&&f.schema_json.fields)||[])){
+      const id=`fld-${f.id}-${fl.key}`; let v=null;
+      if(fl.type==='radio'){ const c=document.querySelector(`input[name="${id}"]:checked`); v=c?c.value:null; }
+      else if(fl.type==='checkbox'){ v=document.getElementById(id).checked; }
+      else if(fl.type==='file'){ v=pendingFiles.find(x=>x.form_id===f.id&&x.field_key===fl.key)?'(uploaded)':null; }
+      else { const el=document.getElementById(id); v=el?(el.value||null):null; }
+      vals[fl.key]=v;
+      if(fl.required && (v===null||v===''||v===false)) missing=missing||fl.label;
     }
-    document.getElementById('form-container').style.display = 'none';
-    document.getElementById('success').style.display = '';
-    document.getElementById('success-msg').textContent =
-      `Thank you, ${first}! You are registered for ${eventData.name}. We look forward to seeing you.`;
-  } catch(e) {
-    showFormErr('An error occurred. Please try again.');
-    btn.disabled = false; btn.textContent = 'Register for Screening';
+    answers.push({ form_id:f.id, values:vals });
   }
+  if(missing){ showToast('Please complete: '+missing); return; }
+  data.state.answers=answers; data.state.files=pendingFiles;
+  renderReview(); goStep('confirm');
 }
 
-function showFormErr(m) {
-  const el = document.getElementById('form-err');
-  el.textContent = m; el.style.display = '';
+// ── Confirm ──
+function renderReview(){
+  const s=data.state, l=s.location;
+  document.getElementById('review').innerHTML=`<table class="data-table"><tbody>
+    <tr><td style="color:var(--gray-400);">Name</td><td>${esc(s.details.first_name)} ${esc(s.details.last_name)}</td></tr>
+    <tr><td style="color:var(--gray-400);">Location</td><td>${esc(l.name)} — ${esc([l.address,l.city,l.state].filter(Boolean).join(', '))}</td></tr>
+    <tr><td style="color:var(--gray-400);">Date</td><td>${esc(new Date(s.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}))}</td></tr>
+    <tr><td style="color:var(--gray-400);">Time</td><td>${esc(s.time)}</td></tr>
+    ${s.details.email?`<tr><td style="color:var(--gray-400);">Email</td><td>${esc(s.details.email)}</td></tr>`:''}
+  </tbody></table>`;
+}
+async function submitReg(){
+  const s=data.state; const btn=document.getElementById('submit-btn'); btn.disabled=true; btn.textContent='Submitting…';
+  const body={ slug, location_id:s.location.id, appointment_date:s.date, appointment_time:s.time,
+    ...s.details, answers:s.answers, files:s.files };
+  try{
+    const r=await fetch('/api/event-register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const j=await r.json();
+    if(!r.ok){ const e=document.getElementById('confirm-err'); e.textContent=j.error||'Registration failed'; e.style.display=''; btn.disabled=false; btn.textContent='Confirm Registration'; return; }
+    document.getElementById('done-msg').textContent=(s.details.email?`A confirmation has been sent to ${s.details.email}. `:'')+'See you at your appointment!';
+    goStep('done');
+  }catch(e){ const el=document.getElementById('confirm-err'); el.textContent=e.message; el.style.display=''; btn.disabled=false; btn.textContent='Confirm Registration'; }
 }
 
-function fmtDate(d) {
-  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-}
-
-init();
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
-</body>
-</html>
+</body></html>
