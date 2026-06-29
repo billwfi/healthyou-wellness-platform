@@ -563,6 +563,8 @@ IF COL_LENGTH('dbo.biometric_results','waist_height_ratio') IS NULL     ALTER TA
 GO
 IF COL_LENGTH('dbo.biometric_results','waist_height_category') IS NULL  ALTER TABLE dbo.biometric_results ADD waist_height_category NVARCHAR(20);
 GO
+IF COL_LENGTH('dbo.biometric_results','grip_strength') IS NULL          ALTER TABLE dbo.biometric_results ADD grip_strength DECIMAL(5,1);
+GO
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- Forms (builder) + assignment to events (shown during public registration).

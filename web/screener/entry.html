@@ -82,6 +82,17 @@
         </div>
       </div>
 
+      <!-- Functional Strength -->
+      <div class="card">
+        <div class="form-section-title" style="margin-bottom:16px;">Functional Strength</div>
+        <div class="form-grid cols-3">
+          <div class="form-group">
+            <label>Grip Strength (kg)</label>
+            <input id="f-grip" type="number" step="0.1" min="0" max="150" placeholder="e.g. 35"/>
+          </div>
+        </div>
+      </div>
+
       <!-- Blood Pressure & Vitals -->
       <div class="card">
         <div class="form-section-title" style="margin-bottom:16px;">Blood Pressure &amp; Vitals</div>
@@ -288,6 +299,7 @@ async function submitForm(e) {
     height_in:parseFloat(document.getElementById('f-height').value)||null,
     weight_lbs:parseFloat(document.getElementById('f-weight').value)||null,
     waist_circumference_in:parseFloat(document.getElementById('f-waist').value)||null,
+    grip_strength:parseFloat(document.getElementById('f-grip').value)||null,
     systolic_bp:parseInt(document.getElementById('f-sys').value)||null,
     diastolic_bp:parseInt(document.getElementById('f-dia').value)||null,
     heart_rate:parseInt(document.getElementById('f-hr').value)||null,

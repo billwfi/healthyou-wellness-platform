@@ -77,7 +77,8 @@ exports.handler = async (event, context) => {
       height_in, weight_lbs, waist_circumference_in, body_fat_pct,
       systolic_bp, diastolic_bp, heart_rate,
       total_cholesterol, hdl_cholesterol, ldl_cholesterol, triglycerides,
-      blood_glucose, hba1c, notes, fasting_flag, pregnant, non_hdl, cholesterol_ratio
+      blood_glucose, hba1c, notes, fasting_flag, pregnant, non_hdl, cholesterol_ratio,
+      grip_strength
     } = b;
 
     if (!participant_id) return badRequest('participant_id required');
@@ -110,10 +111,10 @@ exports.handler = async (event, context) => {
             systolic_bp,diastolic_bp,heart_rate,
             total_cholesterol,hdl_cholesterol,ldl_cholesterol,triglycerides,cholesterol_ratio,non_hdl,
             blood_glucose,hba1c,
-            waist_height_ratio,waist_height_category,fasting_flag,pregnant,
+            waist_height_ratio,waist_height_category,fasting_flag,pregnant,grip_strength,
             bp_risk,cholesterol_risk,glucose_risk,bmi_category,overall_risk,notes)
          OUTPUT INSERTED.*
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)`,
         [participant_id, event_id||null, screened_by||null,
          screened_at||new Date().toISOString(),
          height_in||null, weight_lbs||null, bmi,
@@ -122,7 +123,7 @@ exports.handler = async (event, context) => {
          total_cholesterol||null, hdl_cholesterol||null, ldl_cholesterol||null,
          triglycerides||null, cholesterol_ratio ?? null, non_hdl ?? null,
          blood_glucose||null, hba1c||null,
-         waist_height_ratio, waist_height_category, fasting_flag ? 1 : 0, pregnant ? 1 : 0,
+         waist_height_ratio, waist_height_category, fasting_flag ? 1 : 0, pregnant ? 1 : 0, grip_strength ?? null,
          bp_risk, cholesterol_risk, glucose_risk, bmi_cat, overall, notes||null]
       );
       return created(r.rows[0]);
