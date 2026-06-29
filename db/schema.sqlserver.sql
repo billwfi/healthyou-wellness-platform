@@ -641,3 +641,9 @@ CREATE TABLE dbo.event_appointment_documents (
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_appt_doc_appt') CREATE INDEX idx_appt_doc_appt ON dbo.event_appointment_documents(appointment_id);
 GO
+
+-- Per-event confirmation email template (WYSIWYG body + subject).
+IF COL_LENGTH('dbo.screening_events','email_subject') IS NULL ALTER TABLE dbo.screening_events ADD email_subject NVARCHAR(500);
+GO
+IF COL_LENGTH('dbo.screening_events','email_html') IS NULL    ALTER TABLE dbo.screening_events ADD email_html NVARCHAR(MAX);
+GO

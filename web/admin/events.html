@@ -4,6 +4,9 @@
   <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Screening Events — HealYou Admin</title>
   <link rel="stylesheet" href="/assets/css/style.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css">
+  <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body>
@@ -88,6 +91,7 @@
         <button class="tab event-tab" data-tab="registration" onclick="switchEventTab('registration',this)">Registration Link</button>
         <button class="tab event-tab" data-tab="locations" onclick="switchEventTab('locations',this)">Locations</button>
         <button class="tab event-tab" data-tab="forms" onclick="switchEventTab('forms',this)">Forms</button>
+        <button class="tab event-tab" data-tab="email" onclick="switchEventTab('email',this)">Email</button>
       </div>
 
       <!-- Overview tab -->
@@ -163,6 +167,11 @@
             <button class="btn btn-primary" onclick="copyRegLink()">Copy Link</button>
             <a id="reg-link-open" href="#" target="_blank" class="btn btn-ghost">Open →</a>
           </div>
+          <div style="margin-top:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+            <div id="reg-qr"></div>
+            <div><button class="btn btn-ghost btn-sm" onclick="downloadQR()">Download QR</button>
+              <div style="font-size:.78rem;color:var(--gray-400);margin-top:6px;max-width:240px;">Print or share this QR code — scanning it opens the registration page.</div></div>
+          </div>
         </div>
         <div class="card">
           <div class="card-title">How It Works</div>
@@ -199,6 +208,18 @@
           <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:14px;">Select the forms participants complete during registration for this event. Build forms under <a href="/admin/forms.html" style="color:var(--teal);">Forms</a>.</p>
           <div id="ef-list"><span style="font-size:.85rem;color:var(--gray-400);">Loading…</span></div>
           <div class="save-bar"><button class="btn btn-primary" onclick="saveEventForms()">Save Forms</button></div>
+        </div>
+      </div>
+
+      <!-- Email tab -->
+      <div id="et-email" style="display:none;">
+        <div class="card">
+          <div class="card-title">Confirmation Email Template</div>
+          <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:12px;">Customize the email sent when someone registers. Placeholders: <code>{{first_name}}</code> <code>{{last_name}}</code> <code>{{event}}</code> <code>{{location}}</code> <code>{{date}}</code> <code>{{time}}</code> <code>{{manage_link}}</code>. The HealYou logo, group name, appointment details, and a cancel/reschedule link are added automatically.</p>
+          <div class="form-group" style="margin-bottom:12px;"><label>Subject</label><input id="em-subject" type="text" placeholder="Your screening appointment — {{date}}"/></div>
+          <label style="font-size:.8rem;font-weight:500;color:var(--gray-600);">Body</label>
+          <div id="email-editor" style="height:240px;background:#fff;"></div>
+          <div class="save-bar"><button class="btn btn-primary" onclick="saveEmail()">Save Template</button></div>
         </div>
       </div>
 
@@ -464,7 +485,7 @@ function openEvent(id) {
 
   document.querySelectorAll('.event-tab').forEach(t=>t.classList.remove('active'));
   document.querySelector('[data-tab="overview"]').classList.add('active');
-  ['overview','participants','registration','locations','forms'].forEach(t=>
+  ['overview','participants','registration','locations','forms','email'].forEach(t=>
     document.getElementById('et-'+t).style.display=t==='overview'?'':'none'
   );
   document.getElementById('et-setup').style.display='none';
@@ -482,12 +503,13 @@ function backToList() {
 function switchEventTab(tab, el) {
   document.querySelectorAll('.event-tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  ['overview','participants','registration','locations','forms'].forEach(t=>
+  ['overview','participants','registration','locations','forms','email'].forEach(t=>
     document.getElementById('et-'+t).style.display=t===tab?'':'none'
   );
   document.getElementById('et-setup').style.display='none';
   if(tab==='locations'){ document.getElementById('loc-list-view').style.display=''; loadLocations(); }
   if(tab==='forms') loadEventForms();
+  if(tab==='email') loadEmail();
   if(tab==='participants'&&!ptLoaded) loadParticipants(0);
   if(tab==='registration') renderRegTab();
 }
@@ -676,6 +698,29 @@ function renderRegTab() {
   const regUrl=`${location.origin}/register/?e=${activeEvent.public_slug||activeEvent.id}`;
   document.getElementById('reg-link').value=regUrl;
   document.getElementById('reg-link-open').href=regUrl;
+  const box=document.getElementById('reg-qr'); if(box){ box.innerHTML=''; if(window.QRCode) new QRCode(box,{text:regUrl,width:150,height:150}); }
+}
+// ── Email template + QR ───────────────────────────────────────────────────────
+let quill=null;
+function loadEmail(){
+  if(!quill && window.Quill){ quill=new Quill('#email-editor',{theme:'snow',modules:{toolbar:[['bold','italic','underline'],[{header:[1,2,false]}],[{list:'ordered'},{list:'bullet'}],['link'],['clean']]}}); }
+  document.getElementById('em-subject').value=activeEvent.email_subject||'';
+  if(quill) quill.root.innerHTML=activeEvent.email_html||'<p>Hi {{first_name}}, your screening appointment is confirmed.</p>';
+}
+async function saveEmail(){
+  const subject=document.getElementById('em-subject').value;
+  const html=quill?quill.root.innerHTML:'';
+  try{
+    const r=await fetch('/api/events',{method:'PUT',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify({id:activeEvent.id,email_subject:subject,email_html:html})});
+    if(!r.ok){ showToast('Error: '+((await r.json()).error||'Save failed')); return; }
+    const u=await r.json(); activeEvent.email_subject=u.email_subject; activeEvent.email_html=u.email_html;
+    showToast('Email template saved');
+  }catch(e){ showToast('Error: '+e.message); }
+}
+function downloadQR(){
+  const node=document.querySelector('#reg-qr img')||document.querySelector('#reg-qr canvas'); if(!node) return;
+  const url=node.tagName==='IMG'?node.src:node.toDataURL('image/png');
+  const a=document.createElement('a'); a.href=url; a.download='registration-qr.png'; a.click();
 }
 
 function copyRegLink() {

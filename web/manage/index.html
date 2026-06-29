@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Manage Appointment — HealYou</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <style>.wiz{max-width:620px;margin:0 auto;} .slot{display:inline-block;margin:4px;} .slot button{min-width:74px;}</style>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/"><img src="/assets/img/hylogo.png" alt="HealthYou"></a>
+  <span style="font-size:.8rem;opacity:.85;">Manage Appointment</span>
+</header>
+<main class="container" style="padding-top:28px;">
+  <div class="wiz">
+    <div id="loading" class="empty">Loading…</div>
+    <div id="notfound" style="display:none;" class="card"><div class="empty">This link is invalid or has expired.</div></div>
+
+    <div id="view" style="display:none;">
+      <h1 class="page-title" id="title" style="margin-bottom:2px;"></h1>
+      <p class="page-subtitle" id="sub"></p>
+      <div class="card">
+        <div id="appt"></div>
+      </div>
+      <div id="actions" class="card" style="display:none;">
+        <div class="card-title">Make a change</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-ghost" onclick="startReschedule()">Reschedule</button>
+          <button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);" onclick="cancelAppt()">Cancel appointment</button>
+        </div>
+        <div id="resched" style="display:none;margin-top:16px;border-top:1px solid var(--gray-100);padding-top:16px;">
+          <div class="form-group" style="max-width:280px;"><label>New date</label><select id="rs-date" onchange="rsSlots()"></select></div>
+          <div id="rs-slots" style="margin-top:12px;"></div>
+          <div style="margin-top:12px;"><button class="btn btn-primary" id="rs-confirm" onclick="confirmReschedule()" disabled>Confirm new time</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+const token=new URLSearchParams(location.search).get('t');
+let appt=null, newTime=null;
+
+(async function(){
+  if(!token){ show('notfound'); return; }
+  try{ appt=await fetch(`/api/manage?t=${encodeURIComponent(token)}`).then(r=>r.ok?r.json():null); }catch(e){}
+  if(!appt){ show('notfound'); return; }
+  document.getElementById('loading').style.display='none';
+  document.getElementById('view').style.display='';
+  render();
+})();
+function show(id){ document.getElementById('loading').style.display='none'; const e=document.getElementById(id); if(e) e.style.display=''; }
+
+function render(){
+  document.getElementById('title').textContent=appt.event_name;
+  document.getElementById('sub').textContent=`${appt.first_name} ${appt.last_name}`;
+  const dateStr=appt.appointment_date?new Date(appt.appointment_date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}):'—';
+  const cancelled=appt.status==='cancelled';
+  document.getElementById('appt').innerHTML=`<table class="data-table"><tbody>
+    <tr><td style="color:var(--gray-400);">Status</td><td><span class="badge badge-${cancelled?'cancelled':'completed'}">${cancelled?'Cancelled':'Confirmed'}</span></td></tr>
+    <tr><td style="color:var(--gray-400);">Location</td><td>${esc(appt.location_name)} — ${esc([appt.address,appt.city,appt.state].filter(Boolean).join(', '))}</td></tr>
+    <tr><td style="color:var(--gray-400);">Date</td><td>${esc(dateStr)}</td></tr>
+    <tr><td style="color:var(--gray-400);">Time</td><td>${esc(appt.appointment_time||'—')}</td></tr>
+  </tbody></table>`;
+  document.getElementById('actions').style.display=cancelled?'none':'';
+}
+
+async function cancelAppt(){
+  if(!confirm('Cancel this appointment?')) return;
+  try{
+    const r=await fetch('/api/manage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,action:'cancel'})});
+    if(!r.ok){ showToast('Error: '+((await r.json()).error||'failed')); return; }
+    appt.status='cancelled'; render(); showToast('Appointment cancelled');
+  }catch(e){ showToast('Error: '+e.message); }
+}
+
+function startReschedule(){
+  const box=document.getElementById('resched'); box.style.display=box.style.display==='none'?'':'none';
+  if(box.style.display!=='none') buildDates();
+}
+function buildDates(){
+  const from=appt.valid_from||appt.ev_start, to=appt.valid_to||appt.ev_end||from;
+  const open=new Set(appt.open_weekdays||[]);
+  const sel=document.getElementById('rs-date'); sel.innerHTML='<option value="">— select date —</option>';
+  if(from){ let d=new Date(from+'T00:00:00'), end=new Date((to||from)+'T00:00:00'), n=0;
+    while(d<=end && n<160){ if(open.size===0||open.has(d.getDay())){
+      const iso=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      sel.add(new Option(d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}), iso)); }
+      d.setDate(d.getDate()+1); n++; } }
+}
+async function rsSlots(){
+  const date=document.getElementById('rs-date').value; newTime=null; document.getElementById('rs-confirm').disabled=true;
+  const host=document.getElementById('rs-slots'); if(!date){ host.innerHTML=''; return; }
+  host.innerHTML='Loading…';
+  try{
+    const slots=await fetch(`/api/event-register?location_id=${appt.location_id}&date=${date}`).then(r=>r.json());
+    host.innerHTML=slots.length?slots.map(s=>`<span class="slot"><button class="btn ${s.remaining>0?'btn-ghost':''}" ${s.remaining>0?`onclick="pickRs('${s.time}',this)"`:'disabled'} title="${s.remaining} left">${s.time}</button></span>`).join('')
+      :'<span style="font-size:.85rem;color:var(--gray-400);">No times available.</span>';
+  }catch(e){ host.innerHTML='Error.'; }
+}
+function pickRs(t,btn){ newTime=t; document.querySelectorAll('#rs-slots .btn').forEach(b=>b.classList.remove('btn-primary')); btn.classList.add('btn-primary'); document.getElementById('rs-confirm').disabled=false; }
+async function confirmReschedule(){
+  const date=document.getElementById('rs-date').value; if(!date||!newTime) return;
+  try{
+    const r=await fetch('/api/manage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,action:'reschedule',appointment_date:date,appointment_time:newTime})});
+    if(!r.ok){ showToast('Error: '+((await r.json()).error||'failed')); return; }
+    appt.appointment_date=date; appt.appointment_time=newTime; appt.status='registered';
+    document.getElementById('resched').style.display='none'; render(); showToast('Appointment rescheduled');
+  }catch(e){ showToast('Error: '+e.message); }
+}
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>

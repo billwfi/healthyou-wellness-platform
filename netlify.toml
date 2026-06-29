@@ -53,6 +53,16 @@
   status = 200
 
 [[redirects]]
+  from = "/manage"
+  to = "/manage/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/manage/*"
+  to = "/manage/:splat"
+  status = 200
+
+[[redirects]]
   from = "/register/*"
   to = "/register/:splat"
   status = 200

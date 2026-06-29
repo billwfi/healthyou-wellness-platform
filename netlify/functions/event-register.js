@@ -117,7 +117,7 @@ exports.handler = async (event) => {
 
       // confirmation email (best-effort)
       let email_error = null;
-      if (email) { try { await sendConfirmation(db, { apptId, email, first_name, last_name, eventId, location_id, appointment_date, appointment_time }); } catch (e) { email_error = e.message; } }
+      if (email) { try { await sendConfirmation(db, { email, first_name, last_name, eventId, location_id, appointment_date, appointment_time, token }); } catch (e) { email_error = e.message; } }
       return ok({ registered: true, appointment_id: apptId, magic_token: token, email_error });
     } catch (err) {
       if (/slot is full/i.test(err.message)) return badRequest(err.message);
@@ -128,29 +128,43 @@ exports.handler = async (event) => {
   return badRequest('Method not supported');
 };
 
-async function sendConfirmation(db, { email, first_name, last_name, eventId, location_id, appointment_date, appointment_time }) {
+function applyVars(s, ctx) { return String(s || '').replace(/{{\s*(\w+)\s*}}/g, (_, k) => esc(ctx[k] != null ? ctx[k] : '')); }
+
+async function sendConfirmation(db, { email, first_name, last_name, eventId, location_id, appointment_date, appointment_time, token }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return;
-  const ev = await db.query('SELECT name FROM screening_events WHERE id=$1', [eventId]);
+  const ev = await db.query('SELECT name, email_subject, email_html, org_id FROM screening_events WHERE id=$1', [eventId]);
+  const e = ev.rows[0] || {};
+  const grp = e.org_id ? await db.query('SELECT GroupName AS name FROM iStrata.dbo.is_groups WHERE id=$1', [e.org_id]) : { rows: [] };
   const loc = await db.query('SELECT name, address, city, state FROM event_locations WHERE id=$1', [location_id]);
-  const eName = ev.rows[0]?.name || 'Screening Event';
   const l = loc.rows[0] || {};
   const locLine = [l.name, l.address, [l.city, l.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
   const dt = new Date(`${appointment_date}T${appointment_time}:00`);
   const dateStr = dt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const site = process.env.URL || 'https://healthyou-wellness-platform.netlify.app';
+  const manageLink = token ? `${site}/manage/?t=${token}` : site;
+  const ctx = { first_name, last_name, event: e.name || 'Screening Event', group: grp.rows[0]?.name || '',
+                location: locLine, date: dateStr, time: appointment_time, manage_link: manageLink };
+
+  const subject = applyVars(e.email_subject || 'Your screening appointment — {{date}}', ctx);
+  const body = e.email_html
+    ? applyVars(e.email_html, ctx)
+    : `<p>Hi ${esc(first_name)} ${esc(last_name)}, your screening appointment is confirmed.</p>`;
+  const logo = `${site}/assets/img/hylogo.png`;
+  const html = `<div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+    <div style="background:#0d9488;padding:18px;text-align:center;"><img src="${logo}" alt="HealthYou" height="34" style="background:#fff;padding:4px 12px;border-radius:8px;"></div>
+    <div style="padding:24px;color:#334155;font-size:14px;">
+      ${ctx.group ? `<div style="font-weight:600;margin-bottom:10px;">${esc(ctx.group)}</div>` : ''}
+      ${body}
+      <div style="margin:18px 0;padding:14px;background:#f1f5f9;border-radius:8px;font-size:13px;">
+        <strong>${esc(ctx.event)}</strong><br>${esc(locLine || '—')}<br>${esc(dateStr)} at ${esc(appointment_time)}
+      </div>
+      <p style="font-size:13px;color:#64748b;">Need to make a change? <a href="${manageLink}" style="color:#0d9488;">Cancel or reschedule your appointment</a>.</p>
+    </div></div>`;
   const from = process.env.RESEND_FROM || 'HealYou <onboarding@resend.dev>';
-  const html = `<div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:auto;">
-    <h2 style="color:#0d9488;">You're registered!</h2>
-    <p>Hi ${esc(first_name)} ${esc(last_name)}, your screening appointment is confirmed.</p>
-    <table style="font-size:14px;color:#334155;">
-      <tr><td style="color:#64748b;padding:4px 12px 4px 0;">Event</td><td><strong>${esc(eName)}</strong></td></tr>
-      <tr><td style="color:#64748b;padding:4px 12px 4px 0;">Location</td><td>${esc(locLine || '—')}</td></tr>
-      <tr><td style="color:#64748b;padding:4px 12px 4px 0;">Date</td><td>${esc(dateStr)}</td></tr>
-      <tr><td style="color:#64748b;padding:4px 12px 4px 0;">Time</td><td>${esc(appointment_time)}</td></tr>
-    </table></div>`;
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ from, to: [email], subject: `Your screening appointment — ${dateStr}`, html }),
+    body: JSON.stringify({ from, to: [email], subject, html }),
   });
   if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
 }

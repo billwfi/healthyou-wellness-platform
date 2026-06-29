@@ -62,7 +62,7 @@ exports.handler = async (event, context) => {
 
   if (event.httpMethod === 'PUT') {
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return badRequest('Invalid JSON'); }
-    const { id, name, org_id, start_date, end_date, status, description, notes } = b;
+    const { id, name, org_id, start_date, end_date, status, description, notes, email_subject, email_html } = b;
     if (!id) return badRequest('id required');
     try {
       const r = await db.query(
@@ -70,11 +70,13 @@ exports.handler = async (event, context) => {
            name=COALESCE($2,name), org_id=COALESCE($3,org_id),
            start_date=COALESCE($4,start_date), event_date=COALESCE($4,event_date),
            end_date=COALESCE($5,end_date), status=COALESCE($6,status),
-           description=COALESCE($7,description), notes=COALESCE($8,notes)
+           description=COALESCE($7,description), notes=COALESCE($8,notes),
+           email_subject=COALESCE($9,email_subject), email_html=COALESCE($10,email_html)
          OUTPUT INSERTED.*
          WHERE id=$1`,
         [id, name || null, org_id || null, start_date || null, end_date || null,
-         status || null, description || null, notes || null]
+         status || null, description || null, notes || null,
+         email_subject ?? null, email_html ?? null]
       );
       if (!r.rows.length) return notFound();
       return ok(r.rows[0]);
