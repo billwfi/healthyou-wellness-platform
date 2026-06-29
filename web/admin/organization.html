@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Organization — HealYou Admin</title>
+  <title>Group — HealYou Admin</title>
   <link rel="stylesheet" href="/assets/css/style.css"/>
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <style>
@@ -70,7 +70,7 @@
 <main class="container has-sidebar">
   <div id="content" style="display:none;">
 
-    <a href="/admin/organizations.html" class="back-link">&#8592; Organizations</a>
+    <a href="/admin/groups.html" class="back-link">&#8592; Groups</a>
 
     <!-- Org header -->
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
@@ -82,7 +82,7 @@
         </div>
         <div style="font-size:.84rem;color:var(--gray-400);margin-top:6px;" id="org-contact-line"></div>
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="openOrgModal()">Edit Organization</button>
+      <button class="btn btn-ghost btn-sm" onclick="openOrgModal()">Edit Group</button>
     </div>
 
     <!-- Tabs -->
@@ -192,12 +192,11 @@
 <!-- Edit Org Modal -->
 <div id="org-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'org-modal')">
   <div class="modal">
-    <div class="modal-title">Edit Organization</div>
+    <div class="modal-title">Edit Group</div>
     <div class="form-grid full" style="gap:14px;">
-      <div class="form-group"><label>Organization Name *</label><input id="om-name" type="text"/></div>
-      <div class="form-group"><label>Slug *</label><input id="om-slug" type="text"/></div>
-      <div class="form-group"><label>Contact Name</label><input id="om-cname" type="text"/></div>
-      <div class="form-group"><label>Contact Email</label><input id="om-cemail" type="email"/></div>
+      <div class="form-group"><label>Group Name *</label><input id="om-name" type="text"/></div>
+      <div class="form-group"><label>Group ID</label><input id="om-slug" type="text"/></div>
+      <p style="font-size:.78rem;color:var(--gray-400);margin:0;">Edit the full group record (address, status, rates…) on the Groups page.</p>
     </div>
     <div id="om-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
     <div class="modal-footer">
@@ -288,7 +287,7 @@ netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
 netlifyIdentity.on('logout',()=>{ location.href='/admin/login.html'; });
 
 async function boot(user) {
-  if (!orgId) { location.href='/admin/organizations.html'; return; }
+  if (!orgId) { location.href='/admin/groups.html'; return; }
   document.getElementById('content').style.display='';
   document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
   const hdr={Authorization:'Bearer '+authToken};
@@ -303,7 +302,7 @@ async function boot(user) {
 }
 
 function renderOrgHeader() {
-  document.title = (org?.name || 'Organization') + ' — HealYou Admin';
+  document.title = (org?.name || 'Group') + ' — HealYou Admin';
   document.getElementById('org-name').textContent = org?.name || '';
   document.getElementById('org-slug').textContent = org?.slug || '';
   document.getElementById('org-status').innerHTML = `<span class="badge badge-${org?.active?'active':'inactive'}">${org?.active?'Active':'Inactive'}</span>`;
@@ -578,15 +577,13 @@ async function deleteDept(locationId, deptId) {
 function openOrgModal() {
   document.getElementById('om-name').value=org?.name||'';
   document.getElementById('om-slug').value=org?.slug||'';
-  document.getElementById('om-cname').value=org?.contact_name||'';
-  document.getElementById('om-cemail').value=org?.contact_email||'';
   document.getElementById('om-err').style.display='none';
   document.getElementById('org-modal').style.display='flex';
 }
 
 async function saveOrg() {
   const name=document.getElementById('om-name').value.trim(), slug=document.getElementById('om-slug').value.trim();
-  if(!name||!slug){ showErr('om-err','Name and slug required'); return; }
+  if(!name){ showErr('om-err','Group name is required'); return; }
   const btn=document.getElementById('om-btn'); btn.disabled=true; btn.textContent='Saving…';
   try {
     const r=await fetch('/api/groups',{method:'PUT',
@@ -594,7 +591,7 @@ async function saveOrg() {
       body:JSON.stringify({id:orgId,name,slug})});
     if(!r.ok){ showErr('om-err',(await r.json()).error||'Save failed'); return; }
     org={...org,...await r.json()}; renderOrgHeader();
-    closeModal('org-modal'); showToast('Organization updated');
+    closeModal('org-modal'); showToast('Group updated');
   } catch(e){ showErr('om-err',e.message); }
   finally{ btn.disabled=false; btn.textContent='Save Changes'; }
 }
