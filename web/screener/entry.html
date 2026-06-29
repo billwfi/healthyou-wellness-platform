@@ -410,6 +410,18 @@ function showResults(r) {
   if(r.blood_glucose) tiles.push({label:'Glucose',val:r.blood_glucose+' mg/dL',risk:r.glucose_risk});
   if(r.hba1c) tiles.push({label:'HbA1c',val:r.hba1c+'%',risk:null});
 
+  // Lifestyle Risk Assessment rows ("+" shown when the value hits the slider max)
+  const lifeDisp=(id,val,suf)=>{ if(val==null) return null; const el=document.getElementById(id); let s=String(val); if(el&&Number(val)>=Number(el.max)) s=el.max+'+'; return s+(suf||''); };
+  const lifeRows=[];
+  const pushL=(k,v)=>{ if(v!=null&&v!=='') lifeRows.push([k,v]); };
+  pushL('Fruits & vegetables', lifeDisp('f-fruitveg', r.fruit_veg_servings, ' servings/day'));
+  pushL('Physical activity', lifeDisp('f-activity', r.activity_minutes, ' min/week'));
+  pushL('Muscle-strengthening (2+ days/wk)', r.muscle_strengthening==null?null:(r.muscle_strengthening?'Yes':'No'));
+  pushL('Stress level', r.stress_level==null?null:r.stress_level+' / 10');
+  pushL('Alcohol', lifeDisp('f-alcohol', r.alcohol_drinks, ' drinks/week'));
+  pushL('Tobacco / vaping / nicotine', r.tobacco_use==null?null:(r.tobacco_use?'Yes':'No'));
+  pushL('Quality sleep', lifeDisp('f-sleep', r.sleep_hours, ' hrs'));
+
   const riskColor={high:'var(--red)',crisis:'var(--red)',high_1:'var(--amber)',high_2:'var(--red)',elevated:'var(--amber)',borderline:'var(--amber)',very_high:'var(--red)',prediabetes:'var(--amber)',diabetes:'var(--red)',obese:'var(--red)',overweight:'var(--amber)',normal:'var(--green)',low:'var(--green)',ideal:'var(--green)'};
   const overallColor={high:'#ef4444',moderate:'#f59e0b',low:'#10b981'}[r.overall_risk]||'#6b7280';
 
@@ -424,6 +436,13 @@ function showResults(r) {
         <div class="result-tile-label">${t.label}</div>
       </div>`).join('')}
     </div>
+    ${lifeRows.length?`
+    <div style="margin-top:22px;">
+      <div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Lifestyle Risk Assessment</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 28px;font-size:.85rem;">
+        ${lifeRows.map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--gray-100);padding:5px 0;"><span style="color:var(--gray-600);">${esc(k)}</span><span style="font-weight:600;white-space:nowrap;">${esc(v)}</span></div>`).join('')}
+      </div>
+    </div>`:''}
     ${r.bp_risk==='crisis'?`<div style="margin-top:16px;padding:12px;background:var(--red-light);border:1px solid #fca5a5;border-radius:6px;font-size:.85rem;font-weight:600;color:#991b1b;">⚠️ Hypertensive Crisis — Refer to emergency care immediately.</div>`:''}
     ${r.overall_risk==='high'&&r.bp_risk!=='crisis'?`<div style="margin-top:12px;padding:10px;background:var(--amber-light);border:1px solid #fcd34d;border-radius:6px;font-size:.82rem;color:#92400e;">High risk identified — recommend physician follow-up within 1–2 weeks.</div>`:''}
   `;
