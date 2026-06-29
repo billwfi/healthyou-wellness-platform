@@ -18,7 +18,7 @@
 </head>
 <body>
 <header class="header">
-  <a class="header-logo" href="/screener/"><img src="/assets/img/logo-icon.svg" alt="">Health<span>you</span></a>
+  <a class="header-logo" href="/screener/"><img src="/assets/img/hylogo.png" alt="HealthYou"></a>
   <div style="display:flex;align-items:center;gap:12px;">
     <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
     <span style="font-size:.75rem;opacity:.6;padding:2px 8px;border:1px solid rgba(255,255,255,.4);border-radius:99px;">Screener</span>
@@ -48,6 +48,10 @@
       <!-- Anthropometrics -->
       <div class="card">
         <div class="form-section-title" style="margin-bottom:16px;">Anthropometrics</div>
+        <div style="display:flex;gap:24px;align-items:center;font-size:.9rem;margin-bottom:16px;">
+          <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-fasting"> Fasting</label>
+          <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-pregnant"> Pregnant</label>
+        </div>
         <div class="form-grid cols-3">
           <div class="form-group">
             <label>Height (inches)</label>
@@ -70,9 +74,6 @@
             <input id="f-whr" type="text" readonly placeholder="—" style="background:var(--gray-100);cursor:default;"/>
             <span id="f-whr-cat" style="font-size:.75rem;margin-top:2px;"></span>
           </div>
-        </div>
-        <div style="margin-top:12px;font-size:.9rem;">
-          <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-pregnant"> Pregnant</label>
         </div>
         <div id="bmi-preview" class="result-preview">
           <div style="font-size:.82rem;font-weight:600;color:var(--teal);">Calculated BMI</div>
@@ -110,11 +111,11 @@
         <div class="form-grid cols-3">
           <div class="form-group">
             <label>Total Cholesterol (mg/dL)</label>
-            <input id="f-tchol" type="number" min="50" max="500" placeholder="e.g. 195" oninput="calcChol()"/>
+            <input id="f-tchol" type="number" min="50" max="500" placeholder="e.g. 195"/>
           </div>
           <div class="form-group">
             <label>HDL (mg/dL)</label>
-            <input id="f-hdl" type="number" min="10" max="200" placeholder="e.g. 55" oninput="calcChol()"/>
+            <input id="f-hdl" type="number" min="10" max="200" placeholder="e.g. 55"/>
           </div>
           <div class="form-group">
             <label>LDL (mg/dL)</label>
@@ -125,12 +126,12 @@
             <input id="f-trig" type="number" min="20" max="2000" placeholder="e.g. 130"/>
           </div>
           <div class="form-group">
-            <label>Non-HDL (mg/dL) <span style="font-size:.75rem;color:var(--teal);">(auto)</span></label>
-            <input id="f-nonhdl" type="text" readonly placeholder="—" style="background:var(--gray-100);cursor:default;"/>
+            <label>Non-HDL (mg/dL)</label>
+            <input id="f-nonhdl" type="number" min="10" max="500" placeholder="e.g. 140"/>
           </div>
           <div class="form-group">
-            <label>Cholesterol Ratio <span style="font-size:.75rem;color:var(--teal);">(auto)</span></label>
-            <input id="f-cratio" type="text" readonly placeholder="—" style="background:var(--gray-100);cursor:default;"/>
+            <label>Cholesterol Ratio</label>
+            <input id="f-cratio" type="number" step="0.1" min="1" max="20" placeholder="e.g. 3.5"/>
           </div>
         </div>
       </div>
@@ -147,9 +148,6 @@
             <label>HbA1c (%)</label>
             <input id="f-hba1c" type="number" step="0.1" min="3" max="20" placeholder="e.g. 5.6"/>
           </div>
-        </div>
-        <div style="margin-top:12px;font-size:.9rem;">
-          <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-fasting"> Fasting</label>
         </div>
       </div>
 
@@ -261,13 +259,6 @@ function calcWhr() {
   } else { out.value=''; cat.innerHTML=''; }
 }
 
-function calcChol() {
-  const t=parseInt(document.getElementById('f-tchol').value);
-  const hd=parseInt(document.getElementById('f-hdl').value);
-  document.getElementById('f-nonhdl').value=(t>0 && hd>0)?String(t-hd):'';
-  document.getElementById('f-cratio').value=(t>0 && hd>0)?(t/hd).toFixed(1):'';
-}
-
 function checkBp() {
   const sys=parseInt(document.getElementById('f-sys').value);
   const dia=parseInt(document.getElementById('f-dia').value);
@@ -304,6 +295,8 @@ async function submitForm(e) {
     hdl_cholesterol:parseInt(document.getElementById('f-hdl').value)||null,
     ldl_cholesterol:parseInt(document.getElementById('f-ldl').value)||null,
     triglycerides:parseInt(document.getElementById('f-trig').value)||null,
+    non_hdl:parseInt(document.getElementById('f-nonhdl').value)||null,
+    cholesterol_ratio:parseFloat(document.getElementById('f-cratio').value)||null,
     blood_glucose:parseInt(document.getElementById('f-glucose').value)||null,
     hba1c:parseFloat(document.getElementById('f-hba1c').value)||null,
     fasting_flag:document.getElementById('f-fasting').checked,

@@ -77,7 +77,7 @@ exports.handler = async (event, context) => {
       height_in, weight_lbs, waist_circumference_in, body_fat_pct,
       systolic_bp, diastolic_bp, heart_rate,
       total_cholesterol, hdl_cholesterol, ldl_cholesterol, triglycerides,
-      blood_glucose, hba1c, notes, fasting_flag, pregnant
+      blood_glucose, hba1c, notes, fasting_flag, pregnant, non_hdl, cholesterol_ratio
     } = b;
 
     if (!participant_id) return badRequest('participant_id required');
@@ -86,12 +86,7 @@ exports.handler = async (event, context) => {
     const bmi = (height_in && weight_lbs)
       ? +(703 * weight_lbs / (height_in * height_in)).toFixed(2)
       : null;
-    const cholesterol_ratio = (total_cholesterol && hdl_cholesterol)
-      ? +(total_cholesterol / hdl_cholesterol).toFixed(2)
-      : null;
-    const non_hdl = (total_cholesterol && hdl_cholesterol)
-      ? total_cholesterol - hdl_cholesterol
-      : null;
+    // Non-HDL and cholesterol ratio are entered manually by the screener (not auto).
     // Waist-to-height ratio: <0.50 ideal | 0.50–0.59 borderline | >=0.60 high
     const waist_height_ratio = (waist_circumference_in && height_in)
       ? +(waist_circumference_in / height_in).toFixed(2)
@@ -125,7 +120,7 @@ exports.handler = async (event, context) => {
          waist_circumference_in||null, body_fat_pct||null,
          systolic_bp||null, diastolic_bp||null, heart_rate||null,
          total_cholesterol||null, hdl_cholesterol||null, ldl_cholesterol||null,
-         triglycerides||null, cholesterol_ratio, non_hdl,
+         triglycerides||null, cholesterol_ratio ?? null, non_hdl ?? null,
          blood_glucose||null, hba1c||null,
          waist_height_ratio, waist_height_category, fasting_flag ? 1 : 0, pregnant ? 1 : 0,
          bp_risk, cholesterol_risk, glucose_risk, bmi_cat, overall, notes||null]
