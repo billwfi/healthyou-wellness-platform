@@ -499,3 +499,19 @@ CREATE TABLE dbo.event_notification_recipients (
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_event_notif_event') CREATE INDEX idx_event_notif_event ON dbo.event_notification_recipients(event_id);
 GO
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- Screening data additions — fasting/pregnant flags, waist-to-height ratio,
+-- non-HDL cholesterol. (body_fat_pct stays for historical rows but is no longer
+-- captured in the entry form.) All additive / guarded.
+-- ════════════════════════════════════════════════════════════════════════════
+IF COL_LENGTH('dbo.biometric_results','fasting_flag') IS NULL           ALTER TABLE dbo.biometric_results ADD fasting_flag BIT;
+GO
+IF COL_LENGTH('dbo.biometric_results','pregnant') IS NULL               ALTER TABLE dbo.biometric_results ADD pregnant BIT;
+GO
+IF COL_LENGTH('dbo.biometric_results','non_hdl') IS NULL                ALTER TABLE dbo.biometric_results ADD non_hdl INT;
+GO
+IF COL_LENGTH('dbo.biometric_results','waist_height_ratio') IS NULL     ALTER TABLE dbo.biometric_results ADD waist_height_ratio DECIMAL(4,2);
+GO
+IF COL_LENGTH('dbo.biometric_results','waist_height_category') IS NULL  ALTER TABLE dbo.biometric_results ADD waist_height_category NVARCHAR(20);
+GO

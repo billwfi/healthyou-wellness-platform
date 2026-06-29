@@ -77,7 +77,7 @@ exports.handler = async (event, context) => {
       height_in, weight_lbs, waist_circumference_in, body_fat_pct,
       systolic_bp, diastolic_bp, heart_rate,
       total_cholesterol, hdl_cholesterol, ldl_cholesterol, triglycerides,
-      blood_glucose, hba1c, notes
+      blood_glucose, hba1c, notes, fasting_flag, pregnant
     } = b;
 
     if (!participant_id) return badRequest('participant_id required');
@@ -89,6 +89,16 @@ exports.handler = async (event, context) => {
     const cholesterol_ratio = (total_cholesterol && hdl_cholesterol)
       ? +(total_cholesterol / hdl_cholesterol).toFixed(2)
       : null;
+    const non_hdl = (total_cholesterol && hdl_cholesterol)
+      ? total_cholesterol - hdl_cholesterol
+      : null;
+    // Waist-to-height ratio: <0.50 ideal | 0.50–0.59 borderline | >=0.60 high
+    const waist_height_ratio = (waist_circumference_in && height_in)
+      ? +(waist_circumference_in / height_in).toFixed(2)
+      : null;
+    const waist_height_category = waist_height_ratio == null ? null
+      : waist_height_ratio < 0.5 ? 'ideal'
+      : waist_height_ratio < 0.6 ? 'borderline' : 'high';
 
     // Risk flags
     const bp_risk         = bpRisk(systolic_bp, diastolic_bp);
@@ -103,19 +113,21 @@ exports.handler = async (event, context) => {
            (participant_id,event_id,screened_by,screened_at,
             height_in,weight_lbs,bmi,waist_circumference_in,body_fat_pct,
             systolic_bp,diastolic_bp,heart_rate,
-            total_cholesterol,hdl_cholesterol,ldl_cholesterol,triglycerides,cholesterol_ratio,
+            total_cholesterol,hdl_cholesterol,ldl_cholesterol,triglycerides,cholesterol_ratio,non_hdl,
             blood_glucose,hba1c,
+            waist_height_ratio,waist_height_category,fasting_flag,pregnant,
             bp_risk,cholesterol_risk,glucose_risk,bmi_category,overall_risk,notes)
          OUTPUT INSERTED.*
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)`,
         [participant_id, event_id||null, screened_by||null,
          screened_at||new Date().toISOString(),
          height_in||null, weight_lbs||null, bmi,
          waist_circumference_in||null, body_fat_pct||null,
          systolic_bp||null, diastolic_bp||null, heart_rate||null,
          total_cholesterol||null, hdl_cholesterol||null, ldl_cholesterol||null,
-         triglycerides||null, cholesterol_ratio,
+         triglycerides||null, cholesterol_ratio, non_hdl,
          blood_glucose||null, hba1c||null,
+         waist_height_ratio, waist_height_category, fasting_flag ? 1 : 0, pregnant ? 1 : 0,
          bp_risk, cholesterol_risk, glucose_risk, bmi_cat, overall, notes||null]
       );
       return created(r.rows[0]);

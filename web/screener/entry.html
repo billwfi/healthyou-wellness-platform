@@ -51,7 +51,7 @@
         <div class="form-grid cols-3">
           <div class="form-group">
             <label>Height (inches)</label>
-            <input id="f-height" type="number" step="0.5" min="36" max="96" placeholder="e.g. 67" oninput="calcBmi()"/>
+            <input id="f-height" type="number" step="0.5" min="36" max="96" placeholder="e.g. 67" oninput="calcBmi();calcWhr()"/>
           </div>
           <div class="form-group">
             <label>Weight (lbs)</label>
@@ -63,12 +63,16 @@
           </div>
           <div class="form-group">
             <label>Waist Circumference (in)</label>
-            <input id="f-waist" type="number" step="0.5" min="18" max="80" placeholder="e.g. 34"/>
+            <input id="f-waist" type="number" step="0.5" min="18" max="80" placeholder="e.g. 34" oninput="calcWhr()"/>
           </div>
           <div class="form-group">
-            <label>Body Fat %</label>
-            <input id="f-bfpct" type="number" step="0.1" min="2" max="60" placeholder="e.g. 22"/>
+            <label>Waist-to-Height Ratio <span style="font-size:.75rem;color:var(--teal);">(auto-calculated)</span></label>
+            <input id="f-whr" type="text" readonly placeholder="—" style="background:var(--gray-100);cursor:default;"/>
+            <span id="f-whr-cat" style="font-size:.75rem;margin-top:2px;"></span>
           </div>
+        </div>
+        <div style="margin-top:12px;font-size:.9rem;">
+          <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-pregnant"> Pregnant</label>
         </div>
         <div id="bmi-preview" class="result-preview">
           <div style="font-size:.82rem;font-weight:600;color:var(--teal);">Calculated BMI</div>
@@ -106,11 +110,11 @@
         <div class="form-grid cols-3">
           <div class="form-group">
             <label>Total Cholesterol (mg/dL)</label>
-            <input id="f-tchol" type="number" min="50" max="500" placeholder="e.g. 195"/>
+            <input id="f-tchol" type="number" min="50" max="500" placeholder="e.g. 195" oninput="calcChol()"/>
           </div>
           <div class="form-group">
             <label>HDL (mg/dL)</label>
-            <input id="f-hdl" type="number" min="10" max="200" placeholder="e.g. 55"/>
+            <input id="f-hdl" type="number" min="10" max="200" placeholder="e.g. 55" oninput="calcChol()"/>
           </div>
           <div class="form-group">
             <label>LDL (mg/dL)</label>
@@ -120,6 +124,14 @@
             <label>Triglycerides (mg/dL)</label>
             <input id="f-trig" type="number" min="20" max="2000" placeholder="e.g. 130"/>
           </div>
+          <div class="form-group">
+            <label>Non-HDL (mg/dL) <span style="font-size:.75rem;color:var(--teal);">(auto)</span></label>
+            <input id="f-nonhdl" type="text" readonly placeholder="—" style="background:var(--gray-100);cursor:default;"/>
+          </div>
+          <div class="form-group">
+            <label>Cholesterol Ratio <span style="font-size:.75rem;color:var(--teal);">(auto)</span></label>
+            <input id="f-cratio" type="text" readonly placeholder="—" style="background:var(--gray-100);cursor:default;"/>
+          </div>
         </div>
       </div>
 
@@ -128,13 +140,16 @@
         <div class="form-section-title" style="margin-bottom:16px;">Blood Glucose</div>
         <div class="form-grid cols-3">
           <div class="form-group">
-            <label>Fasting Blood Glucose (mg/dL)</label>
+            <label>Blood Glucose (mg/dL)</label>
             <input id="f-glucose" type="number" min="40" max="600" placeholder="e.g. 95"/>
           </div>
           <div class="form-group">
             <label>HbA1c (%)</label>
             <input id="f-hba1c" type="number" step="0.1" min="3" max="20" placeholder="e.g. 5.6"/>
           </div>
+        </div>
+        <div style="margin-top:12px;font-size:.9rem;">
+          <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-fasting"> Fasting</label>
         </div>
       </div>
 
@@ -231,6 +246,28 @@ function calcBmi() {
   }
 }
 
+function calcWhr() {
+  const w=parseFloat(document.getElementById('f-waist').value);
+  const h=parseFloat(document.getElementById('f-height').value);
+  const out=document.getElementById('f-whr'), cat=document.getElementById('f-whr-cat');
+  if(w>0 && h>0){
+    const ratio=w/h;
+    out.value=ratio.toFixed(2);
+    let label,color;
+    if(ratio<0.5){ label='Ideal'; color='var(--green)'; }
+    else if(ratio<0.6){ label='Borderline'; color='var(--amber)'; }
+    else { label='High'; color='var(--red)'; }
+    cat.innerHTML=`<span style="color:${color};font-weight:600;">${label}</span>`;
+  } else { out.value=''; cat.innerHTML=''; }
+}
+
+function calcChol() {
+  const t=parseInt(document.getElementById('f-tchol').value);
+  const hd=parseInt(document.getElementById('f-hdl').value);
+  document.getElementById('f-nonhdl').value=(t>0 && hd>0)?String(t-hd):'';
+  document.getElementById('f-cratio').value=(t>0 && hd>0)?(t/hd).toFixed(1):'';
+}
+
 function checkBp() {
   const sys=parseInt(document.getElementById('f-sys').value);
   const dia=parseInt(document.getElementById('f-dia').value);
@@ -260,7 +297,6 @@ async function submitForm(e) {
     height_in:parseFloat(document.getElementById('f-height').value)||null,
     weight_lbs:parseFloat(document.getElementById('f-weight').value)||null,
     waist_circumference_in:parseFloat(document.getElementById('f-waist').value)||null,
-    body_fat_pct:parseFloat(document.getElementById('f-bfpct').value)||null,
     systolic_bp:parseInt(document.getElementById('f-sys').value)||null,
     diastolic_bp:parseInt(document.getElementById('f-dia').value)||null,
     heart_rate:parseInt(document.getElementById('f-hr').value)||null,
@@ -270,6 +306,8 @@ async function submitForm(e) {
     triglycerides:parseInt(document.getElementById('f-trig').value)||null,
     blood_glucose:parseInt(document.getElementById('f-glucose').value)||null,
     hba1c:parseFloat(document.getElementById('f-hba1c').value)||null,
+    fasting_flag:document.getElementById('f-fasting').checked,
+    pregnant:document.getElementById('f-pregnant').checked,
     notes:document.getElementById('f-notes').value||null,
     screened_at:new Date().toISOString(),
   };
@@ -288,14 +326,17 @@ function showResults(r) {
   const tiles=[];
   if(r.weight_lbs) tiles.push({label:'Weight',val:r.weight_lbs+' lbs',risk:null});
   if(r.bmi) tiles.push({label:'BMI',val:Number(r.bmi).toFixed(1),risk:r.bmi_category});
+  if(r.waist_height_ratio) tiles.push({label:'Waist/Height',val:Number(r.waist_height_ratio).toFixed(2),risk:r.waist_height_category});
   if(r.systolic_bp) tiles.push({label:'Blood Pressure',val:`${r.systolic_bp}/${r.diastolic_bp}`,risk:r.bp_risk});
   if(r.heart_rate) tiles.push({label:'Heart Rate',val:r.heart_rate+' bpm',risk:null});
   if(r.total_cholesterol) tiles.push({label:'Total Chol.',val:r.total_cholesterol+' mg/dL',risk:r.cholesterol_risk});
   if(r.hdl_cholesterol) tiles.push({label:'HDL',val:r.hdl_cholesterol+' mg/dL',risk:null});
+  if(r.non_hdl) tiles.push({label:'Non-HDL',val:r.non_hdl+' mg/dL',risk:null});
+  if(r.cholesterol_ratio) tiles.push({label:'Chol. Ratio',val:Number(r.cholesterol_ratio).toFixed(1),risk:null});
   if(r.blood_glucose) tiles.push({label:'Glucose',val:r.blood_glucose+' mg/dL',risk:r.glucose_risk});
   if(r.hba1c) tiles.push({label:'HbA1c',val:r.hba1c+'%',risk:null});
 
-  const riskColor={high:'var(--red)',crisis:'var(--red)',high_1:'var(--amber)',high_2:'var(--red)',elevated:'var(--amber)',borderline:'var(--amber)',very_high:'var(--red)',prediabetes:'var(--amber)',diabetes:'var(--red)',obese:'var(--red)',overweight:'var(--amber)',normal:'var(--green)',low:'var(--green)'};
+  const riskColor={high:'var(--red)',crisis:'var(--red)',high_1:'var(--amber)',high_2:'var(--red)',elevated:'var(--amber)',borderline:'var(--amber)',very_high:'var(--red)',prediabetes:'var(--amber)',diabetes:'var(--red)',obese:'var(--red)',overweight:'var(--amber)',normal:'var(--green)',low:'var(--green)',ideal:'var(--green)'};
   const overallColor={high:'#ef4444',moderate:'#f59e0b',low:'#10b981'}[r.overall_risk]||'#6b7280';
 
   document.getElementById('results-summary').innerHTML=`
