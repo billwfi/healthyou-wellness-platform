@@ -15,8 +15,8 @@ function buildEmailHtml(ctx) {
   return `<!DOCTYPE html><html><body style="margin:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
   <div style="max-width:600px;margin:0 auto;padding:24px;">
     <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
-      <div style="background:#0d7a74;padding:18px 24px;">
-        <img src="https://myhealthyou.com/assets/img/hylogo-white.png" alt="HealthYou" style="height:34px;"/>
+      <div style="background:#0d7a74;padding:18px 24px;text-align:center;">
+        <img src="https://healthyou-wellness-platform.netlify.app/assets/img/hylogo-white.png" alt="HealthYou" height="36" style="height:36px;"/>
       </div>
       <div style="padding:24px;">
         <h2 style="margin:0 0 12px;font-size:1.15rem;color:#991b1b;">Emergent Risk — Screening Follow-up</h2>
