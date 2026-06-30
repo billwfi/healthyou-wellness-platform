@@ -1223,7 +1223,7 @@ function openEventModal(id) {
   } else {
     ['em-name','em-start','em-end','em-desc','em-notes'].forEach(i=>document.getElementById(i).value='');
     document.getElementById('em-org').value='';
-    document.getElementById('em-requires-elig').checked=false;
+    document.getElementById('em-requires-elig').checked=true;
     document.getElementById('em-flu-shot').checked=false;
     fillCategorySelect(categories[0]?.name);
   }
