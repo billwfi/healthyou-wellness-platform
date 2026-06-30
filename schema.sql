@@ -366,3 +366,8 @@ CREATE TABLE IF NOT EXISTS screening_documents (
   uploaded_at    TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_screening_documents_participant ON screening_documents(participant_id, event_id);
+
+-- Event eligibility / flu-shot flags (applied to live SQL Server via ALTER TABLE):
+--   screening_events.requires_eligibility BIT  -- verify registrants vs iStrata vw_full_eligibility (Active)
+--   screening_events.offers_flu_shot      BIT  -- ask registrants if they want a flu shot
+--   event_appointments.flu_shot           BIT  -- registrant's flu-shot answer (NULL = not asked)

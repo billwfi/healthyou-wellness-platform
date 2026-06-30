@@ -67,7 +67,15 @@
             <div class="form-group"><label>Email</label><input id="d-email" type="email"/></div>
           </div>
         </div>
-        <div class="nav"><button class="btn btn-ghost" onclick="goStep('datetime')">← Back</button><button class="btn btn-primary" onclick="afterDetails()">Next →</button></div>
+        <div class="card" id="flu-card" style="display:none;">
+          <div class="card-title">Flu Shot</div>
+          <p style="font-size:.9rem;color:var(--gray-600);margin:0 0 12px;">A flu shot will be offered at this event. Would you like to participate in a flu shot?</p>
+          <div style="display:flex;gap:22px;">
+            <label style="display:flex;gap:7px;align-items:center;font-size:.95rem;"><input type="radio" name="flu" value="yes"> Yes</label>
+            <label style="display:flex;gap:7px;align-items:center;font-size:.95rem;"><input type="radio" name="flu" value="no"> No</label>
+          </div>
+        </div>
+        <div class="nav"><button class="btn btn-ghost" onclick="goStep('datetime')">← Back</button><button class="btn btn-primary" id="details-next" onclick="afterDetails()">Next →</button></div>
       </div>
 
       <!-- Step: forms -->
@@ -116,6 +124,7 @@ const slug=qs.get('e')||qs.get('event')||qs.get('slug');
   document.getElementById('wizard').style.display='';
   document.getElementById('ev-name').textContent=data.event.name;
   document.getElementById('ev-sub').textContent=[data.group_name, data.event.description].filter(Boolean).join(' · ');
+  if(data.event.offers_flu_shot){ document.getElementById('flu-card').style.display=''; }
   if(data.locations.length===1){ selectLocation(data.locations[0].id); }
   renderLocations();
   goStep('location');
@@ -192,14 +201,39 @@ async function loadSlots(){
 function pickTime(t,btn){ data.state.time=t; document.querySelectorAll('#dt-slots .btn').forEach(b=>b.classList.remove('btn-primary')); btn.classList.add('btn-primary'); document.getElementById('dt-next').disabled=false; }
 
 // ── Details ──
-function afterDetails(){
+async function afterDetails(){
   const first=document.getElementById('d-first').value.trim(), last=document.getElementById('d-last').value.trim();
   const dob=document.getElementById('d-dob').value||null, gender=document.getElementById('d-gender').value||null;
   if(!first||!last){ showToast('First and last name are required.'); return; }
   if(!dob){ showToast('Date of birth is required.'); return; }
   if(!gender){ showToast('Gender is required.'); return; }
+  // Flu shot participation (when offered for this event)
+  let fluShot=null;
+  if(data.event.offers_flu_shot){
+    const f=document.querySelector('input[name="flu"]:checked');
+    if(!f){ showToast('Please indicate whether you would like a flu shot.'); return; }
+    fluShot=(f.value==='yes');
+  }
   data.state.details={ first_name:first, last_name:last, date_of_birth:dob, gender,
     phone:document.getElementById('d-phone').value.trim()||null, email:document.getElementById('d-email').value.trim()||null };
+  data.state.flu_shot=fluShot;
+
+  // Eligibility verification (when required for this event)
+  if(data.event.requires_eligibility){
+    const btn=document.getElementById('details-next'); const prev=btn.textContent; btn.disabled=true; btn.textContent='Verifying…';
+    try{
+      const res=await fetch('/api/verify-eligibility',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({slug, first_name:first, last_name:last, date_of_birth:dob, gender})}).then(r=>r.json());
+      btn.disabled=false; btn.textContent=prev;
+      if(res.eligible){
+        alert('You are eligible to register.');
+      } else {
+        alert('You are not currently eligible to register.\n\nPlease contact HR.'+(res.reason?'\n\n'+res.reason:''));
+        return;   // stop the registration process
+      }
+    }catch(e){ btn.disabled=false; btn.textContent=prev; alert('We could not verify your eligibility right now. Please try again in a moment.'); return; }
+  }
+
   if(hasForms()){ renderForms(); goStep('forms'); }
   else { renderReview(); goStep('confirm'); }   // no forms → straight to review
 }
@@ -273,12 +307,13 @@ function renderReview(){
     <tr><td style="color:var(--gray-400);">Date</td><td>${esc(new Date(s.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}))}</td></tr>
     <tr><td style="color:var(--gray-400);">Time</td><td>${esc(fmtTime(s.time))}</td></tr>
     ${s.details.email?`<tr><td style="color:var(--gray-400);">Email</td><td>${esc(s.details.email)}</td></tr>`:''}
+    ${data.event.offers_flu_shot?`<tr><td style="color:var(--gray-400);">Flu Shot</td><td>${s.flu_shot?'Yes':'No'}</td></tr>`:''}
   </tbody></table>`;
 }
 async function submitReg(){
   const s=data.state; const btn=document.getElementById('submit-btn'); btn.disabled=true; btn.textContent='Submitting…';
   const body={ slug, location_id:s.location.id, appointment_date:s.date, appointment_time:s.time,
-    ...s.details, answers:s.answers, files:s.files };
+    ...s.details, flu_shot:s.flu_shot, answers:s.answers, files:s.files };
   try{
     const r=await fetch('/api/event-register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const j=await r.json();

@@ -45,7 +45,7 @@ exports.handler = async (event) => {
       // full event payload by public slug
       if (!qs.slug) return badRequest('slug required');
       const ev = await db.query(
-        `SELECT id, name, description, event_category,
+        `SELECT id, name, description, event_category, requires_eligibility, offers_flu_shot,
                 CONVERT(varchar(10), start_date, 23) AS start_date,
                 CONVERT(varchar(10), end_date, 23)   AS end_date, org_id, public_slug
            FROM screening_events WHERE public_slug=$1`, [qs.slug]);
@@ -76,6 +76,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'POST') {
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return badRequest('Invalid JSON'); }
     const { slug, location_id, appointment_date, appointment_time, first_name, last_name, email, phone, date_of_birth, gender } = b;
+    const fluShot = (b.flu_shot === true || b.flu_shot === false) ? (b.flu_shot ? 1 : 0) : null;
     if (!slug || !location_id || !appointment_date || !appointment_time || !first_name || !last_name)
       return badRequest('slug, location, date, time, first and last name are required');
     try {
@@ -98,10 +99,10 @@ exports.handler = async (event) => {
 
         const ins = await q(
           `INSERT INTO event_appointments
-             (event_id, location_id, first_name, last_name, email, phone, date_of_birth, gender, appointment_date, appointment_time, magic_token)
-           OUTPUT INSERTED.id VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+             (event_id, location_id, first_name, last_name, email, phone, date_of_birth, gender, appointment_date, appointment_time, magic_token, flu_shot)
+           OUTPUT INSERTED.id VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
           [eventId, location_id, first_name, last_name, email || null, phone || null,
-           date_of_birth || null, gender || null, appointment_date, appointment_time, token]);
+           date_of_birth || null, gender || null, appointment_date, appointment_time, token, fluShot]);
         const id = ins.rows[0].id;
 
         for (const a of (Array.isArray(b.answers) ? b.answers : [])) {

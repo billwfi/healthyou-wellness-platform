@@ -40,17 +40,18 @@ exports.handler = async (event, context) => {
 
   if (event.httpMethod === 'POST') {
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return badRequest('Invalid JSON'); }
-    const { name, org_id, start_date, end_date, status, description, notes, event_category } = b;
+    const { name, org_id, start_date, end_date, status, description, notes, event_category, requires_eligibility, offers_flu_shot } = b;
     if (!name || !start_date) return badRequest('name and start_date required');
     // event_date column is legacy + NOT NULL — keep it in sync with start_date.
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const r = await db.query(
           `INSERT INTO screening_events
-             (name, org_id, event_date, start_date, end_date, status, description, notes, event_category, public_slug)
-           OUTPUT INSERTED.* VALUES ($1,$2,$3,$3,$4,$5,$6,$7,$8,$9)`,
+             (name, org_id, event_date, start_date, end_date, status, description, notes, event_category, public_slug, requires_eligibility, offers_flu_shot)
+           OUTPUT INSERTED.* VALUES ($1,$2,$3,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
           [name, org_id || null, start_date, end_date || null, status || 'scheduled',
-           description || null, notes || null, event_category || 'Screening Event', slugify(name)]
+           description || null, notes || null, event_category || 'Screening Event', slugify(name),
+           requires_eligibility ? 1 : 0, offers_flu_shot ? 1 : 0]
         );
         return created(r.rows[0]);
       } catch (e) {
@@ -66,6 +67,8 @@ exports.handler = async (event, context) => {
     if (!id) return badRequest('id required');
     // Only touch email_template_id when the caller actually sends it (allows clearing to null).
     const setTpl = Object.prototype.hasOwnProperty.call(b, 'email_template_id') ? 1 : 0;
+    const reqElig = Object.prototype.hasOwnProperty.call(b, 'requires_eligibility') ? (b.requires_eligibility ? 1 : 0) : null;
+    const fluShot = Object.prototype.hasOwnProperty.call(b, 'offers_flu_shot') ? (b.offers_flu_shot ? 1 : 0) : null;
     try {
       const r = await db.query(
         `UPDATE screening_events SET
@@ -74,12 +77,14 @@ exports.handler = async (event, context) => {
            end_date=COALESCE($5,end_date), status=COALESCE($6,status),
            description=COALESCE($7,description), notes=COALESCE($8,notes),
            email_template_id=CASE WHEN $9=1 THEN $10 ELSE email_template_id END,
-           event_category=COALESCE($11,event_category)
+           event_category=COALESCE($11,event_category),
+           requires_eligibility=COALESCE($12,requires_eligibility),
+           offers_flu_shot=COALESCE($13,offers_flu_shot)
          OUTPUT INSERTED.*
          WHERE id=$1`,
         [id, name || null, org_id || null, start_date || null, end_date || null,
          status || null, description || null, notes || null,
-         setTpl, (email_template_id || null), event_category || null]
+         setTpl, (email_template_id || null), event_category || null, reqElig, fluShot]
       );
       if (!r.rows.length) return notFound();
       return ok(r.rows[0]);
