@@ -220,11 +220,16 @@
 
       <!-- Forms tab -->
       <div id="et-forms" style="display:none;">
-        <div class="card">
-          <div class="card-title">Registration Forms</div>
-          <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:14px;">Select one or more forms participants complete during registration for this event. Build forms under <a href="/admin/forms.html" style="color:var(--teal);">Event Management → Forms</a>.</p>
-          <div id="ef-list"><span style="font-size:.85rem;color:var(--gray-400);">Loading…</span></div>
-          <div class="save-bar"><button class="btn btn-primary" onclick="saveEventForms()">Save Forms</button></div>
+        <div class="section-header" style="margin-bottom:14px;">
+          <h3>Registration Forms <span id="ef-count" style="font-size:.8rem;font-weight:400;color:var(--gray-400);"></span></h3>
+          <button class="btn btn-primary btn-sm" onclick="openFormsModal()">+ Add Form</button>
+        </div>
+        <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:14px;">Forms participants complete during registration for this event. Build forms under <a href="/admin/forms.html" style="color:var(--teal);">Event Management → Forms</a>.</p>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <table class="data-table">
+            <thead><tr><th>Form</th><th style="text-align:center;">Fields</th><th>Type</th><th style="width:90px;"></th></tr></thead>
+            <tbody id="ef-tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+          </table>
         </div>
       </div>
 
@@ -372,6 +377,21 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('report-modal')">Close</button>
       <button class="btn btn-primary" onclick="printScreeningReport()">Print / Save PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Forms Modal -->
+<div id="forms-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'forms-modal')">
+  <div class="modal">
+    <div class="modal-title">Add Forms</div>
+    <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:14px;">Check the forms to include on this event's registration.</p>
+    <div id="fm-picker" style="max-height:50vh;overflow-y:auto;border:1px solid var(--gray-200);border-radius:8px;">
+      <div style="padding:14px;font-size:.85rem;color:var(--gray-400);">Loading…</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('forms-modal')">Cancel</button>
+      <button class="btn btn-primary" id="fm-apply" onclick="applyFormsSelection()">Add Selected</button>
     </div>
   </div>
 </div>
@@ -992,38 +1012,66 @@ async function updateStatus(id,status) {
 function auth(){ return {Authorization:'Bearer '+authToken}; }
 
 // ── Forms tab (assign forms to the event) ─────────────────────────────────────
+let efAll=[], efAssigned=new Set();
+function efFieldCount(f){ return (f.schema_json&&f.schema_json.fields?f.schema_json.fields.length:0); }
 async function loadEventForms(){
   try{
     const [all, assigned] = await Promise.all([
       fetch('/api/forms?active=1',{headers:auth()}).then(r=>r.json()),
       fetch(`/api/event-forms?event_id=${activeEvent.id}`,{headers:auth()}).then(r=>r.json()),
     ]);
-    const allForms=Array.isArray(all)?all:[]; const sel=new Set((Array.isArray(assigned)?assigned:[]).map(f=>f.id));
-    const c=document.getElementById('ef-list');
-    if(!allForms.length){
-      c.innerHTML='<div style="font-size:.85rem;color:var(--gray-400);padding:8px 0;">No active forms yet. Create one under <a href="/admin/forms.html" style="color:var(--teal);">Forms</a>.</div>';
-      return;
-    }
-    c.innerHTML='<div style="border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;">'+allForms.map((f,i)=>{
-      const n=(f.schema_json&&f.schema_json.fields?f.schema_json.fields.length:0);
-      const meta=[`${n} field${n===1?'':'s'}`]; if(f.requires_ack) meta.push('Acknowledgement required');
+    efAll=Array.isArray(all)?all:[];
+    efAssigned=new Set((Array.isArray(assigned)?assigned:[]).map(f=>f.id));
+    renderAssignedForms();
+  }catch(e){ showToast('Error loading forms'); }
+}
+function renderAssignedForms(){
+  const rows=efAll.filter(f=>efAssigned.has(f.id));
+  document.getElementById('ef-count').textContent=rows.length?`(${rows.length})`:'';
+  document.getElementById('ef-tbody').innerHTML = rows.length ? rows.map(f=>{
+    const n=efFieldCount(f);
+    return `<tr>
+      <td><strong>${esc(f.name)}</strong>${f.description?`<br><span style="font-size:.78rem;color:var(--gray-400);">${esc(f.description)}</span>`:''}</td>
+      <td style="text-align:center;">${n}</td>
+      <td>${f.requires_ack?'<span class="badge" style="background:#fef3c7;color:#92400e;">Acknowledgement</span>':'<span style="color:var(--gray-400);font-size:.82rem;">Information</span>'}</td>
+      <td><button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);" onclick="removeEventForm(${f.id})">Remove</button></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="4" class="empty">No forms added yet. Use “+ Add Form” to attach one.</td></tr>';
+}
+function openFormsModal(){
+  const c=document.getElementById('fm-picker');
+  if(!efAll.length){
+    c.innerHTML='<div style="padding:16px;font-size:.85rem;color:var(--gray-400);">No active forms exist yet. Create one under <a href="/admin/forms.html" style="color:var(--teal);">Forms</a>.</div>';
+  } else {
+    c.innerHTML=efAll.map((f,i)=>{
+      const n=efFieldCount(f); const meta=[`${n} field${n===1?'':'s'}`]; if(f.requires_ack) meta.push('Acknowledgement required');
       return `<label style="display:flex;align-items:flex-start;gap:11px;padding:12px 14px;cursor:pointer;${i?'border-top:1px solid var(--gray-100);':''}">
-        <input type="checkbox" value="${f.id}" ${sel.has(f.id)?'checked':''} style="width:auto;margin-top:2px;flex:none;">
+        <input type="checkbox" value="${f.id}" ${efAssigned.has(f.id)?'checked':''} style="width:auto;margin-top:2px;flex:none;">
         <span style="display:flex;flex-direction:column;gap:2px;">
           <span style="font-weight:600;font-size:.9rem;color:var(--gray-800);">${esc(f.name)}</span>
           <span style="font-size:.78rem;color:var(--gray-400);">${meta.join(' · ')}</span>
-        </span>
-      </label>`;
-    }).join('')+'</div>';
-  }catch(e){ showToast('Error loading forms'); }
+        </span></label>`;
+    }).join('');
+  }
+  document.getElementById('forms-modal').style.display='flex';
+}
+async function applyFormsSelection(){
+  efAssigned=new Set([...document.querySelectorAll('#fm-picker input[type=checkbox]:checked')].map(c=>parseInt(c.value)));
+  const btn=document.getElementById('fm-apply'); btn.disabled=true; btn.textContent='Saving…';
+  const okSaved=await saveEventForms();
+  btn.disabled=false; btn.textContent='Add Selected';
+  if(okSaved){ closeModal('forms-modal'); renderAssignedForms(); }
+}
+async function removeEventForm(id){
+  efAssigned.delete(id);
+  if(await saveEventForms()) renderAssignedForms();
 }
 async function saveEventForms(){
-  const ids=[...document.querySelectorAll('#ef-list input[type=checkbox]:checked')].map(c=>parseInt(c.value));
   try{
-    const r=await fetch('/api/event-forms',{method:'PUT',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify({event_id:activeEvent.id,form_ids:ids})});
-    if(!r.ok){ showToast('Error: '+((await r.json()).error||'Save failed')); return; }
-    showToast('Forms saved');
-  }catch(e){ showToast('Error: '+e.message); }
+    const r=await fetch('/api/event-forms',{method:'PUT',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify({event_id:activeEvent.id,form_ids:[...efAssigned]})});
+    if(!r.ok){ showToast('Error: '+((await r.json()).error||'Save failed')); return false; }
+    showToast('Forms updated'); return true;
+  }catch(e){ showToast('Error: '+e.message); return false; }
 }
 
 async function loadLocations(){
