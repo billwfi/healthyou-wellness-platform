@@ -44,20 +44,25 @@ async function buildAndSend(db, { email, first_name, last_name, event_id, eventI
                 location: locLine, date: dateStr, time: timeStr, manage_link: manageLink };
 
   const subject = applyVars(tpl.subject || 'Your screening appointment — {{date}}', ctx);
-  const body = tpl.body_html
-    ? applyVars(tpl.body_html, ctx)
-    : `<p>Hi ${esc(first_name)} ${esc(last_name)}, your screening appointment is confirmed.</p>`;
-  const logo = `${site}/assets/img/hylogo.png`;
-  const html = `<div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+  let html;
+  if (tpl.body_html) {
+    // The template IS the complete email — render it as-is with placeholders filled.
+    // (Authors include their own logo, details, and manage link.)
+    html = applyVars(tpl.body_html, ctx);
+  } else {
+    // No template assigned: send the built-in default (logo + greeting + details + manage link).
+    const logo = `${site}/assets/img/hylogo.png`;
+    html = `<div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
     <div style="background:#0d9488;padding:18px;text-align:center;"><img src="${logo}" alt="HealthYou" height="34" style="background:#fff;padding:4px 12px;border-radius:8px;"></div>
     <div style="padding:24px;color:#334155;font-size:14px;">
       ${ctx.group ? `<div style="font-weight:600;margin-bottom:10px;">${esc(ctx.group)}</div>` : ''}
-      ${body}
+      <p>Hi ${esc(first_name)} ${esc(last_name)}, your screening appointment is confirmed.</p>
       <div style="margin:18px 0;padding:14px;background:#f1f5f9;border-radius:8px;font-size:13px;">
         <strong>${esc(ctx.event)}</strong><br>${esc(locLine || '—')}<br>${esc(dateStr)} at ${esc(timeStr)}
       </div>
       <p style="font-size:13px;color:#64748b;">Need to make a change? <a href="${manageLink}" style="color:#0d9488;">Cancel or reschedule your appointment</a>.</p>
     </div></div>`;
+  }
   await sendEmail({ to: email, subject, html });
   return { sent: true };
 }
