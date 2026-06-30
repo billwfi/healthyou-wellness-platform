@@ -765,7 +765,10 @@ function screeningReportHTML(r){
   const COUNTED=new Set(['waist_circumference','waist_height','blood_pressure','hdl','ldl','triglycerides','non_hdl','blood_glucose','hba1c','grip_strength']);
   const countedTiles=tiles.filter(t=>COUNTED.has(t[2]));
   const otherTiles=tiles.filter(t=>!COUNTED.has(t[2]));
-  const gridHtml=list=>`<div class="result-preview-grid">${list.map(t=>{ const c=tileColor(t[2]); const ideal=t[2]&&IDEAL_RANGE[t[2]]; return `<div class="result-tile" style="${c?'border-color:'+c+';':''}"><div class="result-tile-val" style="${c?'color:'+c+';':''}">${esc(String(t[1]))}</div><div class="result-tile-label">${esc(t[0])}</div>${ideal?`<div style="font-size:.62rem;color:var(--gray-400);margin-top:3px;">${ideal}</div>`:''}</div>`;}).join('')}</div>`;
+  // Measures that get a ⚠ Critical-Risk flag in the badge corner when at/over the CR threshold.
+  const CR_BADGE=new Set(['blood_pressure','blood_glucose','hba1c','ldl','triglycerides']);
+  const crIcon=`<span title="Critical Risk — reading is in the critical-risk range" style="position:absolute;top:5px;right:6px;font-size:.95rem;line-height:1;color:#b91c1c;">⚠️</span>`;
+  const gridHtml=list=>`<div class="result-preview-grid">${list.map(t=>{ const c=tileColor(t[2]); const ideal=t[2]&&IDEAL_RANGE[t[2]]; const cr=t[2]&&CR_BADGE.has(t[2])&&M[t[2]]&&M[t[2]].cr; return `<div class="result-tile" style="position:relative;${c?'border-color:'+c+';':''}">${cr?crIcon:''}<div class="result-tile-val" style="${c?'color:'+c+';':''}">${esc(String(t[1]))}</div><div class="result-tile-label">${esc(t[0])}</div>${ideal?`<div style="font-size:.62rem;color:var(--gray-400);margin-top:3px;">${ideal}</div>`:''}</div>`;}).join('')}</div>`;
   const sectionTitle=t=>`<div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;margin:18px 0 8px;">${t}</div>`;
 
   return `
