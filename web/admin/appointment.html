@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Edit Appointment — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo.png" alt="HealthYou"></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <a href="/admin/groups.html" class="sidebar-item">Groups</a>
+    <div class="sidebar-section" style="margin-top:12px;">Health Coaching Admin</div>
+    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <div class="sidebar-section" style="margin-top:12px;">Event Management</div>
+    <a href="/admin/events.html" class="sidebar-item">Events</a>
+    <a href="/admin/calendar.html" class="sidebar-item">Calendar</a>
+    <a href="/admin/appointment-search.html" class="sidebar-item">Appointment Search</a>
+    <a href="/admin/forms.html" class="sidebar-item">Forms</a>
+    <a href="/admin/emails.html" class="sidebar-item">Email Templates</a>
+    <div class="sidebar-section" style="margin-top:12px;">Wellness Portal</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+    <a href="/admin/umbraco.html" class="sidebar-item">Umbraco</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/settings.html" class="sidebar-item">System Settings</a>
+    <a href="/admin/release-notes.html" class="sidebar-item">Release Notes</a>
+  </nav>
+</aside>
+<main class="container has-sidebar">
+  <div id="content" style="display:none;">
+    <a href="#" id="back-link" class="back-link" onclick="history.back();return false;">&#8592; Back</a>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
+      <div>
+        <h1 class="page-title" style="margin-bottom:2px;">Edit Appointment</h1>
+        <p style="color:var(--gray-400);font-size:.88rem;margin:0;" id="ev-label"></p>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="resend-btn" onclick="resend(this)">Resend confirmation</button>
+    </div>
+
+    <div id="notfound" style="display:none;" class="card"><div class="empty">Appointment not found.</div></div>
+
+    <div id="form-wrap" style="display:none;">
+      <div class="card">
+        <div class="card-title">Registrant details</div>
+        <div class="form-grid" style="gap:14px;">
+          <div class="form-group"><label>First Name *</label><input id="f-first" type="text"/></div>
+          <div class="form-group"><label>Last Name *</label><input id="f-last" type="text"/></div>
+          <div class="form-group"><label>Email</label><input id="f-email" type="email"/></div>
+          <div class="form-group"><label>Phone</label><input id="f-phone" type="tel"/></div>
+          <div class="form-group"><label>Date of Birth</label><input id="f-dob" type="date"/></div>
+          <div class="form-group"><label>Gender</label><select id="f-gender"></select></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Appointment</div>
+        <div class="form-grid" style="gap:14px;">
+          <div class="form-group span-2"><label>Location</label><select id="f-loc"></select></div>
+          <div class="form-group"><label>Date</label><input id="f-date" type="date"/></div>
+          <div class="form-group"><label>Time</label><input id="f-time" type="time"/></div>
+          <div class="form-group"><label>Status</label><select id="f-status"><option value="registered">Registered</option><option value="cancelled">Cancelled</option></select></div>
+        </div>
+      </div>
+
+      <div class="save-bar">
+        <span id="err" style="display:none;font-size:.84rem;color:var(--red);"></span>
+        <button class="btn btn-ghost" onclick="history.back()">Cancel</button>
+        <button class="btn btn-primary" id="save-btn" onclick="save()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, appt=null;
+const apptId=new URLSearchParams(location.search).get('id');
+const GENDERS=['Male','Female','Other','Prefer not to say'];
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} else { location.href='/admin/login.html'; } });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ location.href='/admin/login.html'; });
+
+async function boot(user){
+  document.getElementById('content').style.display='';
+  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+  if(!apptId){ document.getElementById('notfound').style.display=''; return; }
+  load();
+}
+function auth(){ return {Authorization:'Bearer '+authToken}; }
+
+async function load(){
+  try{
+    const r=await fetch(`/api/appointment?id=${encodeURIComponent(apptId)}`,{headers:auth()});
+    if(!r.ok){ document.getElementById('notfound').style.display=''; return; }
+    appt=await r.json();
+    fill();
+  }catch(e){ showToast('Error: '+e.message); }
+}
+
+function fill(){
+  document.getElementById('ev-label').textContent=appt.event_name||'';
+  document.getElementById('form-wrap').style.display='';
+  document.getElementById('f-first').value=appt.first_name||'';
+  document.getElementById('f-last').value=appt.last_name||'';
+  document.getElementById('f-email').value=appt.email||'';
+  document.getElementById('f-phone').value=appt.phone||'';
+  document.getElementById('f-dob').value=appt.date_of_birth||'';
+  // gender select (include current value if non-standard)
+  const opts=[...GENDERS]; if(appt.gender && !opts.some(o=>o.toLowerCase()===String(appt.gender).toLowerCase())) opts.unshift(appt.gender);
+  document.getElementById('f-gender').innerHTML='<option value="">— select —</option>'+opts.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('');
+  document.getElementById('f-gender').value=appt.gender||'';
+  // locations
+  const lsel=document.getElementById('f-loc');
+  lsel.innerHTML=(appt.locations||[]).map(l=>`<option value="${l.id}">${esc(l.name)}${l.city?' — '+esc([l.city,l.state].filter(Boolean).join(', ')):''}</option>`).join('');
+  lsel.value=String(appt.location_id||'');
+  document.getElementById('f-date').value=appt.appointment_date||'';
+  document.getElementById('f-time').value=appt.appointment_time||'';
+  document.getElementById('f-status').value=appt.status||'registered';
+}
+
+async function save(){
+  const first=document.getElementById('f-first').value.trim(), last=document.getElementById('f-last').value.trim();
+  if(!first||!last){ showErr('First and last name are required.'); return; }
+  const body={ id:Number(apptId), first_name:first, last_name:last,
+    email:document.getElementById('f-email').value.trim()||null,
+    phone:document.getElementById('f-phone').value.trim()||null,
+    date_of_birth:document.getElementById('f-dob').value||null,
+    gender:document.getElementById('f-gender').value||null,
+    location_id:Number(document.getElementById('f-loc').value)||null,
+    appointment_date:document.getElementById('f-date').value||null,
+    appointment_time:document.getElementById('f-time').value||null,
+    status:document.getElementById('f-status').value };
+  const btn=document.getElementById('save-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try{
+    const r=await fetch('/api/appointment',{method:'PUT',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify(body)});
+    if(!r.ok){ showErr((await r.json()).error||'Save failed'); return; }
+    showToast('Appointment updated');
+  }catch(e){ showErr(e.message); }
+  finally{ btn.disabled=false; btn.textContent='Save Changes'; }
+}
+
+async function resend(btn){
+  if(btn){ btn.disabled=true; btn.textContent='Sending…'; }
+  try{
+    const r=await fetch('/api/event-participants',{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify({action:'resend',appointment_id:Number(apptId)})});
+    const j=await r.json().catch(()=>({}));
+    showToast(r.ok?'Confirmation email resent':('Error: '+(j.error||'Could not resend')));
+  }catch(e){ showToast('Error: '+e.message); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='Resend confirmation'; } }
+}
+
+function showErr(m){ const e=document.getElementById('err'); e.textContent=m; e.style.display=''; }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>
