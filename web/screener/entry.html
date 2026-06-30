@@ -449,6 +449,102 @@ function educationHTML(M){
    + `</div>`;
 }
 
+// ── Graphical report cards (mirrors the admin report) ─────────────────────────
+const GG='#10b981',GA='#f59e0b',GR='#ef4444';
+const MUNIT={bmi:'',waist_circumference:'in',waist_height:'',systolic:'mmHg',diastolic:'mmHg',blood_glucose:'mg/dL',hba1c:'%',hdl:'mg/dL',ldl:'mg/dL',non_hdl:'mg/dL',total_cholesterol:'mg/dL',cholesterol_ratio:'',triglycerides:'mg/dL'};
+function gaugeSpec(key,sex,fasting){
+  switch(key){
+    case 'bmi': return {min:15,max:40,dec:1,segs:[[15,18.5,GR],[18.5,25,GG],[25,30,GA],[30,40,GR]]};
+    case 'waist_circumference': { const t=sex==='F'?35:40; return {min:25,max:55,dec:0,segs:[[25,t,GG],[t,55,GR]]}; }
+    case 'waist_height': return {min:0.3,max:0.75,dec:2,segs:[[0.3,0.5,GG],[0.5,0.6,GA],[0.6,0.75,GR]]};
+    case 'systolic': return {min:90,max:190,dec:0,segs:[[90,120,GG],[120,140,GA],[140,190,GR]]};
+    case 'diastolic': return {min:50,max:120,dec:0,segs:[[50,80,GG],[80,90,GA],[90,120,GR]]};
+    case 'blood_glucose': return fasting?{min:60,max:300,dec:0,segs:[[60,100,GG],[100,126,GA],[126,300,GR]]}:{min:60,max:300,dec:0,segs:[[60,140,GG],[140,200,GA],[200,300,GR]]};
+    case 'hba1c': return {min:4,max:12,dec:1,segs:[[4,5.7,GG],[5.7,6.5,GA],[6.5,12,GR]]};
+    case 'hdl': return sex==='F'?{min:20,max:90,dec:0,segs:[[20,41,GR],[41,50,GA],[50,90,GG]]}:{min:20,max:90,dec:0,segs:[[20,31,GR],[31,41,GA],[41,90,GG]]};
+    case 'ldl': return {min:50,max:200,dec:0,segs:[[50,100,GG],[100,140,GA],[140,200,GR]]};
+    case 'triglycerides': return fasting?{min:50,max:400,dec:0,segs:[[50,150,GG],[150,200,GA],[200,400,GR]]}:{min:50,max:400,dec:0,segs:[[50,200,GG],[200,250,GA],[250,400,GR]]};
+    case 'non_hdl': return {min:80,max:220,dec:0,segs:[[80,130,GG],[130,170,GA],[170,220,GR]]};
+    case 'total_cholesterol': return {min:120,max:320,dec:0,segs:[[120,200,GG],[200,240,GA],[240,320,GR]]};
+    case 'cholesterol_ratio': return {min:2,max:8,dec:1,segs:[[2,4,GG],[4,4.5,GA],[4.5,8,GR]]};
+    default: return null;
+  }
+}
+function fmtNum(n,dec){ return dec?Number(n).toFixed(dec):String(Math.round(Number(n))); }
+function segColorAt(spec,v){ for(const s of spec.segs){ if(v>=s[0]&&v<s[1]) return s[2]; } return v<spec.segs[0][0]?spec.segs[0][2]:spec.segs[spec.segs.length-1][2]; }
+function gaugeCritical(key,v,fasting,diabetic){
+  switch(key){
+    case 'systolic': return v>=150;
+    case 'diastolic': return v>=100;
+    case 'blood_glucose': return fasting?(v>=(diabetic?180:140)):(v>=(diabetic?240:200));
+    case 'hba1c': return diabetic?(v>=8.0):(v>6.4);
+    case 'ldl': return v>160;
+    case 'triglycerides': return fasting?(v>=400):(v>=500);
+    default: return false;
+  }
+}
+function gaugeCard(key,label,val,sex,fasting,diabetic){
+  const spec=gaugeSpec(key,sex,fasting);
+  if(!spec||val==null||val===''||isNaN(Number(val))) return '';
+  const v=Number(val), span=spec.max-spec.min, unit=MUNIT[key]||'', dec=spec.dec||0;
+  const cr=gaugeCritical(key,v,fasting,!!diabetic);
+  let glo=null,ghi=null; spec.segs.forEach(s=>{ if(s[2]===GG){ if(glo===null)glo=s[0]; ghi=s[1]; } });
+  const loAtMin=glo!==null&&Math.abs(glo-spec.min)<1e-9, hiAtMax=ghi!==null&&Math.abs(ghi-spec.max)<1e-9;
+  let nr='';
+  if(glo!==null){ nr=(loAtMin&&!hiAtMax)?('< '+fmtNum(ghi,dec)):(hiAtMax&&!loAtMin)?('> '+fmtNum(glo,dec)):(fmtNum(glo,dec)+' – '+fmtNum(ghi,dec)); }
+  const pct=x=>Math.max(0,Math.min(100,((x-spec.min)/span)*100));
+  const segHtml=spec.segs.map(s=>`<div style="width:${((s[1]-s[0])/span*100)}%;background:${s[2]};"></div>`).join('');
+  const vpct=pct(v), pillColor=segColorAt(spec,v), disp=fmtNum(v,dec);
+  const lblLo=(glo!==null&&!loAtMin)?`<span style="position:absolute;left:${pct(glo)}%;transform:translateX(-50%);">${fmtNum(glo,dec)}</span>`:'';
+  const lblHi=(ghi!==null&&!hiAtMax)?`<span style="position:absolute;left:${pct(ghi)}%;transform:translateX(-50%);">${fmtNum(ghi,dec)}</span>`:'';
+  return `<div style="position:relative;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px 12px;background:#fff;">
+    ${cr?`<span title="Critical Risk — reading is in the critical-risk range" style="position:absolute;top:8px;right:10px;font-size:.95rem;line-height:1;color:#b91c1c;">⚠️</span>`:''}
+    <div style="font-weight:700;color:#1f2937;font-size:.9rem;">${label}</div>
+    <div style="font-size:.74rem;color:#9ca3af;margin-bottom:30px;">Normal range: ${nr}${unit?' '+unit:''}</div>
+    <div style="position:relative;">
+      <div style="position:absolute;left:${vpct}%;transform:translateX(-50%);top:-26px;display:flex;flex-direction:column;align-items:center;">
+        <span style="background:${pillColor};color:#fff;font-weight:700;font-size:.82rem;border-radius:11px;padding:2px 11px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.18);">${disp}</span>
+        <span style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid ${pillColor};"></span>
+      </div>
+      <div style="height:13px;border-radius:7px;overflow:hidden;display:flex;">${segHtml}</div>
+      <div style="position:relative;height:16px;font-size:.72rem;color:#6b7280;margin-top:4px;">${lblLo}${lblHi}</div>
+    </div>
+  </div>`;
+}
+function graphicalReportHTML(r){
+  const g=((r.gender||participantSex||'')+'').toUpperCase();
+  const sex=g.startsWith('F')?'F':(g.startsWith('M')?'M':'');
+  const fasting=!!r.fasting_flag, diabetic=!!r.diabetic;
+  const cards=[];
+  const add=(key,label,valKey)=>cards.push(gaugeCard(key,label,r[valKey],sex,fasting,diabetic));
+  add('bmi','BMI','bmi');
+  add('waist_circumference','Waist Circumference','waist_circumference_in');
+  add('waist_height','Waist-to-Height Ratio','waist_height_ratio');
+  cards.push(gaugeCard('systolic','Blood Pressure — Systolic',r.systolic_bp,sex,fasting,diabetic));
+  cards.push(gaugeCard('diastolic','Blood Pressure — Diastolic',r.diastolic_bp,sex,fasting,diabetic));
+  add('blood_glucose','Blood Glucose'+(fasting?' (fasting)':''),'blood_glucose');
+  add('hba1c','HbA1c','hba1c');
+  add('hdl','HDL Cholesterol','hdl_cholesterol');
+  add('ldl','LDL Cholesterol','ldl_cholesterol');
+  add('non_hdl','Non-HDL Cholesterol','non_hdl');
+  add('total_cholesterol','Total Cholesterol','total_cholesterol');
+  add('cholesterol_ratio','Cholesterol Ratio','cholesterol_ratio');
+  add('triglycerides','Triglycerides'+(fasting?' (fasting)':''),'triglycerides');
+  const shown=cards.filter(Boolean);
+  if(!shown.length) return '';
+  const legend=`<div style="display:flex;gap:16px;align-items:center;font-size:.74rem;color:var(--gray-500);margin:6px 0 14px;flex-wrap:wrap;">
+    <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:2px;background:${GG};display:inline-block;"></span>Ideal</span>
+    <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:2px;background:${GA};display:inline-block;"></span>Borderline</span>
+    <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:2px;background:${GR};display:inline-block;"></span>High</span>
+    <span style="color:var(--gray-400);">The bubble shows this participant's result and its position in our ranges.</span>
+  </div>`;
+  return `<div style="margin-top:26px;border-top:1px solid var(--gray-200);padding-top:18px;">
+    <div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Results vs. Ideal Ranges</div>
+    ${legend}
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">${shown.join('')}</div>
+  </div>`;
+}
+
 function showResults(r) {
   // Per-measure risk levels from the server model (green/yellow/red + critical).
   let risk={}; try{ risk = r.risk_json ? JSON.parse(r.risk_json) : (r.risk||{}); }catch(e){ risk={}; }
@@ -535,7 +631,8 @@ function showResults(r) {
     `<div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
        <div style="flex:1;min-width:300px;">${eduBody}</div>
        <div style="width:430px;flex:none;border-left:1px solid var(--gray-200);padding-left:20px;">${educationHTML(M)}</div>
-     </div>`;
+     </div>`
+    +graphicalReportHTML(r);
 }
 
 function lifeLabel(key){
