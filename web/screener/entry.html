@@ -50,7 +50,10 @@
       <!-- Anthropometrics -->
       <div class="card">
         <div class="form-section-title" style="margin-bottom:16px;">Anthropometrics</div>
-        <div style="display:flex;gap:24px;align-items:center;font-size:.9rem;margin-bottom:16px;">
+        <div style="display:flex;gap:24px;align-items:center;font-size:.9rem;margin-bottom:16px;flex-wrap:wrap;">
+          <label style="display:flex;gap:6px;align-items:center;">Sex
+            <select id="f-sex" style="width:auto;padding:4px 8px;"><option value="">—</option><option value="M">Male</option><option value="F">Female</option></select>
+          </label>
           <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-fasting"> Fasting</label>
           <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-pregnant" onchange="applyPregnant()"> Pregnant</label>
           <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-diabetic"> Diabetic</label>
@@ -290,6 +293,7 @@ async function boot(user) {
     if(p.org_name) meta.push(p.org_name);
     document.getElementById('p-meta').textContent=meta.join(' · ');
     participantSex=(p.gender||'').toLowerCase();
+    document.getElementById('f-sex').value = participantSex.startsWith('m')?'M':participantSex.startsWith('f')?'F':'';
     setAlcoholRange(p.gender);
 
     // If this participant already has a record for THIS event, load it for
@@ -390,6 +394,7 @@ async function submitForm(e) {
     fasting_flag:document.getElementById('f-fasting').checked,
     pregnant:document.getElementById('f-pregnant').checked,
     diabetic:document.getElementById('f-diabetic').checked,
+    gender:({M:'Male',F:'Female'})[document.getElementById('f-sex').value]||null,
     fruit_veg_servings:document.getElementById('f-fruitveg').value!==''?parseInt(document.getElementById('f-fruitveg').value):null,
     activity_minutes:parseInt(document.getElementById('f-activity').value),
     muscle_strengthening:radioVal('f-muscle'),
@@ -420,7 +425,7 @@ function showResults(r) {
   if(r.weight_lbs) tiles.push({label:'Weight',val:r.weight_lbs+' lbs'});
   if(r.bmi) tiles.push({label:'BMI',val:Number(r.bmi).toFixed(1),key:'bmi'});
   if(r.waist_circumference_in) tiles.push({label:'Waist',val:Number(r.waist_circumference_in)+' in',key:'waist_circumference'});
-  if(r.waist_height_ratio) tiles.push({label:'Waist/Height',val:Number(r.waist_height_ratio).toFixed(2)});
+  if(r.waist_height_ratio) tiles.push({label:'Waist/Height',val:Number(r.waist_height_ratio).toFixed(2),key:'waist_height'});
   if(r.grip_strength) tiles.push({label:'Grip Strength',val:Number(r.grip_strength)+' lbs',key:'grip_strength'});
   if(r.systolic_bp) tiles.push({label:'Blood Pressure',val:`${r.systolic_bp}/${r.diastolic_bp}`,key:'blood_pressure'});
   if(r.heart_rate) tiles.push({label:'Heart Rate',val:r.heart_rate+' bpm'});

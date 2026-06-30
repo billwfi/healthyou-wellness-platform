@@ -664,13 +664,14 @@ function computeRiskClient(r){
   if((v=num(r.triglycerides))!=null) M.triglycerides = fasting?rs(v>=200?'high':v>=150?'borderline':'ideal',v>=400):rs(v>=250?'high':v>=200?'borderline':'ideal',v>=500);
   if((v=num(r.total_cholesterol))!=null) M.total_cholesterol=rs(v>=240?'high':v>=200?'borderline':'ideal');
   if((v=num(r.cholesterol_ratio))!=null) M.cholesterol_ratio=rs(v>=4.5?'high':v>=4.0?'borderline':'ideal',v>6.0);
+  if((v=num(r.waist_height_ratio))!=null) M.waist_height=rs(v>=0.6?'high':v>=0.5?'borderline':'ideal');
   if((v=num(r.grip_strength))!=null&&sex&&age!=null){ let m,f; if(age<20){m=78;f=42;}else if(age<30){m=81;f=47;}else if(age<40){m=79;f=47;}else if(age<50){m=78;f=42;}else if(age<60){m=72;f=40;}else{m=66;f=38;} const thr=sex==='F'?f:m; M.grip_strength=v>thr?rs('ideal'):rs('high'); }
   const pts={ideal:0,borderline:1,high:2}; let score=0,highs=0,bl=0,crs=0,ers=0;
   for(const k in M){const m=M[k];score+=pts[m.level];if(m.level==='high')highs++;if(m.level==='borderline')bl++;if(m.cr)crs++;if(m.emergency)ers++;}
   const level = (ers||crs)?'critical':highs>=2?'high':(highs>=1||bl>=2)?'moderate':'low';
   return {measures:M,score,level,critical:!!(crs||ers),emergency:!!ers};
 }
-const MEASURE_LABELS={bmi:'BMI',waist_circumference:'Waist Circumference',blood_pressure:'Blood Pressure',blood_glucose:'Blood Glucose',hba1c:'HbA1c',hdl:'HDL',ldl:'LDL',triglycerides:'Triglycerides',total_cholesterol:'Total Cholesterol',cholesterol_ratio:'Cholesterol Ratio',grip_strength:'Grip Strength'};
+const MEASURE_LABELS={bmi:'BMI',waist_circumference:'Waist Circumference',waist_height:'Waist-to-Height',blood_pressure:'Blood Pressure',blood_glucose:'Blood Glucose',hba1c:'HbA1c',hdl:'HDL',ldl:'LDL',triglycerides:'Triglycerides',total_cholesterol:'Total Cholesterol',cholesterol_ratio:'Cholesterol Ratio',grip_strength:'Grip Strength'};
 
 function screeningReportHTML(r){
   const risk=computeRiskClient(r), M=risk.measures;
@@ -679,7 +680,7 @@ function screeningReportHTML(r){
   if(r.weight_lbs) tiles.push(['Weight',r.weight_lbs+' lbs',null]);
   if(r.bmi) tiles.push(['BMI',Number(r.bmi).toFixed(1),'bmi']);
   if(r.waist_circumference_in) tiles.push(['Waist',Number(r.waist_circumference_in)+' in','waist_circumference']);
-  if(r.waist_height_ratio) tiles.push(['Waist/Height',Number(r.waist_height_ratio).toFixed(2),null]);
+  if(r.waist_height_ratio) tiles.push(['Waist/Height',Number(r.waist_height_ratio).toFixed(2),'waist_height']);
   if(r.grip_strength) tiles.push(['Grip Strength',Number(r.grip_strength)+' lbs','grip_strength']);
   if(r.systolic_bp) tiles.push(['Blood Pressure',r.systolic_bp+'/'+r.diastolic_bp,'blood_pressure']);
   if(r.heart_rate) tiles.push(['Heart Rate',r.heart_rate+' bpm',null]);

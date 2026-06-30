@@ -57,6 +57,7 @@ function gripThreshold(age, sex) {
   return sex === 'F' ? f : m;
 }
 function gripStatus(g, age, sex) { if (!g || !sex || age == null) return null; const thr = gripThreshold(age, sex); return g > thr ? st('ideal') : st('high'); }
+function whrStatus(r) { if (r == null) return null; return r >= 0.6 ? st('high') : r >= 0.5 ? st('borderline') : st('ideal'); }
 
 // Compute the full risk object. ctx: { sex:'M'|'F'|null, age:number|null, fasting:bool, diabetic:bool }
 function computeRisk(v, ctx) {
@@ -64,6 +65,7 @@ function computeRisk(v, ctx) {
   const measures = {
     bmi:                bmiStatus(v.bmi),
     waist_circumference: waistStatus(v.waist_circumference_in, c.sex),
+    waist_height:       whrStatus(v.waist_height_ratio),
     blood_pressure:     worse(systolicStatus(v.systolic_bp), diastolicStatus(v.diastolic_bp)),
     blood_glucose:      glucoseStatus(v.blood_glucose, c.fasting, c.diabetic),
     hba1c:              hba1cStatus(v.hba1c, c.diabetic),
@@ -138,7 +140,7 @@ exports.handler = async (event, context) => {
       height_in, weight_lbs, waist_circumference_in, body_fat_pct,
       systolic_bp, diastolic_bp, heart_rate,
       total_cholesterol, hdl_cholesterol, ldl_cholesterol, triglycerides,
-      blood_glucose, hba1c, notes, fasting_flag, pregnant, diabetic, non_hdl, cholesterol_ratio,
+      blood_glucose, hba1c, notes, fasting_flag, pregnant, diabetic, gender, non_hdl, cholesterol_ratio,
       grip_strength,
       fruit_veg_servings, activity_minutes, muscle_strengthening, stress_level,
       alcohol_drinks, tobacco_use, sleep_hours
@@ -147,11 +149,17 @@ exports.handler = async (event, context) => {
     if (!participant_id) return badRequest('participant_id required');
 
     // Participant sex + age drive several spec thresholds (waist, HDL, grip).
+    // A sex supplied at screening time takes precedence and is persisted to the participant.
     let sex = null, age = null;
     try {
       const pr = await db.query('SELECT gender, CONVERT(varchar(10), date_of_birth, 23) AS dob FROM participants WHERE id=$1', [participant_id]);
-      const g = (pr.rows[0]?.gender || '').toString().trim().toUpperCase();
+      const stored = (pr.rows[0]?.gender || '').toString().trim();
+      const chosen = (gender || stored).toString().trim();
+      const g = chosen.toUpperCase();
       sex = g.startsWith('M') ? 'M' : g.startsWith('F') ? 'F' : null;
+      if (gender && gender.toString().trim() && gender.toString().trim().toLowerCase() !== stored.toLowerCase()) {
+        try { await db.query('UPDATE participants SET gender=$2 WHERE id=$1', [participant_id, gender]); } catch (e) { /* non-critical */ }
+      }
       const dob = pr.rows[0]?.dob;
       if (dob) { const d = new Date(dob + 'T00:00:00Z'), now = new Date(); age = now.getUTCFullYear() - d.getUTCFullYear() - ((now.getUTCMonth() < d.getUTCMonth() || (now.getUTCMonth() === d.getUTCMonth() && now.getUTCDate() < d.getUTCDate())) ? 1 : 0); }
     } catch (e) { /* sex/age optional */ }
