@@ -643,27 +643,63 @@ function metSyndrome(r){
   return { measured:crit.length, metCount:crit.filter(c=>c.met).length, crit };
 }
 
+// Client-side risk model — mirrors netlify/functions/biometrics.js (HealthYou Biometric Ranges spec).
+function rs(level,cr,emergency){ return {level,cr:!!cr,emergency:!!emergency}; }
+function computeRiskClient(r){
+  const g=(r.gender||'').toString().trim().toUpperCase();
+  const sex=g.startsWith('M')?'M':g.startsWith('F')?'F':null;
+  let age=null; if(r.date_of_birth){ const d=new Date(String(r.date_of_birth).slice(0,10)+'T00:00:00Z'); const base=r.screened_at?new Date(r.screened_at):new Date(); age=base.getUTCFullYear()-d.getUTCFullYear()-((base.getUTCMonth()<d.getUTCMonth()||(base.getUTCMonth()===d.getUTCMonth()&&base.getUTCDate()<d.getUTCDate()))?1:0); }
+  const fasting=!!r.fasting_flag, diabetic=!!r.diabetic, num=v=>(v==null||v==='')?null:Number(v), M={}; let v;
+  if((v=num(r.bmi))!=null) M.bmi = v<18.5?rs('high'):v<25?rs('ideal'):v<30?rs('borderline'):rs('high');
+  if((v=num(r.waist_circumference_in))!=null&&sex) M.waist_circumference = v>=(sex==='F'?35:40)?rs('high'):rs('ideal');
+  const sys=num(r.systolic_bp), dia=num(r.diastolic_bp);
+  if(sys!=null||dia!=null){ const rk={ideal:0,borderline:1,high:2};
+    const a=sys==null?null:rs(sys>=140?'high':sys>=120?'borderline':'ideal',sys>=150,sys>=180);
+    const b=dia==null?null:rs(dia>=90?'high':dia>=80?'borderline':'ideal',dia>=100,dia>=120);
+    M.blood_pressure = !a?b:!b?a:rs(rk[a.level]>=rk[b.level]?a.level:b.level,a.cr||b.cr,a.emergency||b.emergency); }
+  if((v=num(r.blood_glucose))!=null){ const em=v>300; M.blood_glucose = fasting?rs(v>=126?'high':v>=100?'borderline':'ideal',v>=(diabetic?180:140),em):rs(v>=200?'high':v>=140?'borderline':'ideal',v>=(diabetic?240:200),em); }
+  if((v=num(r.hba1c))!=null) M.hba1c=rs(v>=6.5?'high':v>=5.7?'borderline':'ideal',diabetic?v>=8.0:v>6.4,v>12.0);
+  if((v=num(r.hdl_cholesterol))!=null&&sex) M.hdl = sex==='F'?(v>50?rs('ideal'):v>=41?rs('borderline'):rs('high')):(v>40?rs('ideal'):v>=31?rs('borderline'):rs('high'));
+  if((v=num(r.ldl_cholesterol))!=null) M.ldl=rs(v>=140?'high':v>=100?'borderline':'ideal',v>160);
+  if((v=num(r.triglycerides))!=null) M.triglycerides = fasting?rs(v>=200?'high':v>=150?'borderline':'ideal',v>=400):rs(v>=250?'high':v>=200?'borderline':'ideal',v>=500);
+  if((v=num(r.total_cholesterol))!=null) M.total_cholesterol=rs(v>=240?'high':v>=200?'borderline':'ideal');
+  if((v=num(r.cholesterol_ratio))!=null) M.cholesterol_ratio=rs(v>=4.5?'high':v>=4.0?'borderline':'ideal',v>6.0);
+  if((v=num(r.grip_strength))!=null&&sex&&age!=null){ let m,f; if(age<20){m=78;f=42;}else if(age<30){m=81;f=47;}else if(age<40){m=79;f=47;}else if(age<50){m=78;f=42;}else if(age<60){m=72;f=40;}else{m=66;f=38;} const thr=sex==='F'?f:m; M.grip_strength=v>thr?rs('ideal'):rs('high'); }
+  const pts={ideal:0,borderline:1,high:2}; let score=0,highs=0,bl=0,crs=0,ers=0;
+  for(const k in M){const m=M[k];score+=pts[m.level];if(m.level==='high')highs++;if(m.level==='borderline')bl++;if(m.cr)crs++;if(m.emergency)ers++;}
+  const level = (ers||crs)?'critical':highs>=2?'high':(highs>=1||bl>=2)?'moderate':'low';
+  return {measures:M,score,level,critical:!!(crs||ers),emergency:!!ers};
+}
+const MEASURE_LABELS={bmi:'BMI',waist_circumference:'Waist Circumference',blood_pressure:'Blood Pressure',blood_glucose:'Blood Glucose',hba1c:'HbA1c',hdl:'HDL',ldl:'LDL',triglycerides:'Triglycerides',total_cholesterol:'Total Cholesterol',cholesterol_ratio:'Cholesterol Ratio',grip_strength:'Grip Strength'};
+
 function screeningReportHTML(r){
+  const risk=computeRiskClient(r), M=risk.measures;
   const tiles=[];
   if(r.height_in) tiles.push(['Height',Number(r.height_in)+' in',null]);
   if(r.weight_lbs) tiles.push(['Weight',r.weight_lbs+' lbs',null]);
-  if(r.bmi) tiles.push(['BMI',Number(r.bmi).toFixed(1),r.bmi_category]);
-  if(r.waist_circumference_in) tiles.push(['Waist',Number(r.waist_circumference_in)+' in',null]);
-  if(r.waist_height_ratio) tiles.push(['Waist/Height',Number(r.waist_height_ratio).toFixed(2),r.waist_height_category]);
-  if(r.grip_strength) tiles.push(['Grip Strength',Number(r.grip_strength)+' lbs',null]);
-  if(r.systolic_bp) tiles.push(['Blood Pressure',r.systolic_bp+'/'+r.diastolic_bp,r.bp_risk]);
+  if(r.bmi) tiles.push(['BMI',Number(r.bmi).toFixed(1),'bmi']);
+  if(r.waist_circumference_in) tiles.push(['Waist',Number(r.waist_circumference_in)+' in','waist_circumference']);
+  if(r.waist_height_ratio) tiles.push(['Waist/Height',Number(r.waist_height_ratio).toFixed(2),null]);
+  if(r.grip_strength) tiles.push(['Grip Strength',Number(r.grip_strength)+' lbs','grip_strength']);
+  if(r.systolic_bp) tiles.push(['Blood Pressure',r.systolic_bp+'/'+r.diastolic_bp,'blood_pressure']);
   if(r.heart_rate) tiles.push(['Heart Rate',r.heart_rate+' bpm',null]);
-  if(r.total_cholesterol) tiles.push(['Total Chol.',r.total_cholesterol+' mg/dL',r.cholesterol_risk]);
-  if(r.hdl_cholesterol) tiles.push(['HDL',r.hdl_cholesterol+' mg/dL',null]);
-  if(r.ldl_cholesterol) tiles.push(['LDL',r.ldl_cholesterol+' mg/dL',null]);
-  if(r.triglycerides) tiles.push(['Triglycerides',r.triglycerides+' mg/dL',null]);
+  if(r.total_cholesterol) tiles.push(['Total Chol.',r.total_cholesterol+' mg/dL','total_cholesterol']);
+  if(r.hdl_cholesterol) tiles.push(['HDL',r.hdl_cholesterol+' mg/dL','hdl']);
+  if(r.ldl_cholesterol) tiles.push(['LDL',r.ldl_cholesterol+' mg/dL','ldl']);
+  if(r.triglycerides) tiles.push(['Triglycerides',r.triglycerides+' mg/dL','triglycerides']);
   if(r.non_hdl) tiles.push(['Non-HDL',r.non_hdl+' mg/dL',null]);
-  if(r.cholesterol_ratio) tiles.push(['Chol. Ratio',Number(r.cholesterol_ratio).toFixed(1),null]);
-  if(r.blood_glucose) tiles.push(['Glucose',r.blood_glucose+' mg/dL',r.glucose_risk]);
-  if(r.hba1c) tiles.push(['HbA1c',r.hba1c+'%',null]);
+  if(r.cholesterol_ratio) tiles.push(['Chol. Ratio',Number(r.cholesterol_ratio).toFixed(1),'cholesterol_ratio']);
+  if(r.blood_glucose) tiles.push(['Glucose',r.blood_glucose+' mg/dL','blood_glucose']);
+  if(r.hba1c) tiles.push(['HbA1c',r.hba1c+'%','hba1c']);
 
-  const riskColor={high:'var(--red)',crisis:'var(--red)',high_1:'var(--amber)',high_2:'var(--red)',elevated:'var(--amber)',borderline:'var(--amber)',very_high:'var(--red)',prediabetes:'var(--amber)',diabetes:'var(--red)',obese:'var(--red)',overweight:'var(--amber)',normal:'var(--green)',low:'var(--green)',ideal:'var(--green)'};
-  const overallColor={high:'#ef4444',moderate:'#f59e0b',low:'#10b981'}[r.overall_risk]||'#6b7280';
+  const levelColor={ideal:'var(--green)',borderline:'var(--amber)',high:'var(--red)'};
+  const tileColor=key=>{ const m=key&&M[key]; return m?levelColor[m.level]:null; };
+  const statusLabel={ideal:'Ideal',borderline:'Borderline',high:'High'};
+  const overallColor={low:'#10b981',moderate:'#f59e0b',high:'#ef4444',critical:'#b91c1c'}[risk.level]||'#6b7280';
+  const emergencyList=Object.keys(M).filter(k=>M[k].emergency).map(k=>MEASURE_LABELS[k]||k);
+  const crList=Object.keys(M).filter(k=>M[k].cr&&!M[k].emergency).map(k=>MEASURE_LABELS[k]||k);
+  // Summary rows: every captured measure with its status.
+  const summaryRows=tiles.map(t=>{ const m=t[2]&&M[t[2]]; const lvl=m?statusLabel[m.level]:'—'; const tags=m?[m.emergency?'Medical Emergency':'',m.cr&&!m.emergency?'Critical Risk':''].filter(Boolean).join(', '):''; const col=m?levelColor[m.level]:'var(--gray-400)'; return {label:t[0],val:t[1],lvl,tags,col}; });
 
   const female=(r.gender||'').toLowerCase().startsWith('f');
   const lifeMax={fruitveg:5,activity:300,alcohol:female?8:15,sleep:9};
@@ -685,13 +721,16 @@ function screeningReportHTML(r){
   return `
     <div style="text-align:center;margin-bottom:20px;">
       <div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;">Overall Risk</div>
-      <div style="font-size:2rem;font-weight:800;color:${overallColor};text-transform:capitalize;">${r.overall_risk||'—'}</div>
+      <div style="font-size:2rem;font-weight:800;color:${overallColor};text-transform:capitalize;">${risk.level}</div>
+      <div style="font-size:.78rem;color:var(--gray-400);">Risk score: ${risk.score}</div>
     </div>
+    ${emergencyList.length?`<div style="margin-bottom:12px;padding:12px 14px;background:var(--red-light);border:1px solid #fca5a5;border-radius:8px;font-size:.88rem;font-weight:700;color:#991b1b;">🚑 Medical Emergency — refer to the ER immediately: ${esc(emergencyList.join(', '))}.</div>`:''}
+    ${crList.length?`<div style="margin-bottom:12px;padding:12px 14px;background:var(--amber-light);border:1px solid #fcd34d;border-radius:8px;font-size:.86rem;font-weight:600;color:#92400e;">⚠️ Critical Risk — recommend HealthYou follow-up: ${esc(crList.join(', '))}.</div>`:''}
     <div class="result-preview-grid">
-      ${tiles.map(t=>`<div class="result-tile" style="${t[2]&&riskColor[t[2]]?'border-color:'+riskColor[t[2]]+';':''}">
-        <div class="result-tile-val" style="${t[2]&&riskColor[t[2]]?'color:'+riskColor[t[2]]+';':''}">${esc(String(t[1]))}</div>
+      ${tiles.map(t=>{ const c=tileColor(t[2]); return `<div class="result-tile" style="${c?'border-color:'+c+';':''}">
+        <div class="result-tile-val" style="${c?'color:'+c+';':''}">${esc(String(t[1]))}</div>
         <div class="result-tile-label">${esc(t[0])}</div>
-      </div>`).join('')}
+      </div>`;}).join('')}
     </div>
     ${ms.measured?`
     <div style="margin-top:20px;padding:14px 16px;border:1px solid ${msColor};border-radius:8px;background:${msBg};">
@@ -710,6 +749,19 @@ function screeningReportHTML(r){
         ${lifeRows.map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--gray-100);padding:5px 0;"><span style="color:var(--gray-600);">${esc(k)}</span><span style="font-weight:600;white-space:nowrap;">${esc(v)}</span></div>`).join('')}
       </div>
     </div>`:''}
+    <div style="margin-top:22px;">
+      <div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Measure Summary</div>
+      <table class="data-table" style="font-size:.84rem;">
+        <thead><tr><th>Measure</th><th>Value</th><th>Status</th></tr></thead>
+        <tbody>
+          ${summaryRows.map(s=>`<tr>
+            <td>${esc(s.label)}</td>
+            <td style="font-weight:600;">${esc(String(s.val))}</td>
+            <td><span style="font-weight:700;color:${s.col};">${esc(s.lvl)}</span>${s.tags?` <span style="font-size:.75rem;color:#991b1b;">(${esc(s.tags)})</span>`:''}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
   `;
 }
 
