@@ -483,6 +483,17 @@ function gaugeCritical(key,v,fasting,diabetic){
     default: return false;
   }
 }
+function crThreshold(key,fasting,diabetic){
+  switch(key){
+    case 'systolic': return 150;
+    case 'diastolic': return 100;
+    case 'blood_glucose': return fasting?(diabetic?180:140):(diabetic?240:200);
+    case 'hba1c': return diabetic?8.0:6.4;
+    case 'ldl': return 160;
+    case 'triglycerides': return fasting?400:500;
+    default: return null;
+  }
+}
 function gaugeCard(key,label,val,sex,fasting,diabetic){
   const spec=gaugeSpec(key,sex,fasting);
   if(!spec||val==null||val===''||isNaN(Number(val))) return '';
@@ -495,8 +506,12 @@ function gaugeCard(key,label,val,sex,fasting,diabetic){
   const pct=x=>Math.max(0,Math.min(100,((x-spec.min)/span)*100));
   const segHtml=spec.segs.map(s=>`<div style="width:${((s[1]-s[0])/span*100)}%;background:${s[2]};"></div>`).join('');
   const vpct=pct(v), pillColor=segColorAt(spec,v), disp=fmtNum(v,dec);
-  const lblLo=(glo!==null&&!loAtMin)?`<span style="position:absolute;left:${pct(glo)}%;transform:translateX(-50%);">${fmtNum(glo,dec)}</span>`:'';
-  const lblHi=(ghi!==null&&!hiAtMax)?`<span style="position:absolute;left:${pct(ghi)}%;transform:translateX(-50%);">${fmtNum(ghi,dec)}</span>`:'';
+  const bounds=[]; for(let i=0;i<spec.segs.length-1;i++) bounds.push(spec.segs[i][1]);
+  const notchHtml=bounds.map(b=>`<div style="position:absolute;left:${pct(b)}%;transform:translateX(-50%);top:-2px;width:2px;height:17px;background:#475569;"></div>`).join('');
+  const boundLbls=bounds.map(b=>`<span style="position:absolute;top:0;left:${pct(b)}%;transform:translateX(-50%);">${fmtNum(b,dec)}</span>`).join('');
+  const crThr=crThreshold(key,fasting,!!diabetic), showCr=crThr!=null&&crThr>spec.min&&crThr<=spec.max;
+  const crNotch=showCr?`<div title="Critical Risk threshold" style="position:absolute;left:${pct(crThr)}%;transform:translateX(-50%);top:-5px;width:2px;height:23px;background:#b91c1c;"></div>`:'';
+  const crLbl=showCr?`<span style="position:absolute;top:15px;left:${pct(crThr)}%;transform:translateX(-50%);color:#b91c1c;font-weight:700;white-space:nowrap;">CR ${fmtNum(crThr,dec)}</span>`:'';
   return `<div style="position:relative;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px 12px;background:#fff;">
     ${cr?`<span title="Critical Risk — reading is in the critical-risk range" style="position:absolute;top:8px;right:10px;font-size:.95rem;line-height:1;color:#b91c1c;">⚠️</span>`:''}
     <div style="font-weight:700;color:#1f2937;font-size:.9rem;">${label}</div>
@@ -506,8 +521,11 @@ function gaugeCard(key,label,val,sex,fasting,diabetic){
         <span style="background:${pillColor};color:#fff;font-weight:700;font-size:.82rem;border-radius:11px;padding:2px 11px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.18);">${disp}</span>
         <span style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid ${pillColor};"></span>
       </div>
-      <div style="height:13px;border-radius:7px;overflow:hidden;display:flex;">${segHtml}</div>
-      <div style="position:relative;height:16px;font-size:.72rem;color:#6b7280;margin-top:4px;">${lblLo}${lblHi}</div>
+      <div style="position:relative;height:13px;">
+        <div style="height:13px;border-radius:7px;overflow:hidden;display:flex;">${segHtml}</div>
+        ${notchHtml}${crNotch}
+      </div>
+      <div style="position:relative;height:${showCr?'30':'18'}px;font-size:.7rem;color:#6b7280;margin-top:5px;">${boundLbls}${crLbl}</div>
     </div>
   </div>`;
 }
@@ -628,11 +646,7 @@ function showResults(r) {
     ${r.overall_risk==='high'?`<div style="margin-top:12px;padding:10px;background:var(--amber-light);border:1px solid #fcd34d;border-radius:6px;font-size:.82rem;color:#92400e;">High risk identified — recommend physician follow-up within 1–2 weeks.</div>`:''}
   `;
   document.getElementById('results-summary').innerHTML=
-    `<div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
-       <div style="flex:1;min-width:300px;">${eduBody}</div>
-       <div style="width:430px;flex:none;border-left:1px solid var(--gray-200);padding-left:20px;">${educationHTML(M)}</div>
-     </div>`
-    +graphicalReportHTML(r);
+    eduBody+graphicalReportHTML(r);
 }
 
 function lifeLabel(key){
