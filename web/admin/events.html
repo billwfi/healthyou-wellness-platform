@@ -900,14 +900,28 @@ function graphicalReportHTML(r){
 }
 
 function printScreeningReport(){
-  const area=document.getElementById('report-print-area').innerHTML;
+  const r=reportRecord;
+  if(!r){ showToast('Open a report first'); return; }
   const w=window.open('','_blank','width=820,height=940');
   if(!w){ showToast('Allow pop-ups to print/save the report'); return; }
   const reportCss=document.getElementById('report-css').innerHTML;
+  const M=computeRiskClient(r).measures;
+  const name=`${(r.first_name||'')} ${(r.last_name||'')}`.trim();
+  const sub=document.getElementById('report-sub').textContent||'';
+  const head=title=>`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <img src="/assets/img/hylogo.png" alt="HealYou" style="height:30px;"/>
+      <span style="font-size:.8rem;color:#9ca3af;text-align:right;">${sub}</span>
+    </div>
+    <div style="font-size:1.25rem;font-weight:700;color:#1f2937;margin-bottom:16px;">${name} — ${title}</div>`;
+  const page=(inner,last)=>`<section style="${last?'':'page-break-after:always;'}">${head(inner.title)}${inner.body}</section>`;
+  const area=
+    page({title:'Screening Report', body:screeningReportHTML(r)})
+    +page({title:'Understanding Your Results', body:educationHTML(M)})
+    +page({title:'Results vs. Ideal Ranges', body:graphicalReportHTML(r)}, true);
   w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Screening Report</title>'
     +'<link rel="stylesheet" href="/assets/css/style.css"/>'
-    +'<style>body{padding:28px;background:#fff;}'+reportCss+'</style></head><body>'+area
-    +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},350);};</scr'+'ipt>'
+    +'<style>body{padding:28px;background:#fff;}section{page-break-inside:auto;}'+reportCss+'</style></head><body>'+area
+    +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},400);};</scr'+'ipt>'
     +'</body></html>');
   w.document.close();
 }
