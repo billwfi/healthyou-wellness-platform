@@ -150,7 +150,18 @@ function afterLocation(){ if(!data.state.location) return; buildDates(); goStep(
 // ── Date/time ──
 function buildDates(){
   const l=data.state.location;
-  const from=l.valid_from||data.event.start_date, to=l.valid_to||data.event.end_date||l.valid_from||data.event.start_date;
+  const isoOf=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  // PCP events: registrants may only schedule within the next 30 days (today + 30).
+  const isPCP=(data.event.event_category||'').toUpperCase()==='PCP';
+  let from, to;
+  if(isPCP){
+    const t=new Date(); t.setHours(0,0,0,0);
+    const e=new Date(t); e.setDate(e.getDate()+30);
+    from=isoOf(t); to=isoOf(e);
+  } else {
+    from=l.valid_from||data.event.start_date;
+    to=l.valid_to||data.event.end_date||l.valid_from||data.event.start_date;
+  }
   const open=new Set(l.open_weekdays||[]);
   const sel=document.getElementById('dt-date'); sel.innerHTML='<option value="">— select date —</option>';
   if(from){

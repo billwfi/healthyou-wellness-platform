@@ -45,7 +45,7 @@ exports.handler = async (event) => {
       // full event payload by public slug
       if (!qs.slug) return badRequest('slug required');
       const ev = await db.query(
-        `SELECT id, name, description,
+        `SELECT id, name, description, event_category,
                 CONVERT(varchar(10), start_date, 23) AS start_date,
                 CONVERT(varchar(10), end_date, 23)   AS end_date, org_id, public_slug
            FROM screening_events WHERE public_slug=$1`, [qs.slug]);
