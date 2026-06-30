@@ -846,10 +846,23 @@ function gaugeSpec(key,sex,fasting){
 }
 function fmtNum(n,dec){ return dec?Number(n).toFixed(dec):String(Math.round(Number(n))); }
 function segColorAt(spec,v){ for(const s of spec.segs){ if(v>=s[0]&&v<s[1]) return s[2]; } return v<spec.segs[0][0]?spec.segs[0][2]:spec.segs[spec.segs.length-1][2]; }
-function gaugeCard(key,label,val,sex,fasting){
+// Critical-Risk test for the graphical cards (BP, Glucose/A1C, LDL, Triglycerides) — mirrors the spec.
+function gaugeCritical(key,v,fasting,diabetic){
+  switch(key){
+    case 'systolic': return v>=150;
+    case 'diastolic': return v>=100;
+    case 'blood_glucose': return fasting?(v>=(diabetic?180:140)):(v>=(diabetic?240:200));
+    case 'hba1c': return diabetic?(v>=8.0):(v>6.4);
+    case 'ldl': return v>160;
+    case 'triglycerides': return fasting?(v>=400):(v>=500);
+    default: return false;
+  }
+}
+function gaugeCard(key,label,val,sex,fasting,diabetic){
   const spec=gaugeSpec(key,sex,fasting);
   if(!spec||val==null||val===''||isNaN(Number(val))) return '';
   const v=Number(val), span=spec.max-spec.min, unit=MUNIT[key]||'', dec=spec.dec||0;
+  const cr=gaugeCritical(key,v,fasting,!!diabetic);
   // Ideal (green) band bounds for the "Normal range" text + boundary labels.
   let glo=null,ghi=null; spec.segs.forEach(s=>{ if(s[2]===GG){ if(glo===null)glo=s[0]; ghi=s[1]; } });
   const loAtMin=glo!==null&&Math.abs(glo-spec.min)<1e-9, hiAtMax=ghi!==null&&Math.abs(ghi-spec.max)<1e-9;
@@ -860,7 +873,8 @@ function gaugeCard(key,label,val,sex,fasting){
   const vpct=pct(v), pillColor=segColorAt(spec,v), disp=fmtNum(v,dec);
   const lblLo=(glo!==null&&!loAtMin)?`<span style="position:absolute;left:${pct(glo)}%;transform:translateX(-50%);">${fmtNum(glo,dec)}</span>`:'';
   const lblHi=(ghi!==null&&!hiAtMax)?`<span style="position:absolute;left:${pct(ghi)}%;transform:translateX(-50%);">${fmtNum(ghi,dec)}</span>`:'';
-  return `<div style="border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px 12px;background:#fff;">
+  return `<div style="position:relative;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px 12px;background:#fff;">
+    ${cr?`<span title="Critical Risk — reading is in the critical-risk range" style="position:absolute;top:8px;right:10px;font-size:.95rem;line-height:1;color:#b91c1c;">⚠️</span>`:''}
     <div style="font-weight:700;color:#1f2937;font-size:.9rem;">${label}</div>
     <div style="font-size:.74rem;color:#9ca3af;margin-bottom:30px;">Normal range: ${nr}${unit?' '+unit:''}</div>
     <div style="position:relative;">
@@ -876,14 +890,14 @@ function gaugeCard(key,label,val,sex,fasting){
 function graphicalReportHTML(r){
   const g=(r.gender||'').toUpperCase();
   const sex=g.startsWith('F')?'F':(g.startsWith('M')?'M':'');
-  const fasting=!!r.fasting_flag;
+  const fasting=!!r.fasting_flag, diabetic=!!r.diabetic;
   const cards=[];
-  const add=(key,label,valKey)=>cards.push(gaugeCard(key,label,r[valKey],sex,fasting));
+  const add=(key,label,valKey)=>cards.push(gaugeCard(key,label,r[valKey],sex,fasting,diabetic));
   add('bmi','BMI','bmi');
   add('waist_circumference','Waist Circumference','waist_circumference_in');
   add('waist_height','Waist-to-Height Ratio','waist_height_ratio');
-  cards.push(gaugeCard('systolic','Blood Pressure — Systolic',r.systolic_bp,sex,fasting));
-  cards.push(gaugeCard('diastolic','Blood Pressure — Diastolic',r.diastolic_bp,sex,fasting));
+  cards.push(gaugeCard('systolic','Blood Pressure — Systolic',r.systolic_bp,sex,fasting,diabetic));
+  cards.push(gaugeCard('diastolic','Blood Pressure — Diastolic',r.diastolic_bp,sex,fasting,diabetic));
   add('blood_glucose','Blood Glucose'+(fasting?' (fasting)':''),'blood_glucose');
   add('hba1c','HbA1c','hba1c');
   add('hdl','HDL Cholesterol','hdl_cholesterol');
