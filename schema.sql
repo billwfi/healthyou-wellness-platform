@@ -351,3 +351,18 @@ CREATE TABLE IF NOT EXISTS emergent_risk_forms (
   emailed_to         VARCHAR(256),
   created_at         TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Documents attached to a screening record (PCP results, registrant-provided
+-- blood work). Stored as base64 in `data` (small files; ~5 MB cap enforced in the
+-- function). Applied to the live SQL Server DB via a one-off CREATE TABLE.
+CREATE TABLE IF NOT EXISTS screening_documents (
+  id             SERIAL PRIMARY KEY,
+  participant_id INTEGER,
+  event_id       INTEGER,
+  filename       VARCHAR(255),
+  content_type   VARCHAR(120),
+  file_size      INTEGER,
+  data           TEXT,
+  uploaded_at    TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_screening_documents_participant ON screening_documents(participant_id, event_id);

@@ -154,10 +154,14 @@ function renderTable(rows) {
       <td>${esc(p.coach_name||'—')}</td>
       <td><span class="badge badge-${p.active?'active':'inactive'}">${p.active?'Active':'Inactive'}</span></td>
       <td onclick="event.stopPropagation()"><div class="actions">
+        <button class="btn btn-ghost btn-sm" onclick="addScreening(${p.id})">Add Screening</button>
         <button class="btn btn-ghost btn-sm" onclick="openModal(${p.id})">Edit</button>
       </div></td>
     </tr>`).join('');
 }
+
+// Open the screener entry form to add/update this participant's biometric screening.
+function addScreening(id){ window.open(`/screener/entry.html?participant_id=${id}`,'_blank'); }
 
 function openModal(id) {
   editId=id||null;
