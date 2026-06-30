@@ -369,10 +369,6 @@
 <!-- Screening Report Modal -->
 <div id="report-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'report-modal')">
   <div class="modal" style="max-width:1040px;">
-    <div style="display:flex;gap:6px;margin-bottom:12px;">
-      <button id="rvbtn-standard" class="btn btn-primary btn-sm" onclick="setReportView('standard')">Standard view</button>
-      <button id="rvbtn-graphical" class="btn btn-ghost btn-sm" onclick="setReportView('graphical')">Graphical view</button>
-    </div>
     <div id="report-print-area">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
         <img src="/assets/img/hylogo.png" alt="HealYou" style="height:30px;"/>
@@ -805,7 +801,7 @@ function screeningReportHTML(r){
   `;
 }
 
-let reportRecord=null, reportView='standard';
+let reportRecord=null;
 function openScreeningReport(i){
   const r=ovScreenings[i]; if(!r) return;
   reportRecord=r;
@@ -814,28 +810,20 @@ function openScreeningReport(i){
   if(r.screened_at) sub.push('Screened '+fmtDate(r.screened_at));
   if(activeEvent&&activeEvent.name) sub.push(activeEvent.name);
   document.getElementById('report-sub').textContent=sub.join(' · ');
-  renderReportView();
+  document.getElementById('report-body').innerHTML=
+    `<div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
+       <div style="flex:1;min-width:300px;">${screeningReportHTML(r)}</div>
+       <div style="width:430px;flex:none;border-left:1px solid var(--gray-200);padding-left:20px;">${educationHTML(computeRiskClient(r).measures)}</div>
+     </div>`
+    +graphicalReportHTML(r);
   document.getElementById('report-modal').style.display='flex';
 }
-function setReportView(mode){ reportView=mode; renderReportView(); }
-function renderReportView(){
-  const r=reportRecord; if(!r) return;
-  document.getElementById('rvbtn-standard').className='btn btn-sm '+(reportView==='standard'?'btn-primary':'btn-ghost');
-  document.getElementById('rvbtn-graphical').className='btn btn-sm '+(reportView==='graphical'?'btn-primary':'btn-ghost');
-  if(reportView==='graphical'){
-    document.getElementById('report-body').innerHTML=graphicalReportHTML(r);
-  } else {
-    document.getElementById('report-body').innerHTML=
-      `<div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
-         <div style="flex:1;min-width:300px;">${screeningReportHTML(r)}</div>
-         <div style="width:430px;flex:none;border-left:1px solid var(--gray-200);padding-left:20px;">${educationHTML(computeRiskClient(r).measures)}</div>
-       </div>`;
-  }
-}
 
-// ── Graphical report: each measure as a colored range bar with a value marker ──
+// ── Graphical report: our measures/ranges (green=ideal, amber=borderline, red=high)
+//    drawn as cards with the current result shown in a colored bubble + pointer. ──
+const GG='#10b981',GA='#f59e0b',GR='#ef4444';
+const MUNIT={bmi:'',waist_circumference:'in',waist_height:'',systolic:'mmHg',diastolic:'mmHg',blood_glucose:'mg/dL',hba1c:'%',hdl:'mg/dL',ldl:'mg/dL',non_hdl:'mg/dL',total_cholesterol:'mg/dL',cholesterol_ratio:'',triglycerides:'mg/dL'};
 function gaugeSpec(key,sex,fasting){
-  const GG='#10b981',GA='#f59e0b',GR='#ef4444';
   switch(key){
     case 'bmi': return {min:15,max:40,dec:1,segs:[[15,18.5,GR],[18.5,25,GG],[25,30,GA],[30,40,GR]]};
     case 'waist_circumference': { const t=sex==='F'?35:40; return {min:25,max:55,dec:0,segs:[[25,t,GG],[t,55,GR]]}; }
@@ -853,32 +841,46 @@ function gaugeSpec(key,sex,fasting){
     default: return null;
   }
 }
-function gaugeBar(label,val,spec,idealText){
+function fmtNum(n,dec){ return dec?Number(n).toFixed(dec):String(Math.round(Number(n))); }
+function segColorAt(spec,v){ for(const s of spec.segs){ if(v>=s[0]&&v<s[1]) return s[2]; } return v<spec.segs[0][0]?spec.segs[0][2]:spec.segs[spec.segs.length-1][2]; }
+function gaugeCard(key,label,val,sex,fasting){
+  const spec=gaugeSpec(key,sex,fasting);
   if(!spec||val==null||val===''||isNaN(Number(val))) return '';
-  const v=Number(val), span=spec.max-spec.min;
-  const segHtml=spec.segs.map(s=>`<div style="flex:${(s[1]-s[0])};background:${s[2]};"></div>`).join('');
-  const pct=Math.max(0,Math.min(100,((v-spec.min)/span)*100));
-  const disp=spec.dec?v.toFixed(spec.dec):String(v);
-  return `<div style="margin-bottom:16px;break-inside:avoid;-webkit-column-break-inside:avoid;">
-    <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:4px;"><span style="font-weight:600;color:var(--gray-700);">${label}</span><span style="font-weight:700;color:var(--gray-800);">${disp}</span></div>
-    <div style="position:relative;padding-top:6px;">
+  const v=Number(val), span=spec.max-spec.min, unit=MUNIT[key]||'', dec=spec.dec||0;
+  // Ideal (green) band bounds for the "Normal range" text + boundary labels.
+  let glo=null,ghi=null; spec.segs.forEach(s=>{ if(s[2]===GG){ if(glo===null)glo=s[0]; ghi=s[1]; } });
+  const loAtMin=glo!==null&&Math.abs(glo-spec.min)<1e-9, hiAtMax=ghi!==null&&Math.abs(ghi-spec.max)<1e-9;
+  let nr='';
+  if(glo!==null){ nr=(loAtMin&&!hiAtMax)?('< '+fmtNum(ghi,dec)):(hiAtMax&&!loAtMin)?('> '+fmtNum(glo,dec)):(fmtNum(glo,dec)+' – '+fmtNum(ghi,dec)); }
+  const pct=x=>Math.max(0,Math.min(100,((x-spec.min)/span)*100));
+  const segHtml=spec.segs.map(s=>`<div style="width:${((s[1]-s[0])/span*100)}%;background:${s[2]};"></div>`).join('');
+  const vpct=pct(v), pillColor=segColorAt(spec,v), disp=fmtNum(v,dec);
+  const lblLo=(glo!==null&&!loAtMin)?`<span style="position:absolute;left:${pct(glo)}%;transform:translateX(-50%);">${fmtNum(glo,dec)}</span>`:'';
+  const lblHi=(ghi!==null&&!hiAtMax)?`<span style="position:absolute;left:${pct(ghi)}%;transform:translateX(-50%);">${fmtNum(ghi,dec)}</span>`:'';
+  return `<div style="border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px 12px;background:#fff;">
+    <div style="font-weight:700;color:#1f2937;font-size:.9rem;">${label}</div>
+    <div style="font-size:.74rem;color:#9ca3af;margin-bottom:30px;">Normal range: ${nr}${unit?' '+unit:''}</div>
+    <div style="position:relative;">
+      <div style="position:absolute;left:${vpct}%;transform:translateX(-50%);top:-26px;display:flex;flex-direction:column;align-items:center;">
+        <span style="background:${pillColor};color:#fff;font-weight:700;font-size:.82rem;border-radius:11px;padding:2px 11px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.18);">${disp}</span>
+        <span style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid ${pillColor};"></span>
+      </div>
       <div style="height:13px;border-radius:7px;overflow:hidden;display:flex;">${segHtml}</div>
-      <div style="position:absolute;top:2px;left:${pct}%;transform:translateX(-50%);width:3px;height:21px;background:#0f172a;border-radius:2px;box-shadow:0 0 0 1.5px #fff;"></div>
+      <div style="position:relative;height:16px;font-size:.72rem;color:#6b7280;margin-top:4px;">${lblLo}${lblHi}</div>
     </div>
-    ${idealText?`<div style="font-size:.66rem;color:var(--gray-400);margin-top:7px;">${idealText}</div>`:''}
   </div>`;
 }
 function graphicalReportHTML(r){
-  const risk=computeRiskClient(r);
-  const sex=(r.gender||'').toUpperCase().startsWith('F')?'F':((r.gender||'').toUpperCase().startsWith('M')?'M':'');
+  const g=(r.gender||'').toUpperCase();
+  const sex=g.startsWith('F')?'F':(g.startsWith('M')?'M':'');
   const fasting=!!r.fasting_flag;
-  const bars=[];
-  const add=(key,label,valKey)=>{ const v=r[valKey]; const ideal=IDEAL_RANGE[key]; bars.push(gaugeBar(label,v,gaugeSpec(key,sex,fasting),ideal)); };
+  const cards=[];
+  const add=(key,label,valKey)=>cards.push(gaugeCard(key,label,r[valKey],sex,fasting));
   add('bmi','BMI','bmi');
   add('waist_circumference','Waist Circumference','waist_circumference_in');
   add('waist_height','Waist-to-Height Ratio','waist_height_ratio');
-  bars.push(gaugeBar('Blood Pressure — Systolic',r.systolic_bp,gaugeSpec('systolic',sex,fasting),'Ideal &lt;120 mmHg'));
-  bars.push(gaugeBar('Blood Pressure — Diastolic',r.diastolic_bp,gaugeSpec('diastolic',sex,fasting),'Ideal &lt;80 mmHg'));
+  cards.push(gaugeCard('systolic','Blood Pressure — Systolic',r.systolic_bp,sex,fasting));
+  cards.push(gaugeCard('diastolic','Blood Pressure — Diastolic',r.diastolic_bp,sex,fasting));
   add('blood_glucose','Blood Glucose'+(fasting?' (fasting)':''),'blood_glucose');
   add('hba1c','HbA1c','hba1c');
   add('hdl','HDL Cholesterol','hdl_cholesterol');
@@ -887,16 +889,19 @@ function graphicalReportHTML(r){
   add('total_cholesterol','Total Cholesterol','total_cholesterol');
   add('cholesterol_ratio','Cholesterol Ratio','cholesterol_ratio');
   add('triglycerides','Triglycerides'+(fasting?' (fasting)':''),'triglycerides');
-  const shown=bars.filter(Boolean);
-  const legend=`<div style="display:flex;gap:16px;align-items:center;font-size:.74rem;color:var(--gray-500);margin-bottom:16px;">
-    <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:2px;background:#10b981;display:inline-block;"></span>Ideal</span>
-    <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:2px;background:#f59e0b;display:inline-block;"></span>Borderline</span>
-    <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:2px;background:#ef4444;display:inline-block;"></span>High</span>
-    <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:3px;height:16px;background:#0f172a;border-radius:2px;display:inline-block;"></span>Your result</span>
+  const shown=cards.filter(Boolean);
+  if(!shown.length) return '';
+  const legend=`<div style="display:flex;gap:16px;align-items:center;font-size:.74rem;color:var(--gray-500);margin:6px 0 14px;flex-wrap:wrap;">
+    <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:2px;background:${GG};display:inline-block;"></span>Ideal</span>
+    <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:2px;background:${GA};display:inline-block;"></span>Borderline</span>
+    <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:2px;background:${GR};display:inline-block;"></span>High</span>
+    <span style="color:var(--gray-400);">The bubble shows this participant's result and its position in our ranges.</span>
   </div>`;
-  const intro=`<div style="font-size:.74rem;color:var(--gray-400);font-style:italic;line-height:1.45;margin-bottom:12px;">Each bar shows where your result falls across the ideal, borderline and high ranges. These ranges are for education and are not a diagnosis — please discuss your results with your healthcare provider.</div>`;
-  if(!shown.length) return intro+'<div style="color:var(--gray-400);">No measurable values to chart.</div>';
-  return intro+legend+`<div style="column-count:2;column-gap:34px;">${shown.join('')}</div>`;
+  return `<div style="margin-top:26px;border-top:1px solid var(--gray-200);padding-top:18px;">
+    <div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Results vs. Ideal Ranges</div>
+    ${legend}
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">${shown.join('')}</div>
+  </div>`;
 }
 
 function printScreeningReport(){
