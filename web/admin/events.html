@@ -666,13 +666,17 @@ function computeRiskClient(r){
   if((v=num(r.total_cholesterol))!=null) M.total_cholesterol=rs(v>=240?'high':v>=200?'borderline':'ideal');
   if((v=num(r.cholesterol_ratio))!=null) M.cholesterol_ratio=rs(v>=4.5?'high':v>=4.0?'borderline':'ideal',v>6.0);
   if((v=num(r.waist_height_ratio))!=null) M.waist_height=rs(v>=0.6?'high':v>=0.5?'borderline':'ideal');
+  if((v=num(r.non_hdl))!=null) M.non_hdl=rs(v>=170?'high':v>=130?'borderline':'ideal');
   if((v=num(r.grip_strength))!=null&&sex&&age!=null){ let m,f; if(age<20){m=78;f=42;}else if(age<30){m=81;f=47;}else if(age<40){m=79;f=47;}else if(age<50){m=78;f=42;}else if(age<60){m=72;f=40;}else{m=66;f=38;} const thr=sex==='F'?f:m; M.grip_strength=v>thr?rs('ideal'):rs('high'); }
-  const pts={ideal:0,borderline:1,high:2}; let score=0,highs=0,bl=0,crs=0,ers=0;
-  for(const k in M){const m=M[k];score+=pts[m.level];if(m.level==='high')highs++;if(m.level==='borderline')bl++;if(m.cr)crs++;if(m.emergency)ers++;}
+  const wo=(a,b)=>{const rk={ideal:0,borderline:1,high:2};if(!a)return b;if(!b)return a;return rk[a.level]>=rk[b.level]?a:b;};
+  const groups={ waist:wo(M.waist_circumference,M.waist_height), blood_pressure:M.blood_pressure, hdl:M.hdl, ldl:M.ldl, triglycerides:M.triglycerides, non_hdl:M.non_hdl, glycemic:wo(M.blood_glucose,M.hba1c), grip_strength:M.grip_strength };
+  let count=0,highs=0,bl=0;
+  for(const k in groups){const s=groups[k];if(!s)continue;if(s.level==='high'){count++;highs++;}else if(s.level==='borderline'){count++;bl++;}}
+  let crs=0,ers=0; for(const k in M){const m=M[k];if(m.cr)crs++;if(m.emergency)ers++;}
   const level = (ers||crs)?'critical':highs>=2?'high':(highs>=1||bl>=2)?'moderate':'low';
-  return {measures:M,score,level,critical:!!(crs||ers),emergency:!!ers};
+  return {measures:M,score:count,count,level,critical:!!(crs||ers),emergency:!!ers};
 }
-const MEASURE_LABELS={bmi:'BMI',waist_circumference:'Waist Circumference',waist_height:'Waist-to-Height',blood_pressure:'Blood Pressure',blood_glucose:'Blood Glucose',hba1c:'HbA1c',hdl:'HDL',ldl:'LDL',triglycerides:'Triglycerides',total_cholesterol:'Total Cholesterol',cholesterol_ratio:'Cholesterol Ratio',grip_strength:'Grip Strength'};
+const MEASURE_LABELS={bmi:'BMI',waist_circumference:'Waist Circumference',waist_height:'Waist-to-Height',blood_pressure:'Blood Pressure',blood_glucose:'Blood Glucose',hba1c:'HbA1c',hdl:'HDL',ldl:'LDL',triglycerides:'Triglycerides',non_hdl:'Non-HDL',total_cholesterol:'Total Cholesterol',cholesterol_ratio:'Cholesterol Ratio',grip_strength:'Grip Strength'};
 
 function screeningReportHTML(r){
   const risk=computeRiskClient(r), M=risk.measures;
@@ -689,7 +693,7 @@ function screeningReportHTML(r){
   if(r.hdl_cholesterol) tiles.push(['HDL',r.hdl_cholesterol+' mg/dL','hdl']);
   if(r.ldl_cholesterol) tiles.push(['LDL',r.ldl_cholesterol+' mg/dL','ldl']);
   if(r.triglycerides) tiles.push(['Triglycerides',r.triglycerides+' mg/dL','triglycerides']);
-  if(r.non_hdl) tiles.push(['Non-HDL',r.non_hdl+' mg/dL',null]);
+  if(r.non_hdl) tiles.push(['Non-HDL',r.non_hdl+' mg/dL','non_hdl']);
   if(r.cholesterol_ratio) tiles.push(['Chol. Ratio',Number(r.cholesterol_ratio).toFixed(1),'cholesterol_ratio']);
   if(r.blood_glucose) tiles.push(['Glucose',r.blood_glucose+' mg/dL','blood_glucose']);
   if(r.hba1c) tiles.push(['HbA1c',r.hba1c+'%','hba1c']);
@@ -724,7 +728,7 @@ function screeningReportHTML(r){
     <div style="text-align:center;margin-bottom:20px;">
       <div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;">Overall Risk</div>
       <div style="font-size:2rem;font-weight:800;color:${overallColor};text-transform:capitalize;">${risk.level}</div>
-      <div style="font-size:.78rem;color:var(--gray-400);">Risk score: ${risk.score}</div>
+      <div style="font-size:.78rem;color:var(--gray-400);">Risk count: ${risk.count} of 8 measures flagged</div>
     </div>
     ${emergencyList.length?`<div style="margin-bottom:12px;padding:12px 14px;background:var(--red-light);border:1px solid #fca5a5;border-radius:8px;font-size:.88rem;font-weight:700;color:#991b1b;">🚑 Medical Emergency — refer to the ER immediately: ${esc(emergencyList.join(', '))}.</div>`:''}
     ${crList.length?`<div style="margin-bottom:12px;padding:12px 14px;background:var(--amber-light);border:1px solid #fcd34d;border-radius:8px;font-size:.86rem;font-weight:600;color:#92400e;">⚠️ Critical Risk — recommend HealthYou follow-up: ${esc(crList.join(', '))}.</div>`:''}

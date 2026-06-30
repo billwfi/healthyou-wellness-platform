@@ -433,7 +433,7 @@ function showResults(r) {
   if(r.hdl_cholesterol) tiles.push({label:'HDL',val:r.hdl_cholesterol+' mg/dL',key:'hdl'});
   if(r.ldl_cholesterol) tiles.push({label:'LDL',val:r.ldl_cholesterol+' mg/dL',key:'ldl'});
   if(r.triglycerides) tiles.push({label:'Triglycerides',val:r.triglycerides+' mg/dL',key:'triglycerides'});
-  if(r.non_hdl) tiles.push({label:'Non-HDL',val:r.non_hdl+' mg/dL'});
+  if(r.non_hdl) tiles.push({label:'Non-HDL',val:r.non_hdl+' mg/dL',key:'non_hdl'});
   if(r.cholesterol_ratio) tiles.push({label:'Chol. Ratio',val:Number(r.cholesterol_ratio).toFixed(1)});
   if(r.blood_glucose) tiles.push({label:'Glucose',val:r.blood_glucose+' mg/dL',key:'blood_glucose'});
   if(r.hba1c) tiles.push({label:'HbA1c',val:r.hba1c+'%',key:'hba1c'});
@@ -466,7 +466,7 @@ function showResults(r) {
     <div style="text-align:center;margin-bottom:20px;">
       <div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;">Overall Risk</div>
       <div style="font-size:2rem;font-weight:800;color:${overallColor};text-transform:capitalize;">${r.overall_risk||'—'}</div>
-      ${risk.score!=null?`<div style="font-size:.78rem;color:var(--gray-400);">Risk score: ${risk.score}</div>`:''}
+      ${risk.count!=null?`<div style="font-size:.78rem;color:var(--gray-400);">Risk count: ${risk.count} of 8 measures flagged</div>`:''}
     </div>
     ${emergencyList.length?`<div style="margin-bottom:12px;padding:12px 14px;background:var(--red-light);border:1px solid #fca5a5;border-radius:8px;font-size:.88rem;font-weight:700;color:#991b1b;">🚑 Medical Emergency — refer to the ER immediately: ${esc(emergencyList.join(', '))}.</div>`:''}
     ${crList.length?`<div style="margin-bottom:18px;padding:12px 14px;background:var(--amber-light);border:1px solid #fcd34d;border-radius:8px;font-size:.86rem;font-weight:600;color:#92400e;">⚠️ Critical Risk — recommend HealthYou follow-up: ${esc(crList.join(', '))}.</div>`:''}

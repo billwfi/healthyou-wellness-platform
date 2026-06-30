@@ -58,6 +58,8 @@ function gripThreshold(age, sex) {
 }
 function gripStatus(g, age, sex) { if (!g || !sex || age == null) return null; const thr = gripThreshold(age, sex); return g > thr ? st('ideal') : st('high'); }
 function whrStatus(r) { if (r == null) return null; return r >= 0.6 ? st('high') : r >= 0.5 ? st('borderline') : st('ideal'); }
+// Non-HDL = LDL target + 30 mg/dL convention (aligned to this spec's LDL cutoffs).
+function nonHdlStatus(n) { if (!n) return null; const lvl = n >= 170 ? 'high' : n >= 130 ? 'borderline' : 'ideal'; return st(lvl); }
 
 // Compute the full risk object. ctx: { sex:'M'|'F'|null, age:number|null, fasting:bool, diabetic:bool }
 function computeRisk(v, ctx) {
@@ -72,26 +74,35 @@ function computeRisk(v, ctx) {
     hdl:                hdlStatus(v.hdl_cholesterol, c.sex),
     ldl:                ldlStatus(v.ldl_cholesterol),
     triglycerides:      trigStatus(v.triglycerides, c.fasting),
+    non_hdl:            nonHdlStatus(v.non_hdl),
     total_cholesterol:  totalCholStatus(v.total_cholesterol),
     cholesterol_ratio:  ratioStatus(v.cholesterol_ratio),
     grip_strength:      gripStatus(v.grip_strength, c.age, c.sex),
   };
-  const pts = { ideal: 0, borderline: 1, high: 2 };
-  let score = 0, highs = 0, borderlines = 0, crs = 0, emergencies = 0;
-  for (const k in measures) {
-    const m = measures[k]; if (!m) continue;
-    score += pts[m.level];
-    if (m.level === 'high') highs++;
-    if (m.level === 'borderline') borderlines++;
-    if (m.cr) crs++;
-    if (m.emergency) emergencies++;
-  }
+  // Risk count = number of FLAGGED (borderline/high) categories below. Paired
+  // measures (waist/waist-height, glucose/HbA1c) count once — worst wins.
+  const groups = {
+    waist:          worse(measures.waist_circumference, measures.waist_height),
+    blood_pressure: measures.blood_pressure,
+    hdl:            measures.hdl,
+    ldl:            measures.ldl,
+    triglycerides:  measures.triglycerides,
+    non_hdl:        measures.non_hdl,
+    glycemic:       worse(measures.blood_glucose, measures.hba1c),
+    grip_strength:  measures.grip_strength,
+  };
+  let count = 0, highs = 0, borderlines = 0;
+  for (const k in groups) { const s = groups[k]; if (!s) continue;
+    if (s.level === 'high') { count++; highs++; } else if (s.level === 'borderline') { count++; borderlines++; } }
+  // Critical Risk / Medical Emergency flags consider all measures (clinical safety).
+  let crs = 0, emergencies = 0;
+  for (const k in measures) { const m = measures[k]; if (!m) continue; if (m.cr) crs++; if (m.emergency) emergencies++; }
   let level;
   if (emergencies > 0 || crs > 0) level = 'critical';
   else if (highs >= 2) level = 'high';
   else if (highs >= 1 || borderlines >= 2) level = 'moderate';
   else level = 'low';
-  return { score, level, critical: crs > 0 || emergencies > 0, emergency: emergencies > 0, measures };
+  return { score: count, count, level, critical: crs > 0 || emergencies > 0, emergency: emergencies > 0, measures };
 }
 
 exports.computeRisk = computeRisk; // exposed for tests
