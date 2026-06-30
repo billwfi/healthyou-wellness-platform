@@ -680,23 +680,29 @@ const MEASURE_LABELS={bmi:'BMI',waist_circumference:'Waist Circumference',waist_
 
 function screeningReportHTML(r){
   const risk=computeRiskClient(r), M=risk.measures;
-  const tiles=[];
-  if(r.height_in) tiles.push(['Height',Number(r.height_in)+' in',null]);
-  if(r.weight_lbs) tiles.push(['Weight',r.weight_lbs+' lbs',null]);
-  if(r.bmi) tiles.push(['BMI',Number(r.bmi).toFixed(1),'bmi']);
-  if(r.waist_circumference_in) tiles.push(['Waist',Number(r.waist_circumference_in)+' in','waist_circumference']);
-  if(r.waist_height_ratio) tiles.push(['Waist/Height',Number(r.waist_height_ratio).toFixed(2),'waist_height']);
-  if(r.grip_strength) tiles.push(['Grip Strength',Number(r.grip_strength)+' lbs','grip_strength']);
-  if(r.systolic_bp) tiles.push(['Blood Pressure',r.systolic_bp+'/'+r.diastolic_bp,'blood_pressure']);
-  if(r.heart_rate) tiles.push(['Heart Rate',r.heart_rate+' bpm',null]);
-  if(r.total_cholesterol) tiles.push(['Total Chol.',r.total_cholesterol+' mg/dL','total_cholesterol']);
-  if(r.hdl_cholesterol) tiles.push(['HDL',r.hdl_cholesterol+' mg/dL','hdl']);
-  if(r.ldl_cholesterol) tiles.push(['LDL',r.ldl_cholesterol+' mg/dL','ldl']);
-  if(r.triglycerides) tiles.push(['Triglycerides',r.triglycerides+' mg/dL','triglycerides']);
-  if(r.non_hdl) tiles.push(['Non-HDL',r.non_hdl+' mg/dL','non_hdl']);
-  if(r.cholesterol_ratio) tiles.push(['Chol. Ratio',Number(r.cholesterol_ratio).toFixed(1),'cholesterol_ratio']);
-  if(r.blood_glucose) tiles.push(['Glucose',r.blood_glucose+' mg/dL','blood_glucose']);
-  if(r.hba1c) tiles.push(['HbA1c',r.hba1c+'%','hba1c']);
+  // Every measure is shown — '—' when no value was captured.
+  const tv=(x,suf,dec)=>(x==null||x==='')?'—':((dec!=null?Number(x).toFixed(dec):x)+(suf||''));
+  const bpVal=(r.systolic_bp!=null||r.diastolic_bp!=null)?((r.systolic_bp??'—')+'/'+(r.diastolic_bp??'—')):'—';
+  const tiles=[
+    ['Height',        tv(r.height_in,' in'),               null],
+    ['Weight',        tv(r.weight_lbs,' lbs'),             null],
+    ['BMI',           tv(r.bmi,'',1),                      'bmi'],
+    ['Waist',         tv(r.waist_circumference_in,' in'),  'waist_circumference'],
+    ['Waist/Height',  tv(r.waist_height_ratio,'',2),       'waist_height'],
+    ['Grip Strength', tv(r.grip_strength,' lbs'),          'grip_strength'],
+    ['Blood Pressure',bpVal,                               'blood_pressure'],
+    ['Heart Rate',    tv(r.heart_rate,' bpm'),             null],
+    ['Total Chol.',   tv(r.total_cholesterol,' mg/dL'),    'total_cholesterol'],
+    ['HDL',           tv(r.hdl_cholesterol,' mg/dL'),      'hdl'],
+    ['LDL',           tv(r.ldl_cholesterol,' mg/dL'),      'ldl'],
+    ['Triglycerides', tv(r.triglycerides,' mg/dL'),        'triglycerides'],
+    ['Non-HDL',       tv(r.non_hdl,' mg/dL'),              'non_hdl'],
+    ['Chol. Ratio',   tv(r.cholesterol_ratio,'',1),        'cholesterol_ratio'],
+    ['Glucose',       tv(r.blood_glucose,' mg/dL'),        'blood_glucose'],
+    ['HbA1c',         tv(r.hba1c,'%'),                     'hba1c'],
+  ];
+  const flag=(label,on)=>`<span style="display:inline-block;padding:3px 11px;border-radius:99px;font-size:.78rem;font-weight:600;margin:0 4px;${on?'background:var(--teal-bg);color:var(--teal-dark);border:1px solid var(--teal-light);':'background:var(--gray-100);color:var(--gray-400);border:1px solid var(--gray-200);'}">${label}: ${on?'Yes':'No'}</span>`;
+  const flagsRow=`<div style="text-align:center;margin-bottom:16px;">${flag('Fasting',!!r.fasting_flag)}${flag('Pregnant',!!r.pregnant)}${flag('Diabetic',!!r.diabetic)}</div>`;
 
   const levelColor={ideal:'var(--green)',borderline:'var(--amber)',high:'var(--red)'};
   const tileColor=key=>{ const m=key&&M[key]; return m?levelColor[m.level]:null; };
@@ -724,20 +730,26 @@ function screeningReportHTML(r){
   const msBg    = ms.metCount>=3?'var(--red-light)':ms.metCount===2?'var(--amber-light)':'var(--teal-bg)';
   const msLabel = ms.metCount>=3?'Metabolic syndrome present (≥3 criteria)':ms.metCount===2?'At risk — 2 of 5 criteria':'Low risk';
 
+  // Split tiles: the measures that feed the risk count vs. everything else.
+  const COUNTED=new Set(['waist_circumference','waist_height','blood_pressure','hdl','ldl','triglycerides','non_hdl','blood_glucose','hba1c','grip_strength']);
+  const countedTiles=tiles.filter(t=>COUNTED.has(t[2]));
+  const otherTiles=tiles.filter(t=>!COUNTED.has(t[2]));
+  const gridHtml=list=>`<div class="result-preview-grid">${list.map(t=>{ const c=tileColor(t[2]); return `<div class="result-tile" style="${c?'border-color:'+c+';':''}"><div class="result-tile-val" style="${c?'color:'+c+';':''}">${esc(String(t[1]))}</div><div class="result-tile-label">${esc(t[0])}</div></div>`;}).join('')}</div>`;
+  const sectionTitle=t=>`<div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;margin:18px 0 8px;">${t}</div>`;
+
   return `
-    <div style="text-align:center;margin-bottom:20px;">
+    <div style="text-align:center;margin-bottom:14px;">
       <div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;">Overall Risk</div>
       <div style="font-size:2rem;font-weight:800;color:${overallColor};text-transform:capitalize;">${risk.level}</div>
       <div style="font-size:.78rem;color:var(--gray-400);">Risk count: ${risk.count} of 8 measures flagged</div>
     </div>
+    ${flagsRow}
     ${emergencyList.length?`<div style="margin-bottom:12px;padding:12px 14px;background:var(--red-light);border:1px solid #fca5a5;border-radius:8px;font-size:.88rem;font-weight:700;color:#991b1b;">🚑 Medical Emergency — refer to the ER immediately: ${esc(emergencyList.join(', '))}.</div>`:''}
     ${crList.length?`<div style="margin-bottom:12px;padding:12px 14px;background:var(--amber-light);border:1px solid #fcd34d;border-radius:8px;font-size:.86rem;font-weight:600;color:#92400e;">⚠️ Critical Risk — recommend HealthYou follow-up: ${esc(crList.join(', '))}.</div>`:''}
-    <div class="result-preview-grid">
-      ${tiles.map(t=>{ const c=tileColor(t[2]); return `<div class="result-tile" style="${c?'border-color:'+c+';':''}">
-        <div class="result-tile-val" style="${c?'color:'+c+';':''}">${esc(String(t[1]))}</div>
-        <div class="result-tile-label">${esc(t[0])}</div>
-      </div>`;}).join('')}
-    </div>
+    ${sectionTitle('Risk Measures (count: '+risk.count+' of 8 flagged)')}
+    ${gridHtml(countedTiles)}
+    ${sectionTitle('Other Measures')}
+    ${gridHtml(otherTiles)}
     ${ms.measured?`
     <div style="margin-top:20px;padding:14px 16px;border:1px solid ${msColor};border-radius:8px;background:${msBg};">
       <div style="font-size:.8rem;color:var(--gray-500);text-transform:uppercase;letter-spacing:.05em;">Metabolic Syndrome Score</div>
