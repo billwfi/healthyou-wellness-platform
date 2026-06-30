@@ -1,5 +1,6 @@
 const { getPool } = require('./_db');
 const { getUser, ok, badRequest, unauthorized, serverError, options } = require('./_auth');
+const { sendEmail, mailEnabled } = require('./_mailer');
 
 exports.handler = async (event, context) => {
   if (event.httpMethod === 'OPTIONS') return options();
@@ -21,7 +22,7 @@ exports.handler = async (event, context) => {
 
       let emailSent = false;
       let emailError = null;
-      if (process.env.RESEND_API_KEY) {
+      if (mailEnabled()) {
         try {
           await sendWelcomeEmail(coach, tempPassword);
           emailSent = true;
@@ -49,24 +50,13 @@ function generatePassword() {
 }
 
 async function sendWelcomeEmail(coach, tempPassword) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return;
-
-  const from = process.env.RESEND_FROM || 'HealYou Health Coaching <onboarding@resend.dev>';
+  if (!mailEnabled()) return;
   const portalUrl = process.env.COACH_PORTAL_URL || 'https://healthyou-wellness-platform.netlify.app/coach/';
-
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      from,
-      to: [coach.email],
-      subject: 'Welcome to HealYou Health Coaching — Your Account Details',
-      html: buildHtml(coach, tempPassword, portalUrl),
-    }),
+  await sendEmail({
+    to: coach.email,
+    subject: 'Welcome to HealYou Health Coaching — Your Account Details',
+    html: buildHtml(coach, tempPassword, portalUrl),
   });
-
-  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
 }
 
 function buildHtml(coach, tempPassword, portalUrl) {

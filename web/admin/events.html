@@ -769,7 +769,11 @@ function renderParticipants(records, total) {
       <td style="font-size:.82rem;">${esc(r.department||(isAppt?'Online registration':'—'))}</td>
       <td>${status}</td>
       <td>${r.overall_risk?`<span class="badge badge-${r.overall_risk}">${r.overall_risk}</span>`:'—'}</td>
-      <td>${isAppt?'<span style="font-size:.78rem;color:var(--gray-400);">link</span>':`<button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);" onclick="removeParticipant(${r.participant_id})">Remove</button>`}</td>
+      <td>${isAppt
+        ? (r.email && r.status!=='cancelled'
+            ? `<button class="btn btn-ghost btn-sm" onclick="resendEmail(${r.appointment_id},this)">Resend</button>`
+            : '<span style="font-size:.78rem;color:var(--gray-400);">'+(r.email?'—':'no email')+'</span>')
+        : `<button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);" onclick="removeParticipant(${r.participant_id})">Remove</button>`}</td>
     </tr>`; }).join('');
 
   const pages=Math.ceil(total/PT_LIMIT), page=Math.floor(ptOffset/PT_LIMIT)+1;
@@ -786,6 +790,15 @@ function renderParticipants(records, total) {
 function debouncePtSearch(){
   clearTimeout(ptSearchTimer);
   ptSearchTimer=setTimeout(()=>loadParticipants(0),320);
+}
+async function resendEmail(appointmentId, btn){
+  if(btn){ btn.disabled=true; btn.textContent='Sending…'; }
+  try{
+    const r=await fetch('/api/event-participants',{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify({action:'resend',appointment_id:appointmentId})});
+    const j=await r.json().catch(()=>({}));
+    showToast(r.ok ? 'Confirmation email resent' : ('Error: '+(j.error||'Could not resend')));
+  }catch(e){ showToast('Error: '+e.message); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='Resend'; } }
 }
 
 // ── CSV upload ────────────────────────────────────────────────────────────────

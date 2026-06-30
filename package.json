@@ -9,7 +9,8 @@
     "db:migrate": "node scripts/migrate-pg-to-sqlserver.js"
   },
   "dependencies": {
-    "mssql": "^11.0.1"
+    "mssql": "^11.0.1",
+    "nodemailer": "^9.0.1"
   },
   "devDependencies": {
     "pg": "^8.13.3"

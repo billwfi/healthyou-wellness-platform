@@ -1,5 +1,6 @@
 const { getPool } = require('./_db');
 const { getUser, ok, created, badRequest, unauthorized, notFound, serverError, options } = require('./_auth');
+const { sendAppointmentConfirmation } = require('./_confirmation');
 
 exports.handler = async (event, context) => {
   if (event.httpMethod === 'OPTIONS') return options();
@@ -47,9 +48,19 @@ exports.handler = async (event, context) => {
     } catch (e) { return serverError(e); }
   }
 
-  // POST: add participant(s) to event
+  // POST: add participant(s) to event — or resend a confirmation email
   if (event.httpMethod === 'POST') {
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return badRequest('Invalid JSON'); }
+
+    // Resend the event's assigned confirmation email to one registrant (by appointment).
+    if (b.action === 'resend') {
+      if (!b.appointment_id) return badRequest('appointment_id required');
+      try {
+        const r = await sendAppointmentConfirmation(db, b.appointment_id);
+        if (r.skipped) return badRequest('Email sending is not configured on the server');
+        return ok({ sent: true });
+      } catch (e) { return badRequest(e.message); }
+    }
 
     // Bulk CSV import: { event_id, org_id, records: [...] }
     if (Array.isArray(b.records)) {

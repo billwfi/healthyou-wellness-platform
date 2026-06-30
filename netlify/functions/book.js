@@ -1,5 +1,6 @@
 const { getPool } = require('./_db');
 const { ok, badRequest, serverError, options, CORS } = require('./_auth');
+const { sendEmail, mailEnabled } = require('./_mailer');
 
 exports.handler = async (event, context) => {
   if (event.httpMethod === 'OPTIONS') return options();
@@ -91,8 +92,7 @@ exports.handler = async (event, context) => {
 // ── Confirmation email ────────────────────────────────────────────────────────
 
 async function sendConfirmation({ to, firstName, lastName, coachName, scheduledAt, durationMinutes }) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return; // silently skip if not configured
+  if (!mailEnabled()) return; // silently skip if no transport configured
 
   // Parse scheduled_at as UTC to match how the booking page submitted it
   const dt = new Date(scheduledAt);
@@ -103,23 +103,11 @@ async function sendConfirmation({ to, firstName, lastName, coachName, scheduledA
     timeZone: 'UTC', hour: 'numeric', minute: '2-digit', hour12: true
   });
 
-  const from = process.env.RESEND_FROM || 'HealYou Health Coaching <onboarding@resend.dev>';
-
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject: `Your coaching session is confirmed — ${dateStr}`,
-      html: buildEmailHtml({ firstName, lastName, coachName, dateStr, timeStr, durationMinutes }),
-    }),
+  await sendEmail({
+    to,
+    subject: `Your coaching session is confirmed — ${dateStr}`,
+    html: buildEmailHtml({ firstName, lastName, coachName, dateStr, timeStr, durationMinutes }),
   });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Resend ${res.status}: ${body}`);
-  }
 }
 
 function buildEmailHtml({ firstName, lastName, coachName, dateStr, timeStr, durationMinutes }) {
