@@ -56,7 +56,7 @@
 <main class="container has-sidebar">
   <div id="content" style="display:none;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
-      <div><h1 class="page-title" style="margin-bottom:2px;">Event Calendar</h1><p style="color:var(--gray-400);font-size:.88rem;">All screening events across their scheduled dates.</p></div>
+      <div><h1 class="page-title" style="margin-bottom:2px;">Event Calendar</h1><p style="color:var(--gray-400);font-size:.88rem;">Events with registered participants, by appointment date — showing location and the number registered.</p></div>
       <div style="display:flex;align-items:center;gap:8px;">
         <button class="btn btn-ghost btn-sm" onclick="shiftMonth(-1)">←</button>
         <span id="cal-label" style="font-weight:700;min-width:160px;text-align:center;"></span>
@@ -70,7 +70,7 @@
 </main>
 <div class="toast" id="toast"></div>
 <script>
-let authToken=null, events=[];
+let authToken=null, entries=[];   // registered-appointment rows: {date,event_id,event_name,event_category,location_name,registered}
 let viewY, viewM; // displayed year / month (0-based)
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -89,15 +89,13 @@ async function boot(user){
   await load(); render();
 }
 async function load(){
-  try{ events=await fetch('/api/events',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json()); if(!Array.isArray(events)) events=[]; }
-  catch(e){ events=[]; showToast('Error loading events'); }
+  try{ entries=await fetch('/api/calendar',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json()); if(!Array.isArray(entries)) entries=[]; }
+  catch(e){ entries=[]; showToast('Error loading calendar'); }
 }
 function shiftMonth(d){ viewM+=d; if(viewM<0){viewM=11;viewY--;} else if(viewM>11){viewM=0;viewY++;} render(); }
 function goToday(){ const n=new Date(); viewY=n.getFullYear(); viewM=n.getMonth(); render(); }
 
 function pad(n){ return String(n).padStart(2,'0'); }
-function evStart(e){ return String(e.start_date||e.event_date||'').slice(0,10); }
-function evEnd(e){ return String(e.end_date||e.start_date||e.event_date||'').slice(0,10); }
 
 function render(){
   document.getElementById('cal-label').textContent=`${MONTHS[viewM]} ${viewY}`;
@@ -113,11 +111,12 @@ function render(){
     else if(i>=firstDow+daysInMonth){ day=i-firstDow-daysInMonth+1; m=viewM+1; if(m>11){m=0;y++;} other=true; }
     else { day=i-firstDow+1; }
     const ds=`${y}-${pad(m+1)}-${pad(day)}`;
-    const dayEvents=events.filter(e=>{ const s=evStart(e),en=evEnd(e); return s && ds>=s && ds<=en; });
-    const chips=dayEvents.map(e=>{
+    const dayEntries=entries.filter(e=>e.date===ds);
+    const chips=dayEntries.map(e=>{
       const c=colorFor(e.event_category);
-      const range=evStart(e)!==evEnd(e);
-      return `<a class="cal-ev" style="background:${c};" href="/admin/events.html" title="${esc(e.name)}${e.event_category?' · '+esc(e.event_category):''}${range?' ('+esc(evStart(e))+' – '+esc(evEnd(e))+')':''}">${esc(e.name)}</a>`;
+      const loc=e.location_name?' · '+e.location_name:'';
+      const label=`${e.event_name}${loc} (${e.registered})`;
+      return `<a class="cal-ev" style="background:${c};" href="/admin/events.html" title="${esc(label)}${e.event_category?' — '+esc(e.event_category):''}">${esc(e.event_name)}${esc(loc)} <b>(${e.registered})</b></a>`;
     }).join('');
     cells+=`<div class="cal-cell ${other?'other':''} ${ds===todayStr?'today':''}"><div class="cal-daynum">${day}</div>${chips}</div>`;
   }
@@ -125,10 +124,12 @@ function render(){
   renderLegend();
 }
 function renderLegend(){
-  const cats=[...new Set(events.map(e=>e.event_category||'Uncategorized'))];
-  document.getElementById('cal-legend').innerHTML = cats.length
+  const cats=[...new Set(entries.map(e=>e.event_category||'Uncategorized'))];
+  const total=entries.reduce((s,e)=>s+(e.registered||0),0);
+  document.getElementById('cal-legend').innerHTML = (cats.length
     ? cats.map(c=>`<span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:11px;height:11px;border-radius:3px;background:${colorFor(c==='Uncategorized'?null:c)};"></span>${esc(c)}</span>`).join('')
-    : '';
+    : '<span>No registered participants yet.</span>')
+    + (total?`<span style="margin-left:auto;font-weight:600;">${total} registered total</span>`:'');
 }
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
 function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
