@@ -2,6 +2,10 @@
   publish = "web"
   functions = "netlify/functions"
 
+# Daily registration digest — 12:00 UTC ≈ 6:00 AM Mountain (prior day, MT, computed in-function).
+[functions."daily-registration-digest"]
+  schedule = "0 12 * * *"
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
