@@ -747,7 +747,7 @@ function screeningReportHTML(r){
   const female=(r.gender||'').toLowerCase().startsWith('f');
   const lifeMax={fruitveg:5,activity:300,alcohol:female?8:15,sleep:9};
   const lifeDisp=(key,val,suf)=>{ if(val==null) return null; let s=String(val); if(lifeMax[key]!=null&&Number(val)>=lifeMax[key]) s=lifeMax[key]+'+'; return s+(suf||''); };
-  const lifeRows=[]; const pushL=(k,v)=>{ if(v!=null&&v!=='') lifeRows.push([k,v]); };
+  const lifeRows=[]; const pushL=(k,v)=>{ lifeRows.push([k,(v!=null&&v!=='')?v:'—']); };
   pushL('Fruits & vegetables', lifeDisp('fruitveg', r.fruit_veg_servings, ' servings/day'));
   pushL('Physical activity', lifeDisp('activity', r.activity_minutes, ' min/week'));
   pushL('Muscle-strengthening (2+ days/wk)', r.muscle_strengthening==null?null:(r.muscle_strengthening?'Yes':'No'));
