@@ -62,14 +62,27 @@
         </div>
         <button class="btn btn-primary" onclick="openEventModal()">+ New Event</button>
       </div>
+
+      <!-- Filters -->
+      <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:14px;">
+        <div class="form-group" style="margin:0;min-width:180px;"><label style="font-size:.75rem;color:var(--gray-500);">Event Type</label>
+          <select id="flt-type" onchange="renderList()"><option value="">All types</option></select></div>
+        <div class="form-group" style="margin:0;"><label style="font-size:.75rem;color:var(--gray-500);">Start date from</label>
+          <input id="flt-from" type="date" onchange="renderList()"></div>
+        <div class="form-group" style="margin:0;"><label style="font-size:.75rem;color:var(--gray-500);">Start date to</label>
+          <input id="flt-to" type="date" onchange="renderList()"></div>
+        <button class="btn btn-ghost btn-sm" onclick="clearFilters()" style="margin-bottom:1px;">Clear</button>
+        <span id="flt-count" style="font-size:.8rem;color:var(--gray-400);margin-bottom:6px;"></span>
+      </div>
+
       <div class="card" style="padding:0;overflow:hidden;">
         <table class="data-table">
           <thead><tr>
-            <th>Event</th><th>Dates</th><th>Group</th>
+            <th>Event</th><th>Type</th><th>Dates</th><th>Group</th>
             <th style="text-align:center;">Locations</th><th style="text-align:center;">Registered</th>
             <th>Status</th><th style="width:160px;">Actions</th>
           </tr></thead>
-          <tbody id="tbody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+          <tbody id="tbody"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -438,6 +451,7 @@ async function loadCategories(){
   try{ categories=await fetch('/api/event-categories',{headers:auth()}).then(r=>r.json()); if(!Array.isArray(categories)) categories=[]; }
   catch(e){ categories=[]; }
   fillCategorySelect();
+  fillTypeFilter();
 }
 function fillCategorySelect(selected){
   const sel=document.getElementById('em-category');
@@ -467,11 +481,41 @@ async function load() {
   } catch(e){ showToast('Error loading events: '+e.message); }
 }
 
+function evStart(e){ return String(e.start_date||e.event_date||'').slice(0,10); }
+function filteredEvents(){
+  const type=(document.getElementById('flt-type')||{}).value||'';
+  const from=(document.getElementById('flt-from')||{}).value||'';
+  const to  =(document.getElementById('flt-to')||{}).value||'';
+  return events.filter(e=>{
+    if(type && (e.event_category||'')!==type) return false;
+    const s=evStart(e);
+    if(from && (!s || s<from)) return false;
+    if(to   && (!s || s>to))   return false;
+    return true;
+  });
+}
+function clearFilters(){
+  const t=document.getElementById('flt-type'); if(t) t.value='';
+  const f=document.getElementById('flt-from'); if(f) f.value='';
+  const o=document.getElementById('flt-to');   if(o) o.value='';
+  renderList();
+}
+function fillTypeFilter(){
+  const sel=document.getElementById('flt-type'); if(!sel) return;
+  const val=sel.value;
+  sel.innerHTML='<option value="">All types</option>'+categories.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+  sel.value=val;
+}
 function renderList() {
-  document.getElementById('tbody').innerHTML=!events.length
-    ?'<tr><td colspan="7" class="empty">No events yet. Create one to get started.</td></tr>'
-    :events.map(e=>`<tr>
+  const rows=filteredEvents();
+  const active=!!((document.getElementById('flt-type')||{}).value || (document.getElementById('flt-from')||{}).value || (document.getElementById('flt-to')||{}).value);
+  const cnt=document.getElementById('flt-count');
+  if(cnt) cnt.textContent=active?`${rows.length} of ${events.length} events`:'';
+  document.getElementById('tbody').innerHTML=!rows.length
+    ?`<tr><td colspan="8" class="empty">${events.length?'No events match the filters.':'No events yet. Create one to get started.'}</td></tr>`
+    :rows.map(e=>`<tr>
         <td><strong style="cursor:pointer;color:var(--teal);" onclick="openEvent(${e.id})">${esc(e.name)}</strong></td>
+        <td>${e.event_category?`<span class="badge" style="background:var(--gray-100);color:var(--gray-600);">${esc(e.event_category)}</span>`:'<span style="color:var(--gray-400);">—</span>'}</td>
         <td style="font-size:.84rem;">${eventDateRange(e)||'—'}</td>
         <td>${esc(e.org_name||'—')}</td>
         <td style="text-align:center;font-weight:600;">${e.location_count||0}</td>
@@ -496,7 +540,7 @@ function openEvent(id) {
 
   document.getElementById('ev-name').textContent=activeEvent.name;
   document.getElementById('ev-status-badge').innerHTML=`<span class="badge badge-${activeEvent.status}">${activeEvent.status.replace('_',' ')}</span>`;
-  document.getElementById('ev-type-badge').innerHTML='';
+  document.getElementById('ev-type-badge').innerHTML=activeEvent.event_category?`<span class="badge" style="background:var(--gray-100);color:var(--gray-600);">${esc(activeEvent.event_category)}</span>`:'';
   const dr=eventDateRange(activeEvent);
   const meta=[]; if(dr) meta.push(dr); if(activeEvent.org_name) meta.push(activeEvent.org_name);
   document.getElementById('ev-meta').textContent=meta.join(' · ');
