@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Appointment Search — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo.png" alt="HealthYou"></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <a href="/admin/groups.html" class="sidebar-item">Groups</a>
+    <div class="sidebar-section" style="margin-top:12px;">Health Coaching Admin</div>
+    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <div class="sidebar-section" style="margin-top:12px;">Event Management</div>
+    <a href="/admin/events.html" class="sidebar-item">Events</a>
+    <a href="/admin/calendar.html" class="sidebar-item">Calendar</a>
+    <a href="/admin/appointment-search.html" class="sidebar-item active">Appointment Search</a>
+    <a href="/admin/forms.html" class="sidebar-item">Forms</a>
+    <a href="/admin/emails.html" class="sidebar-item">Email Templates</a>
+    <div class="sidebar-section" style="margin-top:12px;">Wellness Portal</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+    <a href="/admin/umbraco.html" class="sidebar-item">Umbraco</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/settings.html" class="sidebar-item">System Settings</a>
+    <a href="/admin/release-notes.html" class="sidebar-item">Release Notes</a>
+    <div class="sidebar-section" style="margin-top:12px;">Portals</div>
+    <a href="/coach/" class="sidebar-item">Coach Portal →</a>
+    <a href="/screener/" class="sidebar-item">Screener Portal →</a>
+    <a href="/book/" class="sidebar-item">Booking Page →</a>
+  </nav>
+</aside>
+<main class="container has-sidebar">
+  <div id="content" style="display:none;">
+    <h1 class="page-title">Appointment Search</h1>
+    <p class="page-subtitle">Find registered appointments across all events by group, name, phone, or email.</p>
+
+    <div class="card">
+      <div class="form-grid cols-3" style="gap:14px;">
+        <div class="form-group"><label>Group</label><input id="q-group" type="text" placeholder="Employer / group" onkeydown="if(event.key==='Enter')search()"/></div>
+        <div class="form-group"><label>First Name</label><input id="q-first" type="text" onkeydown="if(event.key==='Enter')search()"/></div>
+        <div class="form-group"><label>Last Name</label><input id="q-last" type="text" onkeydown="if(event.key==='Enter')search()"/></div>
+        <div class="form-group"><label>Phone</label><input id="q-phone" type="text" onkeydown="if(event.key==='Enter')search()"/></div>
+        <div class="form-group"><label>Email</label><input id="q-email" type="text" onkeydown="if(event.key==='Enter')search()"/></div>
+        <div class="form-group" style="justify-content:flex-end;"><div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" onclick="search()">Search</button>
+          <button class="btn btn-ghost" onclick="clearSearch()">Clear</button>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Group</th><th>Event</th><th>Location</th><th>Date / Time</th><th>Contact</th><th>Status</th><th style="width:90px;"></th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="8" class="empty">Enter search terms above, or click Search to list recent appointments.</td></tr></tbody>
+      </table>
+    </div>
+    <div id="pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;font-size:.82rem;color:var(--gray-400);"></div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, offset=0, total=0;
+const LIMIT=100;
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} else { location.href='/admin/login.html'; } });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ location.href='/admin/login.html'; });
+
+function boot(user){
+  document.getElementById('content').style.display='';
+  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+}
+function auth(){ return {Authorization:'Bearer '+authToken}; }
+function val(id){ return document.getElementById(id).value.trim(); }
+
+function clearSearch(){ ['q-group','q-first','q-last','q-phone','q-email'].forEach(i=>document.getElementById(i).value=''); offset=0; search(); }
+
+async function search(off){
+  offset = off||0;
+  const params=new URLSearchParams();
+  if(val('q-group')) params.set('group',val('q-group'));
+  if(val('q-first')) params.set('first',val('q-first'));
+  if(val('q-last'))  params.set('last', val('q-last'));
+  if(val('q-phone')) params.set('phone',val('q-phone'));
+  if(val('q-email')) params.set('email',val('q-email'));
+  params.set('limit',LIMIT); params.set('offset',offset);
+  document.getElementById('tbody').innerHTML='<tr><td colspan="8" class="empty">Searching…</td></tr>';
+  try{
+    const data=await fetch('/api/appointment-search?'+params.toString(),{headers:auth()}).then(r=>r.json());
+    total=data.total||0; render(data.records||[]);
+  }catch(e){ showToast('Error: '+e.message); }
+}
+
+function render(rows){
+  const tb=document.getElementById('tbody');
+  if(!rows.length){ tb.innerHTML='<tr><td colspan="8" class="empty">No appointments match your search.</td></tr>'; document.getElementById('pagination').innerHTML=''; return; }
+  tb.innerHTML=rows.map(r=>{
+    const dt=r.appointment_date?`${fmtDate(r.appointment_date)}${r.appointment_time?'<br><span style="font-size:.78rem;color:var(--gray-400);">'+fmtTime(r.appointment_time)+'</span>':''}`:'—';
+    const contact=[r.email?esc(r.email):'', r.phone?esc(r.phone):''].filter(Boolean).join('<br>')||'—';
+    const status=r.status==='cancelled'?'<span class="badge badge-cancelled">Cancelled</span>':'<span class="badge badge-scheduled">Registered</span>';
+    return `<tr>
+      <td><strong>${esc(r.last_name)}, ${esc(r.first_name)}</strong></td>
+      <td style="font-size:.85rem;">${esc(r.group_name||'—')}</td>
+      <td style="font-size:.85rem;"><a href="/admin/events.html" style="color:var(--teal);">${esc(r.event_name||'—')}</a></td>
+      <td style="font-size:.85rem;">${esc(r.location_name||'—')}</td>
+      <td style="font-size:.85rem;">${dt}</td>
+      <td style="font-size:.82rem;">${contact}</td>
+      <td>${status}</td>
+      <td>${r.email&&r.status!=='cancelled'?`<button class="btn btn-ghost btn-sm" onclick="resend(${r.id},this)">Resend</button>`:''}</td>
+    </tr>`;
+  }).join('');
+  const page=Math.floor(offset/LIMIT)+1, pages=Math.ceil(total/LIMIT);
+  const pg=document.getElementById('pagination');
+  pg.innerHTML=`<span>${total.toLocaleString()} result${total===1?'':'s'}${pages>1?` · page ${page} of ${pages}`:''}</span>`+
+    (pages>1?`<div style="display:flex;gap:6px;">
+      <button class="btn btn-ghost btn-sm" onclick="search(${offset-LIMIT})" ${offset===0?'disabled':''}>← Prev</button>
+      <button class="btn btn-ghost btn-sm" onclick="search(${offset+LIMIT})" ${offset+LIMIT>=total?'disabled':''}>Next →</button>
+    </div>`:'');
+}
+
+async function resend(id, btn){
+  if(btn){ btn.disabled=true; btn.textContent='Sending…'; }
+  try{
+    const r=await fetch('/api/event-participants',{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify({action:'resend',appointment_id:id})});
+    const j=await r.json().catch(()=>({}));
+    showToast(r.ok?'Confirmation email resent':('Error: '+(j.error||'Could not resend')));
+  }catch(e){ showToast('Error: '+e.message); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='Resend'; } }
+}
+
+function fmtDate(d){ if(!d) return ''; const x=new Date(d+'T00:00:00'); return isNaN(x)?d:x.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function fmtTime(t){ if(!t) return ''; const p=String(t).split(':'); let h=parseInt(p[0],10); if(isNaN(h)) return t; const m=(p[1]||'00').slice(0,2); const ap=h<12?'AM':'PM'; h=h%12||12; return `${h}:${m} ${ap}`; }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>
