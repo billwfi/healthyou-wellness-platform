@@ -69,10 +69,13 @@
       <div class="card">
         <div class="card-title">Appointment</div>
         <div class="form-grid" style="gap:14px;">
-          <div class="form-group span-2"><label>Location</label><select id="f-loc"></select></div>
-          <div class="form-group"><label>Date</label><input id="f-date" type="date"/></div>
-          <div class="form-group"><label>Time</label><input id="f-time" type="time"/></div>
+          <div class="form-group span-2"><label>Location</label><select id="f-loc" onchange="onLocChange()"></select></div>
+          <div class="form-group"><label>Date</label><select id="f-date" onchange="loadSlots()"></select></div>
           <div class="form-group"><label>Status</label><select id="f-status"><option value="registered">Registered</option><option value="cancelled">Cancelled</option></select></div>
+        </div>
+        <div class="form-group" style="margin-top:14px;">
+          <label>Available Times</label>
+          <div id="f-slots" style="margin-top:4px;"><span style="font-size:.85rem;color:var(--gray-400);">Select a location and date.</span></div>
         </div>
       </div>
 
@@ -127,10 +130,57 @@ function fill(){
   const lsel=document.getElementById('f-loc');
   lsel.innerHTML=(appt.locations||[]).map(l=>`<option value="${l.id}">${esc(l.name)}${l.city?' — '+esc([l.city,l.state].filter(Boolean).join(', ')):''}</option>`).join('');
   lsel.value=String(appt.location_id||'');
-  document.getElementById('f-date').value=appt.appointment_date||'';
-  document.getElementById('f-time').value=appt.appointment_time||'';
   document.getElementById('f-status').value=appt.status||'registered';
+  selectedTime=appt.appointment_time||null;
+  buildDates();
+  document.getElementById('f-date').value=appt.appointment_date||'';
+  loadSlots();
 }
+
+// ── Date/time picker driven by the selected location's real availability ──
+let selectedTime=null;
+function curLoc(){ return (appt.locations||[]).find(l=>String(l.id)===String(document.getElementById('f-loc').value)) || null; }
+function pad(n){ return String(n).padStart(2,'0'); }
+function onLocChange(){ selectedTime=null; buildDates(); loadSlots(); }
+function buildDates(){
+  const loc=curLoc();
+  const sel=document.getElementById('f-date'); const keep=sel.value;
+  const from=(loc&&loc.valid_from)||'', to=(loc&&loc.valid_to)||from;
+  const open=new Set((loc&&loc.open_weekdays)||[]);
+  const dates=[];
+  if(from){ let d=new Date(from+'T00:00:00'), end=new Date((to||from)+'T00:00:00'), n=0;
+    while(d<=end && n<200){ if(open.size===0||open.has(d.getDay())){
+      dates.push(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`);
+    } d.setDate(d.getDate()+1); n++; } }
+  // Always allow the appointment's existing date even if outside the open days (same location only).
+  if(appt.appointment_date && !dates.includes(appt.appointment_date) && String(appt.location_id)===String(document.getElementById('f-loc').value)) dates.push(appt.appointment_date);
+  dates.sort();
+  sel.innerHTML='<option value="">— select date —</option>'+dates.map(iso=>{
+    const lbl=new Date(iso+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+    return `<option value="${iso}">${lbl}</option>`;
+  }).join('');
+  if(keep && dates.includes(keep)) sel.value=keep;
+}
+async function loadSlots(){
+  const loc=document.getElementById('f-loc').value, date=document.getElementById('f-date').value;
+  const host=document.getElementById('f-slots');
+  if(!loc||!date){ host.innerHTML='<span style="font-size:.85rem;color:var(--gray-400);">Select a location and date.</span>'; return; }
+  host.innerHTML='<span style="font-size:.85rem;color:var(--gray-400);">Loading…</span>';
+  try{
+    let slots=await fetch(`/api/event-register?location_id=${loc}&date=${date}`).then(r=>r.json());
+    if(!Array.isArray(slots)) slots=[];
+    const isOrig = String(loc)===String(appt.location_id) && date===appt.appointment_date && !!appt.appointment_time;
+    if(isOrig && !slots.some(s=>s.time===appt.appointment_time)){ slots.push({time:appt.appointment_time, remaining:1}); slots.sort((a,b)=>a.time.localeCompare(b.time)); }
+    if(!slots.length){ host.innerHTML='<span style="font-size:.85rem;color:var(--gray-400);">No times available for this date.</span>'; return; }
+    host.innerHTML=slots.map(s=>{
+      const avail = s.remaining>0 || (isOrig && s.time===appt.appointment_time);
+      return `<span style="display:inline-block;margin:4px;"><button type="button" class="btn ${avail?'btn-ghost':''} btn-sm" data-time="${s.time}" ${avail?`onclick="pickSlot('${s.time}',this)"`:'disabled'} title="${s.remaining} remaining" style="min-width:78px;">${fmtTime(s.time)}</button></span>`;
+    }).join('');
+    if(selectedTime){ const b=host.querySelector(`.btn[data-time="${selectedTime}"]`); if(b) b.classList.add('btn-primary'); }
+  }catch(e){ host.innerHTML='<span style="font-size:.85rem;color:var(--red);">Error loading times.</span>'; }
+}
+function pickSlot(t, btn){ selectedTime=t; [...document.querySelectorAll('#f-slots .btn')].forEach(b=>b.classList.remove('btn-primary')); btn.classList.add('btn-primary'); }
+function fmtTime(t){ if(!t) return ''; const p=String(t).split(':'); let h=parseInt(p[0],10); if(isNaN(h)) return t; const m=(p[1]||'00').slice(0,2); const ap=h<12?'AM':'PM'; h=h%12||12; return `${h}:${m} ${ap}`; }
 
 async function save(){
   const first=document.getElementById('f-first').value.trim(), last=document.getElementById('f-last').value.trim();
@@ -142,8 +192,9 @@ async function save(){
     gender:document.getElementById('f-gender').value||null,
     location_id:Number(document.getElementById('f-loc').value)||null,
     appointment_date:document.getElementById('f-date').value||null,
-    appointment_time:document.getElementById('f-time').value||null,
+    appointment_time:selectedTime||null,
     status:document.getElementById('f-status').value };
+  if(body.status!=='cancelled' && (!body.appointment_date || !body.appointment_time)){ showErr('Select an available date and time.'); return; }
   const btn=document.getElementById('save-btn'); btn.disabled=true; btn.textContent='Saving…';
   try{
     const r=await fetch('/api/appointment',{method:'PUT',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify(body)});
