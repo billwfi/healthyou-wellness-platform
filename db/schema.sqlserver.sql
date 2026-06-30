@@ -582,6 +582,10 @@ IF COL_LENGTH('dbo.biometric_results','pregnant') IS NULL               ALTER TA
 GO
 IF COL_LENGTH('dbo.biometric_results','diabetic') IS NULL               ALTER TABLE dbo.biometric_results ADD diabetic BIT;
 GO
+IF COL_LENGTH('dbo.biometric_results','risk_score') IS NULL             ALTER TABLE dbo.biometric_results ADD risk_score INT;
+GO
+IF COL_LENGTH('dbo.biometric_results','risk_json') IS NULL              ALTER TABLE dbo.biometric_results ADD risk_json NVARCHAR(MAX);
+GO
 IF COL_LENGTH('dbo.biometric_results','non_hdl') IS NULL                ALTER TABLE dbo.biometric_results ADD non_hdl INT;
 GO
 IF COL_LENGTH('dbo.biometric_results','waist_height_ratio') IS NULL     ALTER TABLE dbo.biometric_results ADD waist_height_ratio DECIMAL(4,2);

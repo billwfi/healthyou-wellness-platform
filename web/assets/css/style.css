@@ -181,6 +181,7 @@ textarea { resize: vertical; min-height: 80px; }
 .badge-low        { background: var(--green-light);  color: #047857; }
 .badge-moderate   { background: var(--amber-light);  color: #b45309; }
 .badge-high       { background: var(--red-light);    color: #b91c1c; }
+.badge-critical   { background: #991b1b;             color: #fff; }
 .badge-crisis     { background: #fce7f3;             color: #9d174d; }
 .badge-normal     { background: var(--green-light);  color: #047857; }
 .badge-elevated   { background: var(--amber-light);  color: #b45309; }

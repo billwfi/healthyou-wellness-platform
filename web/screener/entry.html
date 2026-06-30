@@ -412,23 +412,26 @@ async function submitForm(e) {
 }
 
 function showResults(r) {
+  // Per-measure risk levels from the server model (green/yellow/red + critical).
+  let risk={}; try{ risk = r.risk_json ? JSON.parse(r.risk_json) : (r.risk||{}); }catch(e){ risk={}; }
+  const M = risk.measures||{};
   const tiles=[];
-  if(r.height_in) tiles.push({label:'Height',val:Number(r.height_in)+' in',risk:null});
-  if(r.weight_lbs) tiles.push({label:'Weight',val:r.weight_lbs+' lbs',risk:null});
-  if(r.bmi) tiles.push({label:'BMI',val:Number(r.bmi).toFixed(1),risk:r.bmi_category});
-  if(r.waist_circumference_in) tiles.push({label:'Waist',val:Number(r.waist_circumference_in)+' in',risk:null});
-  if(r.waist_height_ratio) tiles.push({label:'Waist/Height',val:Number(r.waist_height_ratio).toFixed(2),risk:r.waist_height_category});
-  if(r.grip_strength) tiles.push({label:'Grip Strength',val:Number(r.grip_strength)+' lbs',risk:null});
-  if(r.systolic_bp) tiles.push({label:'Blood Pressure',val:`${r.systolic_bp}/${r.diastolic_bp}`,risk:r.bp_risk});
-  if(r.heart_rate) tiles.push({label:'Heart Rate',val:r.heart_rate+' bpm',risk:null});
-  if(r.total_cholesterol) tiles.push({label:'Total Chol.',val:r.total_cholesterol+' mg/dL',risk:r.cholesterol_risk});
-  if(r.hdl_cholesterol) tiles.push({label:'HDL',val:r.hdl_cholesterol+' mg/dL',risk:null});
-  if(r.ldl_cholesterol) tiles.push({label:'LDL',val:r.ldl_cholesterol+' mg/dL',risk:null});
-  if(r.triglycerides) tiles.push({label:'Triglycerides',val:r.triglycerides+' mg/dL',risk:null});
-  if(r.non_hdl) tiles.push({label:'Non-HDL',val:r.non_hdl+' mg/dL',risk:null});
-  if(r.cholesterol_ratio) tiles.push({label:'Chol. Ratio',val:Number(r.cholesterol_ratio).toFixed(1),risk:null});
-  if(r.blood_glucose) tiles.push({label:'Glucose',val:r.blood_glucose+' mg/dL',risk:r.glucose_risk});
-  if(r.hba1c) tiles.push({label:'HbA1c',val:r.hba1c+'%',risk:null});
+  if(r.height_in) tiles.push({label:'Height',val:Number(r.height_in)+' in'});
+  if(r.weight_lbs) tiles.push({label:'Weight',val:r.weight_lbs+' lbs'});
+  if(r.bmi) tiles.push({label:'BMI',val:Number(r.bmi).toFixed(1),key:'bmi'});
+  if(r.waist_circumference_in) tiles.push({label:'Waist',val:Number(r.waist_circumference_in)+' in'});
+  if(r.waist_height_ratio) tiles.push({label:'Waist/Height',val:Number(r.waist_height_ratio).toFixed(2),key:'waist_height'});
+  if(r.grip_strength) tiles.push({label:'Grip Strength',val:Number(r.grip_strength)+' lbs'});
+  if(r.systolic_bp) tiles.push({label:'Blood Pressure',val:`${r.systolic_bp}/${r.diastolic_bp}`,key:'blood_pressure'});
+  if(r.heart_rate) tiles.push({label:'Heart Rate',val:r.heart_rate+' bpm'});
+  if(r.total_cholesterol) tiles.push({label:'Total Chol.',val:r.total_cholesterol+' mg/dL',key:'total_cholesterol'});
+  if(r.hdl_cholesterol) tiles.push({label:'HDL',val:r.hdl_cholesterol+' mg/dL',key:'hdl'});
+  if(r.ldl_cholesterol) tiles.push({label:'LDL',val:r.ldl_cholesterol+' mg/dL',key:'ldl'});
+  if(r.triglycerides) tiles.push({label:'Triglycerides',val:r.triglycerides+' mg/dL',key:'triglycerides'});
+  if(r.non_hdl) tiles.push({label:'Non-HDL',val:r.non_hdl+' mg/dL'});
+  if(r.cholesterol_ratio) tiles.push({label:'Chol. Ratio',val:Number(r.cholesterol_ratio).toFixed(1)});
+  if(r.blood_glucose) tiles.push({label:'Glucose',val:r.blood_glucose+' mg/dL',key:'blood_glucose'});
+  if(r.hba1c) tiles.push({label:'HbA1c',val:r.hba1c+'%',key:'hba1c'});
 
   // Lifestyle Risk Assessment rows ("+" shown when the value hits the slider max)
   const lifeDisp=(id,val,suf)=>{ if(val==null) return null; const el=document.getElementById(id); let s=String(val); if(el&&Number(val)>=Number(el.max)) s=el.max+'+'; return s+(suf||''); };
@@ -442,8 +445,11 @@ function showResults(r) {
   pushL('Tobacco / vaping / nicotine', r.tobacco_use==null?null:(r.tobacco_use?'Yes':'No'));
   pushL('Quality sleep', lifeDisp('f-sleep', r.sleep_hours, ' hrs'));
 
-  const riskColor={high:'var(--red)',crisis:'var(--red)',high_1:'var(--amber)',high_2:'var(--red)',elevated:'var(--amber)',borderline:'var(--amber)',very_high:'var(--red)',prediabetes:'var(--amber)',diabetes:'var(--red)',obese:'var(--red)',overweight:'var(--amber)',normal:'var(--green)',low:'var(--green)',ideal:'var(--green)'};
-  const overallColor={high:'#ef4444',moderate:'#f59e0b',low:'#10b981'}[r.overall_risk]||'#6b7280';
+  const levelColor={green:'var(--green)',yellow:'var(--amber)',red:'var(--red)',critical:'var(--red)'};
+  const tileColor=key=>{ const m=key&&M[key]; return m?levelColor[m.critical?'critical':m.level]:null; };
+  const overallColor={low:'#10b981',moderate:'#f59e0b',high:'#ef4444',critical:'#b91c1c'}[r.overall_risk]||'#6b7280';
+  const MLBL={blood_pressure:'Blood Pressure',blood_glucose:'Blood Glucose',hba1c:'HbA1c',total_cholesterol:'Total Cholesterol',hdl:'HDL',ldl:'LDL',triglycerides:'Triglycerides',bmi:'BMI',waist_height:'Waist-to-Height'};
+  const critList=Object.keys(M).filter(k=>M[k]&&M[k].critical).map(k=>MLBL[k]||k);
 
   const ms=metSyndrome(r, participantSex);
   const msColor = ms.metCount>=3?'var(--red)':ms.metCount===2?'var(--amber)':'var(--green)';
@@ -454,12 +460,14 @@ function showResults(r) {
     <div style="text-align:center;margin-bottom:20px;">
       <div style="font-size:.8rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.05em;">Overall Risk</div>
       <div style="font-size:2rem;font-weight:800;color:${overallColor};text-transform:capitalize;">${r.overall_risk||'—'}</div>
+      ${risk.score!=null?`<div style="font-size:.78rem;color:var(--gray-400);">Risk score: ${risk.score}</div>`:''}
     </div>
+    ${critList.length?`<div style="margin-bottom:18px;padding:12px 14px;background:var(--red-light);border:1px solid #fca5a5;border-radius:8px;font-size:.88rem;font-weight:600;color:#991b1b;">⚠️ Critical values — refer for immediate medical attention: ${esc(critList.join(', '))}.</div>`:''}
     <div class="result-preview-grid">
-      ${tiles.map(t=>`<div class="result-tile" style="${t.risk&&riskColor[t.risk]?'border-color:'+riskColor[t.risk]+';':''} ">
-        <div class="result-tile-val" style="${t.risk&&riskColor[t.risk]?'color:'+riskColor[t.risk]+';':''}">${esc(String(t.val))}</div>
+      ${tiles.map(t=>{ const c=tileColor(t.key); return `<div class="result-tile" style="${c?'border-color:'+c+';':''}">
+        <div class="result-tile-val" style="${c?'color:'+c+';':''}">${esc(String(t.val))}</div>
         <div class="result-tile-label">${t.label}</div>
-      </div>`).join('')}
+      </div>`;}).join('')}
     </div>
     ${ms.measured?`
     <div style="margin-top:20px;padding:14px 16px;border:1px solid ${msColor};border-radius:8px;background:${msBg};">
@@ -478,8 +486,8 @@ function showResults(r) {
         ${lifeRows.map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--gray-100);padding:5px 0;"><span style="color:var(--gray-600);">${esc(k)}</span><span style="font-weight:600;white-space:nowrap;">${esc(v)}</span></div>`).join('')}
       </div>
     </div>`:''}
-    ${r.bp_risk==='crisis'?`<div style="margin-top:16px;padding:12px;background:var(--red-light);border:1px solid #fca5a5;border-radius:6px;font-size:.85rem;font-weight:600;color:#991b1b;">⚠️ Hypertensive Crisis — Refer to emergency care immediately.</div>`:''}
-    ${r.overall_risk==='high'&&r.bp_risk!=='crisis'?`<div style="margin-top:12px;padding:10px;background:var(--amber-light);border:1px solid #fcd34d;border-radius:6px;font-size:.82rem;color:#92400e;">High risk identified — recommend physician follow-up within 1–2 weeks.</div>`:''}
+    ${M.blood_pressure&&M.blood_pressure.critical?`<div style="margin-top:16px;padding:12px;background:var(--red-light);border:1px solid #fca5a5;border-radius:6px;font-size:.85rem;font-weight:600;color:#991b1b;">⚠️ Hypertensive Crisis — Refer to emergency care immediately.</div>`:''}
+    ${r.overall_risk==='high'?`<div style="margin-top:12px;padding:10px;background:var(--amber-light);border:1px solid #fcd34d;border-radius:6px;font-size:.82rem;color:#92400e;">High risk identified — recommend physician follow-up within 1–2 weeks.</div>`:''}
   `;
 }
 
