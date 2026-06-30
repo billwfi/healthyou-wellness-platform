@@ -239,7 +239,7 @@
       <!-- Submit -->
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-bottom:40px;">
         <a href="/screener/" class="btn btn-ghost">Cancel</a>
-        <button type="submit" class="btn btn-primary" id="submit-btn">Save &amp; Print Results</button>
+        <button type="submit" class="btn btn-primary" id="submit-btn">Review Results</button>
       </div>
     </form>
 
@@ -258,6 +258,37 @@
     </div>
   </div>
 </main>
+
+<!-- Emergent Risk form (shown when a critical risk or metabolic syndrome ≥3 is found) -->
+<div id="emergent-modal" class="modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;align-items:center;justify-content:center;padding:20px;">
+  <div class="modal" style="max-width:560px;width:100%;background:#fff;border-radius:12px;max-height:90vh;overflow:auto;">
+    <div style="background:#991b1b;color:#fff;padding:16px 22px;border-radius:12px 12px 0 0;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:1.3rem;">⚠️</span><span style="font-weight:700;font-size:1.05rem;">Emergent Risk — Follow-up Form</span>
+    </div>
+    <div style="padding:22px;">
+      <p style="font-weight:700;font-size:.98rem;margin:0 0 8px;">An emergent risk has been identified:</p>
+      <ul id="emergent-risk-list" style="margin:0 0 16px 0;padding-left:20px;font-size:.92rem;color:#374151;line-height:1.5;"></ul>
+      <div style="font-size:.94rem;font-weight:600;margin-bottom:8px;">Would you like a medical provider to reach out to you for a follow-up appointment regarding your risk(s)?</div>
+      <div style="display:flex;gap:18px;margin-bottom:14px;">
+        <label style="display:flex;gap:6px;align-items:center;font-size:.95rem;"><input type="radio" name="em-followup" value="yes" onchange="toggleEmergentAvail()"> Yes</label>
+        <label style="display:flex;gap:6px;align-items:center;font-size:.95rem;"><input type="radio" name="em-followup" value="no" onchange="toggleEmergentAvail()"> No</label>
+      </div>
+      <div id="emergent-avail-wrap" style="display:none;margin-bottom:16px;">
+        <label style="display:block;font-size:.9rem;font-weight:600;margin-bottom:5px;">If yes, please list best days/times to be contacted:</label>
+        <textarea id="em-availability" rows="3" style="width:100%;padding:8px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:.92rem;" placeholder="e.g. Weekdays after 3pm, or Mon/Wed mornings"></textarea>
+      </div>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:.9rem;background:#f9fafb;border:1px solid var(--gray-200);border-radius:8px;padding:11px 13px;margin-bottom:18px;">
+        <input type="checkbox" id="em-ack" style="margin-top:2px;" onchange="document.getElementById('em-submit').disabled=!this.checked;">
+        <span>I acknowledge that an emergent risk was identified and reviewed with me, and that a copy of this form will be emailed to me. This is not a diagnosis; I should follow up with a medical provider.</span>
+      </label>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="closeEmergentForm()">Close</button>
+        <button class="btn btn-primary" id="em-submit" disabled onclick="submitEmergentForm()">Acknowledge &amp; Email Form</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <script>
 let authToken=null, participantId=null, eventId=null, participantSex='';
@@ -414,7 +445,8 @@ async function submitForm(e) {
     showToast('Biometrics saved');
     document.querySelector('form').style.display='none';
     document.getElementById('results-panel').style.display='';
-  } catch(e){ showToast('Error: '+e.message); btn.disabled=false; btn.textContent='Save & Print Results'; }
+    maybeShowEmergentForm(result);
+  } catch(e){ showToast('Error: '+e.message); btn.disabled=false; btn.textContent='Review Results'; }
 }
 
 // Educational reference panel (descriptions + ranges); highlights the participant's band.
@@ -561,6 +593,53 @@ function graphicalReportHTML(r){
     ${legend}
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">${shown.join('')}</div>
   </div>`;
+}
+
+// ── Emergent Risk form ────────────────────────────────────────────────────────
+const RISK_LABELS={bmi:'BMI',waist_circumference:'Waist Circumference',waist_height:'Waist-to-Height',blood_pressure:'Blood Pressure',blood_glucose:'Blood Glucose',hba1c:'HbA1c',hdl:'HDL',ldl:'LDL',triglycerides:'Triglycerides',non_hdl:'Non-HDL',total_cholesterol:'Total Cholesterol',cholesterol_ratio:'Cholesterol Ratio',grip_strength:'Grip Strength'};
+let emergentState=null;
+function getEmergentInfo(r){
+  let risk={}; try{ risk=r.risk_json?JSON.parse(r.risk_json):(r.risk||{}); }catch(e){}
+  const M=risk.measures||{}, crit=[];
+  Object.keys(M).forEach(k=>{ const m=M[k]; if(m&&m.emergency) crit.push((RISK_LABELS[k]||k)+' — Medical Emergency (ER referral)'); });
+  Object.keys(M).forEach(k=>{ const m=M[k]; if(m&&m.cr&&!m.emergency) crit.push((RISK_LABELS[k]||k)+' — Critical Risk'); });
+  let ms={metCount:0}; try{ ms=metSyndrome(r, participantSex); }catch(e){}
+  return { crit, msHigh: ms.metCount>=3, msCount: ms.metCount };
+}
+function maybeShowEmergentForm(r){
+  const info=getEmergentInfo(r);
+  if(!info.crit.length && !info.msHigh) return;
+  emergentState={ participant_id:parseInt(participantId), event_id:eventId?parseInt(eventId):null, risks:info.crit, msHigh:info.msHigh, msCount:info.msCount };
+  let items=info.crit.map(c=>`<li>${esc(c)}</li>`).join('');
+  if(info.msHigh) items+=`<li>Metabolic Syndrome — ${info.msCount} of 5 criteria (higher risk)</li>`;
+  document.getElementById('emergent-risk-list').innerHTML=items;
+  document.querySelectorAll('input[name="em-followup"]').forEach(x=>x.checked=false);
+  document.getElementById('em-availability').value='';
+  document.getElementById('emergent-avail-wrap').style.display='none';
+  document.getElementById('em-ack').checked=false;
+  document.getElementById('em-submit').disabled=true;
+  document.getElementById('emergent-modal').style.display='flex';
+}
+function toggleEmergentAvail(){
+  const yes=document.querySelector('input[name="em-followup"]:checked');
+  document.getElementById('emergent-avail-wrap').style.display=(yes&&yes.value==='yes')?'':'none';
+}
+function closeEmergentForm(){ document.getElementById('emergent-modal').style.display='none'; }
+async function submitEmergentForm(){
+  if(!document.getElementById('em-ack').checked){ showToast('Please acknowledge the form'); return; }
+  const fu=document.querySelector('input[name="em-followup"]:checked');
+  const followUp = !!(fu && fu.value==='yes');
+  const availability=document.getElementById('em-availability').value||null;
+  const btn=document.getElementById('em-submit'); btn.disabled=true; btn.textContent='Sending…';
+  try{
+    const payload={ participant_id:emergentState.participant_id, event_id:emergentState.event_id, risks:emergentState.risks, metabolic_syndrome:emergentState.msHigh, ms_count:emergentState.msCount, follow_up:followUp, availability:followUp?availability:null, acknowledged:true };
+    const r=await fetch('/api/emergent-risk',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify(payload)});
+    const res=await r.json();
+    if(!r.ok) throw new Error(res.error||'Failed');
+    closeEmergentForm();
+    showToast(res.email&&res.email.skipped?'Acknowledged (no email on file to send a copy)':'Acknowledged — form emailed to participant');
+  }catch(e){ showToast('Error: '+e.message); btn.disabled=false; }
+  btn.textContent='Acknowledge & Email Form';
 }
 
 function showResults(r) {

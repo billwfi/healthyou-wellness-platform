@@ -334,3 +334,20 @@ CREATE TABLE IF NOT EXISTS umbraco_content (
 CREATE INDEX IF NOT EXISTS idx_umbraco_parent  ON umbraco_content(parent_id);
 CREATE INDEX IF NOT EXISTS idx_umbraco_type     ON umbraco_content(content_type);
 CREATE INDEX IF NOT EXISTS idx_umbraco_name     ON umbraco_content(name);
+
+-- Emergent Risk acknowledgements: completed when a screening flags a Critical
+-- Risk / Medical Emergency or Metabolic Syndrome (>=3). A copy is emailed to the
+-- registrant. (Applied to the live SQL Server DB via a one-off CREATE TABLE.)
+CREATE TABLE IF NOT EXISTS emergent_risk_forms (
+  id                 SERIAL PRIMARY KEY,
+  participant_id     INTEGER,
+  event_id           INTEGER,
+  risks              TEXT,
+  metabolic_syndrome BOOLEAN,
+  ms_count           INTEGER,
+  follow_up          BOOLEAN,
+  availability       TEXT,
+  acknowledged       BOOLEAN,
+  emailed_to         VARCHAR(256),
+  created_at         TIMESTAMPTZ DEFAULT NOW()
+);
