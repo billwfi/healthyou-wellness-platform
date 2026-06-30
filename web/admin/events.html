@@ -623,9 +623,21 @@ async function loadOverview() {
       <td>${s.bmi||'—'}</td>
       <td>${s.systolic_bp?s.systolic_bp+'/'+s.diastolic_bp:'—'}</td>
       <td>${s.overall_risk?`<span class="badge badge-${s.overall_risk}">${s.overall_risk}</span>`:'—'}</td>
-      <td style="text-align:right;"><button class="btn btn-ghost btn-sm" onclick="openScreeningReport(${i})">Report</button></td>
+      <td style="text-align:right;white-space:nowrap;">
+        <button class="btn btn-ghost btn-sm" onclick="openScreeningEntry(${i})">Edit</button>
+        <button class="btn btn-ghost btn-sm" onclick="openScreeningReport(${i})">Report</button>
+      </td>
     </tr>`).join('');
   } catch(e){ showToast('Error loading screenings'); }
+}
+
+// Open the screener entry page to update this participant's biometric values.
+function openScreeningEntry(i){
+  const s=ovScreenings[i]; if(!s) return;
+  if(!s.participant_id){ showToast('No participant is linked to this screening'); return; }
+  let url=`/screener/entry.html?participant_id=${s.participant_id}`;
+  if(s.event_id) url+=`&event_id=${s.event_id}`;
+  window.open(url,'_blank');
 }
 
 // ── Screening report (print / save) ──────────────────────────────────────────
