@@ -61,6 +61,8 @@
           <div class="form-grid" style="gap:14px;">
             <div class="form-group"><label>First Name *</label><input id="d-first" type="text"/></div>
             <div class="form-group"><label>Last Name *</label><input id="d-last" type="text"/></div>
+            <div class="form-group"><label>Date of Birth *</label><input id="d-dob" type="date"/></div>
+            <div class="form-group"><label>Gender *</label><select id="d-gender"><option value="">— select —</option><option>Male</option><option>Female</option><option>Other</option><option>Prefer not to say</option></select></div>
             <div class="form-group"><label>Phone</label><input id="d-phone" type="tel"/></div>
             <div class="form-group"><label>Email</label><input id="d-email" type="email"/></div>
           </div>
@@ -181,8 +183,12 @@ function pickTime(t,btn){ data.state.time=t; document.querySelectorAll('#dt-slot
 // ── Details ──
 function afterDetails(){
   const first=document.getElementById('d-first').value.trim(), last=document.getElementById('d-last').value.trim();
+  const dob=document.getElementById('d-dob').value||null, gender=document.getElementById('d-gender').value||null;
   if(!first||!last){ showToast('First and last name are required.'); return; }
-  data.state.details={ first_name:first, last_name:last, phone:document.getElementById('d-phone').value.trim()||null, email:document.getElementById('d-email').value.trim()||null };
+  if(!dob){ showToast('Date of birth is required.'); return; }
+  if(!gender){ showToast('Gender is required.'); return; }
+  data.state.details={ first_name:first, last_name:last, date_of_birth:dob, gender,
+    phone:document.getElementById('d-phone').value.trim()||null, email:document.getElementById('d-email').value.trim()||null };
   if(hasForms()){ renderForms(); goStep('forms'); }
   else { renderReview(); goStep('confirm'); }   // no forms → straight to review
 }
@@ -231,7 +237,7 @@ function afterForms(){
       else if(fl.type==='file'){ v=pendingFiles.find(x=>x.form_id===f.id&&x.field_key===fl.key)?'(uploaded)':null; }
       else { const el=document.getElementById(id); v=el?(el.value||null):null; }
       vals[fl.key]=v;
-      if(fl.required && (v===null||v===''||v===false)) missing=missing||fl.label;
+      if(fl.required && (v===null||v===''||v===false)) missing=missing||shortLabel(fl.label);
     }
     if(f.requires_ack){
       const ack=document.getElementById('ack-'+f.id), checked=!!(ack&&ack.checked);
@@ -250,6 +256,8 @@ function renderReview(){
   const s=data.state, l=s.location;
   document.getElementById('review').innerHTML=`<table class="data-table"><tbody>
     <tr><td style="color:var(--gray-400);">Name</td><td>${esc(s.details.first_name)} ${esc(s.details.last_name)}</td></tr>
+    ${s.details.date_of_birth?`<tr><td style="color:var(--gray-400);">Date of Birth</td><td>${esc(new Date(s.details.date_of_birth+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}))}</td></tr>`:''}
+    ${s.details.gender?`<tr><td style="color:var(--gray-400);">Gender</td><td>${esc(s.details.gender)}</td></tr>`:''}
     <tr><td style="color:var(--gray-400);">Location</td><td>${esc(l.name)} — ${esc([l.address,l.city,l.state].filter(Boolean).join(', '))}</td></tr>
     <tr><td style="color:var(--gray-400);">Date</td><td>${esc(new Date(s.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}))}</td></tr>
     <tr><td style="color:var(--gray-400);">Time</td><td>${esc(s.time)}</td></tr>
@@ -269,6 +277,7 @@ async function submitReg(){
   }catch(e){ const el=document.getElementById('confirm-err'); el.textContent=e.message; el.style.display=''; btn.disabled=false; btn.textContent='Confirm Registration'; }
 }
 
+function shortLabel(s){ s=(s||'this field').toString().replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim(); return s.length>60?s.slice(0,60)+'…':s; }
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
 function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>

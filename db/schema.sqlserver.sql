@@ -656,10 +656,16 @@ CREATE TABLE dbo.event_appointments (
   phone            NVARCHAR(30),
   appointment_date DATE,
   appointment_time TIME,
+  date_of_birth    DATE,
+  gender           NVARCHAR(20),
   status           NVARCHAR(20) DEFAULT 'registered',   -- registered | cancelled
   magic_token      NVARCHAR(64),                        -- cancel/reschedule (Phase 4)
   created_at       DATETIME2(3) DEFAULT SYSUTCDATETIME()
 );
+GO
+IF COL_LENGTH('dbo.event_appointments','date_of_birth') IS NULL ALTER TABLE dbo.event_appointments ADD date_of_birth DATE;
+GO
+IF COL_LENGTH('dbo.event_appointments','gender')        IS NULL ALTER TABLE dbo.event_appointments ADD gender NVARCHAR(20);
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_appt_event') CREATE INDEX idx_appt_event ON dbo.event_appointments(event_id);
 GO
