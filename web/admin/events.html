@@ -678,29 +678,34 @@ function computeRiskClient(r){
 }
 const MEASURE_LABELS={bmi:'BMI',waist_circumference:'Waist Circumference',waist_height:'Waist-to-Height',blood_pressure:'Blood Pressure',blood_glucose:'Blood Glucose',hba1c:'HbA1c',hdl:'HDL',ldl:'LDL',triglycerides:'Triglycerides',non_hdl:'Non-HDL',total_cholesterol:'Total Cholesterol',cholesterol_ratio:'Cholesterol Ratio',grip_strength:'Grip Strength'};
 
-// Educational reference panel (descriptions + ranges) shown beside the report.
-function educationHTML(){
+// Educational reference panel (descriptions + ranges); highlights the participant's band.
+function educationHTML(M){
+  M=M||{};
   const G='var(--green)',A='var(--amber)',R='var(--red)';
-  const item=(name,desc,ranges,extra)=>`<div style="margin-bottom:13px;">
-    <div style="font-weight:700;font-size:.82rem;color:var(--gray-800);">${name}</div>
-    <div style="font-size:.74rem;color:var(--gray-500);line-height:1.45;margin:2px 0 5px;">${desc}</div>
-    ${ranges.map(x=>`<div style="font-size:.74rem;color:var(--gray-600);display:flex;gap:6px;"><span style="width:8px;height:8px;border-radius:2px;background:${x[0]};flex:none;margin-top:4px;"></span><span>${x[1]}</span></div>`).join('')}
-    ${extra?`<div style="font-size:.72rem;color:#991b1b;margin-top:3px;">${extra}</div>`:''}
-  </div>`;
-  return `<div style="font-size:.8rem;color:var(--teal);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;font-weight:700;">Understanding Your Results</div>`
-   + item('BMI','Body Mass Index estimates body fat from height and weight.',[[G,'Ideal 18.5–24.9'],[A,'Borderline 25.0–29.9'],[R,'High &lt;18.5 or ≥30']])
-   + item('Waist Circumference','Abdominal fat — a key cardiometabolic risk marker.',[[G,'Ideal: M &lt;40 in · F &lt;35 in'],[R,'High: M ≥40 · F ≥35']])
-   + item('Waist-to-Height','Waist ÷ height; central fat distribution.',[[G,'Ideal &lt;0.50'],[A,'Borderline 0.50–0.59'],[R,'High ≥0.60']])
-   + item('Blood Pressure','Force of blood on artery walls (systolic/diastolic), mmHg.',[[G,'Ideal &lt;120/80'],[A,'Borderline 120–139 / 80–89'],[R,'High ≥140/90']],'Critical ≥150/100 · ER ≥180/120')
-   + item('Blood Glucose','Blood sugar; thresholds depend on fasting.',[[G,'Ideal: fasting ≤99 · non-fasting &lt;140'],[A,'Borderline: 100–125 · 140–199'],[R,'High: ≥126 · ≥200']],'ER &gt;300 mg/dL')
-   + item('HbA1c','Average blood sugar over ~3 months.',[[G,'Ideal &lt;5.7%'],[A,'Borderline 5.7–6.4%'],[R,'High ≥6.5%']],'ER &gt;12.0%')
-   + item('HDL ("good")','Higher levels are protective.',[[G,'Ideal: M &gt;40 · F &gt;50'],[A,'Borderline: M 31–40 · F 41–50'],[R,'Low: M ≤30 · F ≤40']])
-   + item('LDL ("bad")','Main cholesterol that builds artery plaque.',[[G,'Ideal &lt;100'],[A,'Borderline 100–139'],[R,'High ≥140']],'Critical &gt;160')
-   + item('Triglycerides','Blood fat; fasting-dependent.',[[G,'Ideal: fasting &lt;150 · non-fasting &lt;200'],[A,'Borderline: 150–199 · 200–249'],[R,'High: ≥200 · ≥250']])
-   + item('Non-HDL','Total cholesterol minus HDL — all artery-clogging cholesterol.',[[G,'Ideal &lt;130'],[A,'Borderline 130–169'],[R,'High ≥170']])
-   + item('Total Cholesterol','All cholesterol in the blood.',[[G,'Ideal ≤199'],[A,'Borderline 200–239'],[R,'High ≥240']])
-   + item('Cholesterol Ratio','Total cholesterol ÷ HDL.',[[G,'Ideal &lt;4.0'],[A,'Borderline 4.0–4.49'],[R,'High ≥4.5']],'Critical &gt;6.0')
-   + item('Grip Strength','Hand strength — a marker of overall muscle health. Cutoffs vary by age &amp; sex.',[[G,'Ideal: above age/sex cutoff'],[R,'Low: at or below cutoff']]);
+  const item=(name,key,desc,ranges,extra)=>{
+    const cur=M[key]?M[key].level:null;
+    return `<div style="margin-bottom:13px;">
+      <div style="font-weight:700;font-size:.82rem;color:var(--gray-800);">${name}</div>
+      <div style="font-size:.74rem;color:var(--gray-500);line-height:1.45;margin:2px 0 5px;">${desc}</div>
+      ${ranges.map(x=>{const on=cur&&cur===x[2];return `<div style="font-size:.74rem;color:var(--gray-700);display:flex;gap:6px;align-items:flex-start;padding:1px 4px;border-radius:4px;${on?'background:#eef2ff;font-weight:700;':''}"><span style="width:8px;height:8px;border-radius:2px;background:${x[0]};flex:none;margin-top:4px;"></span><span>${x[1]}${on?' <span style="color:var(--teal);">— your result</span>':''}</span></div>`;}).join('')}
+      ${extra?`<div style="font-size:.72rem;color:#991b1b;margin-top:3px;">${extra}</div>`:''}
+    </div>`;
+  };
+  return `<div style="font-size:.8rem;color:var(--teal);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:700;">Understanding Your Results</div>`
+   + `<div style="font-size:.72rem;color:var(--gray-400);font-style:italic;line-height:1.45;margin-bottom:12px;">These ranges are for education and are not a diagnosis. Please discuss your results with your healthcare provider.</div>`
+   + item('BMI','bmi','Body Mass Index estimates body fat from height and weight.',[[G,'Ideal 18.5–24.9','ideal'],[A,'Borderline 25.0–29.9','borderline'],[R,'High &lt;18.5 or ≥30','high']])
+   + item('Waist Circumference','waist_circumference','Abdominal fat — a key cardiometabolic risk marker.',[[G,'Ideal: M &lt;40 in · F &lt;35 in','ideal'],[R,'High: M ≥40 · F ≥35','high']])
+   + item('Waist-to-Height','waist_height','Waist ÷ height; central fat distribution.',[[G,'Ideal &lt;0.50','ideal'],[A,'Borderline 0.50–0.59','borderline'],[R,'High ≥0.60','high']])
+   + item('Blood Pressure','blood_pressure','Force of blood on artery walls (systolic/diastolic), mmHg.',[[G,'Ideal &lt;120/80','ideal'],[A,'Borderline 120–139 / 80–89','borderline'],[R,'High ≥140/90','high']],'Critical ≥150/100 · ER ≥180/120')
+   + item('Blood Glucose','blood_glucose','Blood sugar; thresholds depend on fasting.',[[G,'Ideal: fasting ≤99 · non-fasting &lt;140','ideal'],[A,'Borderline: 100–125 · 140–199','borderline'],[R,'High: ≥126 · ≥200','high']],'ER &gt;300 mg/dL')
+   + item('HbA1c','hba1c','Average blood sugar over ~3 months.',[[G,'Ideal &lt;5.7%','ideal'],[A,'Borderline 5.7–6.4%','borderline'],[R,'High ≥6.5%','high']],'ER &gt;12.0%')
+   + item('HDL ("good")','hdl','Higher levels are protective.',[[G,'Ideal: M &gt;40 · F &gt;50','ideal'],[A,'Borderline: M 31–40 · F 41–50','borderline'],[R,'Low: M ≤30 · F ≤40','high']])
+   + item('LDL ("bad")','ldl','Main cholesterol that builds artery plaque.',[[G,'Ideal &lt;100','ideal'],[A,'Borderline 100–139','borderline'],[R,'High ≥140','high']],'Critical &gt;160')
+   + item('Triglycerides','triglycerides','Blood fat; fasting-dependent.',[[G,'Ideal: fasting &lt;150 · non-fasting &lt;200','ideal'],[A,'Borderline: 150–199 · 200–249','borderline'],[R,'High: ≥200 · ≥250','high']])
+   + item('Non-HDL','non_hdl','Total cholesterol minus HDL — all artery-clogging cholesterol.',[[G,'Ideal &lt;130','ideal'],[A,'Borderline 130–169','borderline'],[R,'High ≥170','high']])
+   + item('Total Cholesterol','total_cholesterol','All cholesterol in the blood.',[[G,'Ideal ≤199','ideal'],[A,'Borderline 200–239','borderline'],[R,'High ≥240','high']])
+   + item('Cholesterol Ratio','cholesterol_ratio','Total cholesterol ÷ HDL.',[[G,'Ideal &lt;4.0','ideal'],[A,'Borderline 4.0–4.49','borderline'],[R,'High ≥4.5','high']],'Critical &gt;6.0')
+   + item('Grip Strength','grip_strength','Hand strength — a marker of overall muscle health. Cutoffs vary by age &amp; sex.',[[G,'Ideal: above age/sex cutoff','ideal'],[R,'Low: at or below cutoff','high']]);
 }
 
 function screeningReportHTML(r){
@@ -818,7 +823,7 @@ function openScreeningReport(i){
   document.getElementById('report-body').innerHTML=
     `<div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
        <div style="flex:1;min-width:300px;">${screeningReportHTML(r)}</div>
-       <div style="width:290px;flex:none;border-left:1px solid var(--gray-200);padding-left:20px;">${educationHTML()}</div>
+       <div style="width:290px;flex:none;border-left:1px solid var(--gray-200);padding-left:20px;">${educationHTML(computeRiskClient(r).measures)}</div>
      </div>`;
   document.getElementById('report-modal').style.display='flex';
 }
