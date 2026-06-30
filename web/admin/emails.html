@@ -27,7 +27,6 @@
     <div class="sidebar-section" style="margin-top:12px;">Event Management</div>
     <a href="/admin/events.html" class="sidebar-item">Events</a>
     <a href="/admin/forms.html" class="sidebar-item">Forms</a>
-    <div class="sidebar-section" style="margin-top:12px;">Emails</div>
     <a href="/admin/emails.html" class="sidebar-item active">Email Templates</a>
     <div class="sidebar-section" style="margin-top:12px;">Wellness Portal</div>
     <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
@@ -70,9 +69,17 @@
         <p style="font-size:.82rem;color:var(--gray-400);margin-top:12px;">Placeholders: <code>{{first_name}}</code> <code>{{last_name}}</code> <code>{{event}}</code> <code>{{group}}</code> <code>{{location}}</code> <code>{{date}}</code> <code>{{time}}</code> <code>{{manage_link}}</code>. The HealYou logo, group name, appointment details, and a cancel/reschedule link are added automatically.</p>
       </div>
 
-      <div class="section-header" style="margin-bottom:14px;"><h3>Body</h3></div>
+      <div class="section-header" style="margin-bottom:14px;"><h3>Body</h3>
+        <div class="actions" style="margin-left:auto;">
+          <button type="button" id="mode-visual"  class="btn btn-primary btn-sm" onclick="setMode('visual')">Visual</button>
+          <button type="button" id="mode-html"    class="btn btn-ghost btn-sm"   onclick="setMode('html')">HTML</button>
+          <button type="button" id="mode-preview" class="btn btn-ghost btn-sm"   onclick="setMode('preview')">Preview</button>
+        </div>
+      </div>
       <div class="card" style="padding:0;overflow:hidden;">
         <div id="tm-editor" style="height:280px;background:#fff;"></div>
+        <textarea id="tm-html" spellcheck="false" style="display:none;width:100%;min-height:280px;border:0;padding:14px 16px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.82rem;line-height:1.5;resize:vertical;box-sizing:border-box;"></textarea>
+        <div id="tm-preview" style="display:none;min-height:280px;padding:16px;font-size:.92rem;line-height:1.55;"></div>
       </div>
 
       <div class="save-bar">
@@ -123,6 +130,29 @@ function ensureQuill(){
     quill=new Quill('#tm-editor',{theme:'snow',modules:{toolbar:[['bold','italic','underline'],[{header:[1,2,false]}],[{list:'ordered'},{list:'bullet'}],['link'],['clean']]}});
   }
 }
+
+// ── Body editor modes: Visual (Quill) ⇆ HTML source ⇆ Preview ──
+let bodyMode='visual';
+// Read the current HTML from whichever editor mode is active (preview is read-only).
+function currentHtml(){
+  if(bodyMode==='html') return document.getElementById('tm-html').value;
+  return quill?quill.root.innerHTML:'';
+}
+function setMode(m){
+  const html=currentHtml();                 // capture from the mode we're leaving
+  if(quill) quill.root.innerHTML=html;       // keep both editors in sync so any mode can Save
+  document.getElementById('tm-html').value=html;
+  if(m==='preview') document.getElementById('tm-preview').innerHTML=html;
+  bodyMode=m;
+  document.getElementById('tm-editor').style.display = m==='visual'?'':'none';
+  document.getElementById('tm-html').style.display    = m==='html'?'':'none';
+  document.getElementById('tm-preview').style.display = m==='preview'?'':'none';
+  ['visual','html','preview'].forEach(x=>{
+    const b=document.getElementById('mode-'+x);
+    b.classList.toggle('btn-primary', x===m); b.classList.toggle('btn-ghost', x!==m);
+  });
+}
+
 function newTpl(){ editId=null; fillEditor({name:'',description:'',subject:'',body_html:DEFAULT_BODY,active:1}); showEditor(); }
 function editTpl(id){ const t=templates.find(x=>x.id===id); editId=id; fillEditor(t); showEditor(); }
 function fillEditor(t){
@@ -132,7 +162,11 @@ function fillEditor(t){
   document.getElementById('tm-active').value=t.active?'1':'0';
   document.getElementById('tm-err').style.display='none';
   ensureQuill();
-  if(quill) quill.root.innerHTML=t.body_html||DEFAULT_BODY;
+  const html=t.body_html||DEFAULT_BODY;
+  if(quill) quill.root.innerHTML=html;
+  document.getElementById('tm-html').value=html;
+  document.getElementById('tm-preview').innerHTML=html;
+  setMode('visual');
 }
 function showEditor(){ document.getElementById('view-list').style.display='none'; document.getElementById('view-edit').style.display=''; ensureQuill(); }
 function backToList(){ document.getElementById('view-edit').style.display='none'; document.getElementById('view-list').style.display=''; }
@@ -143,7 +177,7 @@ async function saveTpl(){
   const body={ name,
     description:document.getElementById('tm-desc').value||null,
     subject:document.getElementById('tm-subject').value||null,
-    body_html:quill?quill.root.innerHTML:'',
+    body_html:currentHtml(),
     active:document.getElementById('tm-active').value==='1' };
   if(editId) body.id=editId;
   const btn=document.getElementById('tm-save'); btn.disabled=true; btn.textContent='Saving…';
