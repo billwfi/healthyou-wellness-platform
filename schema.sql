@@ -371,3 +371,19 @@ CREATE INDEX IF NOT EXISTS idx_screening_documents_participant ON screening_docu
 --   screening_events.requires_eligibility BIT  -- verify registrants vs iStrata vw_full_eligibility (Active)
 --   screening_events.offers_flu_shot      BIT  -- ask registrants if they want a flu shot
 --   event_appointments.flu_shot           BIT  -- registrant's flu-shot answer (NULL = not asked)
+
+-- Application users (admin Settings → User Management): role, assignable left-nav
+-- categories (JSON), and portal access. Applied to live SQL Server via CREATE TABLE.
+CREATE TABLE IF NOT EXISTS app_users (
+  id              SERIAL PRIMARY KEY,
+  first_name      VARCHAR(100),
+  last_name       VARCHAR(100),
+  phone           VARCHAR(40),
+  email           VARCHAR(256),
+  role            VARCHAR(40),               -- Admin | User | Health Coach
+  nav_categories  TEXT,                      -- JSON array of nav category keys
+  coach_portal    BOOLEAN DEFAULT FALSE,
+  screener_portal BOOLEAN DEFAULT FALSE,
+  active          BOOLEAN DEFAULT TRUE,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
