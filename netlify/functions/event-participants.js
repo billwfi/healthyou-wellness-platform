@@ -25,7 +25,8 @@ exports.handler = async (event, context) => {
                p.first_name, p.last_name, p.email, p.phone, p.employee_id, p.department,
                CAST(er.status AS NVARCHAR(50)) AS status,
                CAST(NULL AS varchar(10)) AS appointment_date, CAST(NULL AS varchar(5)) AS appointment_time,
-               br.id AS bio_id, br.overall_risk, CAST('participant' AS varchar(12)) AS kind
+               br.id AS bio_id, br.overall_risk, CAST('participant' AS varchar(12)) AS kind,
+               CAST(NULL AS NVARCHAR(255)) AS location_name
           FROM event_registrations er
           JOIN participants p ON p.id=er.participant_id
           LEFT JOIN biometric_results br ON br.participant_id=p.id AND br.event_id=er.event_id
@@ -36,8 +37,15 @@ exports.handler = async (event, context) => {
                CAST(NULL AS NVARCHAR(100)), CAST(NULL AS NVARCHAR(255)),
                CAST(a.status AS NVARCHAR(50)),
                CONVERT(varchar(10), a.appointment_date, 23), CONVERT(varchar(5), a.appointment_time, 108),
-               CAST(NULL AS INT), CAST(NULL AS NVARCHAR(50)), CAST('appointment' AS varchar(12))
-          FROM event_appointments a WHERE a.event_id=$1
+               (SELECT TOP 1 br2.id FROM biometric_results br2 JOIN participants pp ON pp.id=br2.participant_id
+                 WHERE LOWER(pp.email)=LOWER(a.email) AND br2.event_id=a.event_id) AS bio_id,
+               (SELECT TOP 1 br2.overall_risk FROM biometric_results br2 JOIN participants pp ON pp.id=br2.participant_id
+                 WHERE LOWER(pp.email)=LOWER(a.email) AND br2.event_id=a.event_id) AS overall_risk,
+               CAST('appointment' AS varchar(12)) AS kind,
+               el.name
+          FROM event_appointments a
+          LEFT JOIN event_locations el ON el.id=a.location_id
+         WHERE a.event_id=$1
       ) u`;
       const [rowsRes, countRes] = await Promise.all([
         db.query(`SELECT * FROM ${inner} ${searchClause}
