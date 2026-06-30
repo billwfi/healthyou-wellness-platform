@@ -175,7 +175,7 @@ async function loadSlots(){
   try{
     const slots=await fetch(`/api/event-register?location_id=${data.state.location.id}&date=${date}`).then(r=>r.json());
     if(!slots.length){ host.innerHTML='<span style="font-size:.85rem;color:var(--gray-400);">No times available for this date.</span>'; return; }
-    host.innerHTML=slots.map(s=>`<span class="slot"><button class="btn ${s.remaining>0?'btn-ghost':''}" ${s.remaining>0?`onclick="pickTime('${s.time}',this)"`:'disabled'} title="${s.remaining} left">${s.time}</button></span>`).join('');
+    host.innerHTML=slots.map(s=>`<span class="slot"><button class="btn ${s.remaining>0?'btn-ghost':''}" ${s.remaining>0?`onclick="pickTime('${s.time}',this)"`:'disabled'} title="${s.remaining} left">${fmtTime(s.time)}</button></span>`).join('');
   }catch(e){ host.innerHTML='Error loading times.'; }
 }
 function pickTime(t,btn){ data.state.time=t; document.querySelectorAll('#dt-slots .btn').forEach(b=>b.classList.remove('btn-primary')); btn.classList.add('btn-primary'); document.getElementById('dt-next').disabled=false; }
@@ -260,7 +260,7 @@ function renderReview(){
     ${s.details.gender?`<tr><td style="color:var(--gray-400);">Gender</td><td>${esc(s.details.gender)}</td></tr>`:''}
     <tr><td style="color:var(--gray-400);">Location</td><td>${esc(l.name)} — ${esc([l.address,l.city,l.state].filter(Boolean).join(', '))}</td></tr>
     <tr><td style="color:var(--gray-400);">Date</td><td>${esc(new Date(s.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}))}</td></tr>
-    <tr><td style="color:var(--gray-400);">Time</td><td>${esc(s.time)}</td></tr>
+    <tr><td style="color:var(--gray-400);">Time</td><td>${esc(fmtTime(s.time))}</td></tr>
     ${s.details.email?`<tr><td style="color:var(--gray-400);">Email</td><td>${esc(s.details.email)}</td></tr>`:''}
   </tbody></table>`;
 }
@@ -277,6 +277,7 @@ async function submitReg(){
   }catch(e){ const el=document.getElementById('confirm-err'); el.textContent=e.message; el.style.display=''; btn.disabled=false; btn.textContent='Confirm Registration'; }
 }
 
+function fmtTime(t){ if(!t) return ''; const p=String(t).split(':'); let h=parseInt(p[0],10); if(isNaN(h)) return t; const m=(p[1]||'00').slice(0,2); const ap=h<12?'AM':'PM'; h=h%12||12; return `${h}:${m} ${ap}`; }
 function shortLabel(s){ s=(s||'this field').toString().replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim(); return s.length>60?s.slice(0,60)+'…':s; }
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
 function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }

@@ -61,7 +61,7 @@ function render(){
     <tr><td style="color:var(--gray-400);">Status</td><td><span class="badge badge-${cancelled?'cancelled':'completed'}">${cancelled?'Cancelled':'Confirmed'}</span></td></tr>
     <tr><td style="color:var(--gray-400);">Location</td><td>${esc(appt.location_name)} — ${esc([appt.address,appt.city,appt.state].filter(Boolean).join(', '))}</td></tr>
     <tr><td style="color:var(--gray-400);">Date</td><td>${esc(dateStr)}</td></tr>
-    <tr><td style="color:var(--gray-400);">Time</td><td>${esc(appt.appointment_time||'—')}</td></tr>
+    <tr><td style="color:var(--gray-400);">Time</td><td>${esc(fmtTime(appt.appointment_time)||'—')}</td></tr>
   </tbody></table>`;
   document.getElementById('actions').style.display=cancelled?'none':'';
 }
@@ -95,7 +95,7 @@ async function rsSlots(){
   host.innerHTML='Loading…';
   try{
     const slots=await fetch(`/api/event-register?location_id=${appt.location_id}&date=${date}`).then(r=>r.json());
-    host.innerHTML=slots.length?slots.map(s=>`<span class="slot"><button class="btn ${s.remaining>0?'btn-ghost':''}" ${s.remaining>0?`onclick="pickRs('${s.time}',this)"`:'disabled'} title="${s.remaining} left">${s.time}</button></span>`).join('')
+    host.innerHTML=slots.length?slots.map(s=>`<span class="slot"><button class="btn ${s.remaining>0?'btn-ghost':''}" ${s.remaining>0?`onclick="pickRs('${s.time}',this)"`:'disabled'} title="${s.remaining} left">${fmtTime(s.time)}</button></span>`).join('')
       :'<span style="font-size:.85rem;color:var(--gray-400);">No times available.</span>';
   }catch(e){ host.innerHTML='Error.'; }
 }
@@ -110,6 +110,7 @@ async function confirmReschedule(){
   }catch(e){ showToast('Error: '+e.message); }
 }
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function fmtTime(t){ if(!t) return ''; const p=String(t).split(':'); let h=parseInt(p[0],10); if(isNaN(h)) return t; const m=(p[1]||'00').slice(0,2); const ap=h<12?'AM':'PM'; h=h%12||12; return `${h}:${m} ${ap}`; }
 function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 </body></html>

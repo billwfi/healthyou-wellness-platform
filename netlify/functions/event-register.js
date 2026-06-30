@@ -146,10 +146,11 @@ async function sendConfirmation(db, { email, first_name, last_name, eventId, loc
   const locLine = [l.name, l.address, [l.city, l.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
   const dt = new Date(`${appointment_date}T${appointment_time}:00`);
   const dateStr = dt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const timeStr = fmtTime(appointment_time);
   const site = process.env.URL || 'https://healthyou-wellness-platform.netlify.app';
   const manageLink = token ? `${site}/manage/?t=${token}` : site;
   const ctx = { first_name, last_name, event: e.name || 'Screening Event', group: grp.rows[0]?.name || '',
-                location: locLine, date: dateStr, time: appointment_time, manage_link: manageLink };
+                location: locLine, date: dateStr, time: timeStr, manage_link: manageLink };
 
   const subject = applyVars(tpl.subject || 'Your screening appointment — {{date}}', ctx);
   const body = tpl.body_html
@@ -162,7 +163,7 @@ async function sendConfirmation(db, { email, first_name, last_name, eventId, loc
       ${ctx.group ? `<div style="font-weight:600;margin-bottom:10px;">${esc(ctx.group)}</div>` : ''}
       ${body}
       <div style="margin:18px 0;padding:14px;background:#f1f5f9;border-radius:8px;font-size:13px;">
-        <strong>${esc(ctx.event)}</strong><br>${esc(locLine || '—')}<br>${esc(dateStr)} at ${esc(appointment_time)}
+        <strong>${esc(ctx.event)}</strong><br>${esc(locLine || '—')}<br>${esc(dateStr)} at ${esc(timeStr)}
       </div>
       <p style="font-size:13px;color:#64748b;">Need to make a change? <a href="${manageLink}" style="color:#0d9488;">Cancel or reschedule your appointment</a>.</p>
     </div></div>`;
@@ -174,3 +175,4 @@ async function sendConfirmation(db, { email, first_name, last_name, eventId, loc
   if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
 }
 function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function fmtTime(t) { if (!t) return ''; const p = String(t).split(':'); let h = parseInt(p[0], 10); if (isNaN(h)) return t; const m = (p[1] || '00').slice(0, 2); const ap = h < 12 ? 'AM' : 'PM'; h = h % 12 || 12; return `${h}:${m} ${ap}`; }
