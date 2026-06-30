@@ -133,8 +133,13 @@ function applyVars(s, ctx) { return String(s || '').replace(/{{\s*(\w+)\s*}}/g, 
 async function sendConfirmation(db, { email, first_name, last_name, eventId, location_id, appointment_date, appointment_time, token }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return;
-  const ev = await db.query('SELECT name, email_subject, email_html, org_id FROM screening_events WHERE id=$1', [eventId]);
+  const ev = await db.query('SELECT name, email_template_id, org_id FROM screening_events WHERE id=$1', [eventId]);
   const e = ev.rows[0] || {};
+  let tpl = {};
+  if (e.email_template_id) {
+    const t = await db.query('SELECT subject, body_html FROM email_templates WHERE id=$1 AND active=1', [e.email_template_id]);
+    tpl = t.rows[0] || {};
+  }
   const grp = e.org_id ? await db.query('SELECT GroupName AS name FROM iStrata.dbo.is_groups WHERE id=$1', [e.org_id]) : { rows: [] };
   const loc = await db.query('SELECT name, address, city, state FROM event_locations WHERE id=$1', [location_id]);
   const l = loc.rows[0] || {};
@@ -146,9 +151,9 @@ async function sendConfirmation(db, { email, first_name, last_name, eventId, loc
   const ctx = { first_name, last_name, event: e.name || 'Screening Event', group: grp.rows[0]?.name || '',
                 location: locLine, date: dateStr, time: appointment_time, manage_link: manageLink };
 
-  const subject = applyVars(e.email_subject || 'Your screening appointment — {{date}}', ctx);
-  const body = e.email_html
-    ? applyVars(e.email_html, ctx)
+  const subject = applyVars(tpl.subject || 'Your screening appointment — {{date}}', ctx);
+  const body = tpl.body_html
+    ? applyVars(tpl.body_html, ctx)
     : `<p>Hi ${esc(first_name)} ${esc(last_name)}, your screening appointment is confirmed.</p>`;
   const logo = `${site}/assets/img/hylogo.png`;
   const html = `<div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">

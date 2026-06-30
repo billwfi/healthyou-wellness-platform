@@ -4,8 +4,6 @@
   <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Screening Events — HealYou Admin</title>
   <link rel="stylesheet" href="/assets/css/style.css"/>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css">
-  <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <style id="report-css">
@@ -34,6 +32,8 @@
     <div class="sidebar-section" style="margin-top:12px;">Event Management</div>
     <a href="/admin/events.html" class="sidebar-item active">Events</a>
     <a href="/admin/forms.html" class="sidebar-item">Forms</a>
+    <div class="sidebar-section" style="margin-top:12px;">Emails</div>
+    <a href="/admin/emails.html" class="sidebar-item">Email Templates</a>
     <div class="sidebar-section" style="margin-top:12px;">Wellness Portal</div>
     <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
     <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
@@ -220,12 +220,13 @@
       <!-- Email tab -->
       <div id="et-email" style="display:none;">
         <div class="card">
-          <div class="card-title">Confirmation Email Template</div>
-          <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:12px;">Customize the email sent when someone registers. Placeholders: <code>{{first_name}}</code> <code>{{last_name}}</code> <code>{{event}}</code> <code>{{location}}</code> <code>{{date}}</code> <code>{{time}}</code> <code>{{manage_link}}</code>. The HealYou logo, group name, appointment details, and a cancel/reschedule link are added automatically.</p>
-          <div class="form-group" style="margin-bottom:12px;"><label>Subject</label><input id="em-subject" type="text" placeholder="Your screening appointment — {{date}}"/></div>
-          <label style="font-size:.8rem;font-weight:500;color:var(--gray-600);">Body</label>
-          <div id="email-editor" style="height:240px;background:#fff;"></div>
-          <div class="save-bar"><button class="btn btn-primary" onclick="saveEmail()">Save Template</button></div>
+          <div class="card-title">Confirmation Email</div>
+          <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:12px;">Choose the reusable email template sent when someone registers for this event. Build and edit templates under <a href="/admin/emails.html">Emails → Email Templates</a>.</p>
+          <div class="form-group" style="max-width:420px;">
+            <label>Email Template</label>
+            <select id="em-template"><option value="">— Default (no template) —</option></select>
+          </div>
+          <div class="save-bar"><button class="btn btn-primary" onclick="saveEmail()">Save</button></div>
         </div>
       </div>
 
@@ -815,19 +816,23 @@ function renderRegTab() {
   const box=document.getElementById('reg-qr'); if(box){ box.innerHTML=''; if(window.QRCode) new QRCode(box,{text:regUrl,width:150,height:150}); }
 }
 // ── Email template + QR ───────────────────────────────────────────────────────
-let quill=null;
-function loadEmail(){
-  if(!quill && window.Quill){ quill=new Quill('#email-editor',{theme:'snow',modules:{toolbar:[['bold','italic','underline'],[{header:[1,2,false]}],[{list:'ordered'},{list:'bullet'}],['link'],['clean']]}}); }
-  document.getElementById('em-subject').value=activeEvent.email_subject||'';
-  if(quill) quill.root.innerHTML=activeEvent.email_html||'<p>Hi {{first_name}}, your screening appointment is confirmed.</p>';
+let emailTemplates=null;
+async function loadEmail(){
+  const sel=document.getElementById('em-template');
+  if(!emailTemplates){
+    try{ emailTemplates=await fetch('/api/email-templates?active=1',{headers:auth()}).then(r=>r.json()); if(!Array.isArray(emailTemplates)) emailTemplates=[]; }
+    catch(e){ emailTemplates=[]; showToast('Error loading templates: '+e.message); }
+  }
+  sel.innerHTML='<option value="">— Default (no template) —</option>'+
+    emailTemplates.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  sel.value=activeEvent.email_template_id||'';
 }
 async function saveEmail(){
-  const subject=document.getElementById('em-subject').value;
-  const html=quill?quill.root.innerHTML:'';
+  const val=document.getElementById('em-template').value;
   try{
-    const r=await fetch('/api/events',{method:'PUT',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify({id:activeEvent.id,email_subject:subject,email_html:html})});
+    const r=await fetch('/api/events',{method:'PUT',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify({id:activeEvent.id,email_template_id:val?parseInt(val):null})});
     if(!r.ok){ showToast('Error: '+((await r.json()).error||'Save failed')); return; }
-    const u=await r.json(); activeEvent.email_subject=u.email_subject; activeEvent.email_html=u.email_html;
+    const u=await r.json(); activeEvent.email_template_id=u.email_template_id;
     showToast('Email template saved');
   }catch(e){ showToast('Error: '+e.message); }
 }

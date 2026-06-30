@@ -670,8 +670,27 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_appt_doc_appt') CREATE INDEX idx_appt_doc_appt ON dbo.event_appointment_documents(appointment_id);
 GO
 
--- Per-event confirmation email template (WYSIWYG body + subject).
+-- Legacy per-event inline email (superseded by reusable email_templates below; columns kept for back-compat).
 IF COL_LENGTH('dbo.screening_events','email_subject') IS NULL ALTER TABLE dbo.screening_events ADD email_subject NVARCHAR(500);
 GO
 IF COL_LENGTH('dbo.screening_events','email_html') IS NULL    ALTER TABLE dbo.screening_events ADD email_html NVARCHAR(MAX);
+GO
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- Reusable email templates (WYSIWYG body + subject), assignable to events.
+-- ════════════════════════════════════════════════════════════════════════════
+IF OBJECT_ID('dbo.email_templates','U') IS NULL
+CREATE TABLE dbo.email_templates (
+  id          INT IDENTITY(1,1) PRIMARY KEY,
+  name        NVARCHAR(255) NOT NULL,
+  description NVARCHAR(MAX),
+  subject     NVARCHAR(500),
+  body_html   NVARCHAR(MAX),
+  active      BIT DEFAULT 1,
+  created_at  DATETIME2(3) DEFAULT SYSUTCDATETIME(),
+  updated_at  DATETIME2(3) DEFAULT SYSUTCDATETIME()
+);
+GO
+-- An event points at the email template used for its confirmation email.
+IF COL_LENGTH('dbo.screening_events','email_template_id') IS NULL ALTER TABLE dbo.screening_events ADD email_template_id INT;
 GO

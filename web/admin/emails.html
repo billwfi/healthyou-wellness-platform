@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Email Templates — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css">
+  <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo.png" alt="HealthYou"></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <a href="/admin/groups.html" class="sidebar-item">Groups</a>
+    <div class="sidebar-section" style="margin-top:12px;">Health Coaching Admin</div>
+    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <div class="sidebar-section" style="margin-top:12px;">Event Management</div>
+    <a href="/admin/events.html" class="sidebar-item">Events</a>
+    <a href="/admin/forms.html" class="sidebar-item">Forms</a>
+    <div class="sidebar-section" style="margin-top:12px;">Emails</div>
+    <a href="/admin/emails.html" class="sidebar-item active">Email Templates</a>
+    <div class="sidebar-section" style="margin-top:12px;">Wellness Portal</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+    <a href="/admin/umbraco.html" class="sidebar-item">Umbraco</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/settings.html" class="sidebar-item">System Settings</a>
+  </nav>
+</aside>
+<main class="container has-sidebar">
+  <div id="content" style="display:none;">
+
+    <!-- LIST -->
+    <div id="view-list">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div><h1 class="page-title" style="margin-bottom:2px;">Email Templates</h1><p style="color:var(--gray-400);font-size:.88rem;">Reusable confirmation-email templates. Assign one to a screening event on its Email tab.</p></div>
+        <button class="btn btn-primary" onclick="newTpl()">+ New Template</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <table class="data-table">
+          <thead><tr><th>Template</th><th>Subject</th><th>Status</th><th style="width:160px;">Actions</th></tr></thead>
+          <tbody id="tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- EDIT -->
+    <div id="view-edit" style="display:none;">
+      <button class="btn btn-ghost btn-sm" onclick="backToList()" style="margin-bottom:16px;">← Email Templates</button>
+      <div class="card">
+        <div class="form-grid" style="gap:14px;">
+          <div class="form-group span-2"><label>Template Name *</label><input id="tm-name" type="text" placeholder="Standard confirmation"/></div>
+          <div class="form-group span-2"><label>Description</label><input id="tm-desc" type="text" placeholder="Internal note (not emailed)"/></div>
+          <div class="form-group span-2"><label>Subject</label><input id="tm-subject" type="text" placeholder="Your screening appointment — {{date}}"/></div>
+          <div class="form-group"><label>Status</label><select id="tm-active"><option value="1">Active</option><option value="0">Inactive</option></select></div>
+        </div>
+        <p style="font-size:.82rem;color:var(--gray-400);margin-top:12px;">Placeholders: <code>{{first_name}}</code> <code>{{last_name}}</code> <code>{{event}}</code> <code>{{group}}</code> <code>{{location}}</code> <code>{{date}}</code> <code>{{time}}</code> <code>{{manage_link}}</code>. The HealYou logo, group name, appointment details, and a cancel/reschedule link are added automatically.</p>
+      </div>
+
+      <div class="section-header" style="margin-bottom:14px;"><h3>Body</h3></div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div id="tm-editor" style="height:280px;background:#fff;"></div>
+      </div>
+
+      <div class="save-bar">
+        <span id="tm-err" style="display:none;font-size:.84rem;color:var(--red);"></span>
+        <button class="btn btn-ghost" onclick="backToList()">Cancel</button>
+        <button class="btn btn-primary" id="tm-save" onclick="saveTpl()">Save Template</button>
+      </div>
+    </div>
+
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, templates=[], editId=null, quill=null;
+const DEFAULT_BODY='<p>Hi {{first_name}}, your screening appointment is confirmed.</p>';
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} else { location.href='/admin/login.html'; } });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ location.href='/admin/login.html'; });
+
+async function boot(user){
+  document.getElementById('content').style.display='';
+  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+  load();
+}
+function auth(){ return {Authorization:'Bearer '+authToken}; }
+async function load(){
+  try{ templates=await fetch('/api/email-templates',{headers:auth()}).then(r=>r.json()); if(!Array.isArray(templates))templates=[]; renderList(); }
+  catch(e){ showToast('Error: '+e.message); }
+}
+
+function renderList(){
+  document.getElementById('tbody').innerHTML=!templates.length
+    ?'<tr><td colspan="4" class="empty">No templates yet. Create one to attach to events.</td></tr>'
+    :templates.map(t=>`<tr>
+        <td><strong>${esc(t.name)}</strong>${t.description?`<br><span style="font-size:.78rem;color:var(--gray-400);">${esc(t.description)}</span>`:''}</td>
+        <td style="font-size:.85rem;">${esc(t.subject||'—')}</td>
+        <td><span class="badge badge-${t.active?'active':'inactive'}">${t.active?'Active':'Inactive'}</span></td>
+        <td><div class="actions">
+          <button class="btn btn-primary btn-sm" onclick="editTpl(${t.id})">Edit</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);" onclick="delTpl(${t.id})">Del</button>
+        </div></td>
+      </tr>`).join('');
+}
+
+function ensureQuill(){
+  if(!quill && window.Quill){
+    quill=new Quill('#tm-editor',{theme:'snow',modules:{toolbar:[['bold','italic','underline'],[{header:[1,2,false]}],[{list:'ordered'},{list:'bullet'}],['link'],['clean']]}});
+  }
+}
+function newTpl(){ editId=null; fillEditor({name:'',description:'',subject:'',body_html:DEFAULT_BODY,active:1}); showEditor(); }
+function editTpl(id){ const t=templates.find(x=>x.id===id); editId=id; fillEditor(t); showEditor(); }
+function fillEditor(t){
+  document.getElementById('tm-name').value=t.name||'';
+  document.getElementById('tm-desc').value=t.description||'';
+  document.getElementById('tm-subject').value=t.subject||'';
+  document.getElementById('tm-active').value=t.active?'1':'0';
+  document.getElementById('tm-err').style.display='none';
+  ensureQuill();
+  if(quill) quill.root.innerHTML=t.body_html||DEFAULT_BODY;
+}
+function showEditor(){ document.getElementById('view-list').style.display='none'; document.getElementById('view-edit').style.display=''; ensureQuill(); }
+function backToList(){ document.getElementById('view-edit').style.display='none'; document.getElementById('view-list').style.display=''; }
+
+async function saveTpl(){
+  const name=document.getElementById('tm-name').value.trim();
+  if(!name){ showErr('Template name is required.'); return; }
+  const body={ name,
+    description:document.getElementById('tm-desc').value||null,
+    subject:document.getElementById('tm-subject').value||null,
+    body_html:quill?quill.root.innerHTML:'',
+    active:document.getElementById('tm-active').value==='1' };
+  if(editId) body.id=editId;
+  const btn=document.getElementById('tm-save'); btn.disabled=true; btn.textContent='Saving…';
+  try{
+    const r=await fetch('/api/email-templates',{method:editId?'PUT':'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify(body)});
+    if(!r.ok){ showErr((await r.json()).error||'Save failed'); return; }
+    showToast(editId?'Template updated':'Template created'); await load(); backToList();
+  }catch(e){ showErr(e.message); }
+  finally{ btn.disabled=false; btn.textContent='Save Template'; }
+}
+async function delTpl(id){
+  if(!confirm('Delete this template? Any events using it will fall back to the default email.')) return;
+  try{ await fetch(`/api/email-templates?id=${id}`,{method:'DELETE',headers:auth()}); showToast('Template deleted'); load(); }
+  catch(e){ showToast('Error: '+e.message); }
+}
+
+function showErr(m){ const e=document.getElementById('tm-err'); e.textContent=m; e.style.display=''; }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>

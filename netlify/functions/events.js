@@ -62,8 +62,10 @@ exports.handler = async (event, context) => {
 
   if (event.httpMethod === 'PUT') {
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return badRequest('Invalid JSON'); }
-    const { id, name, org_id, start_date, end_date, status, description, notes, email_subject, email_html } = b;
+    const { id, name, org_id, start_date, end_date, status, description, notes, email_template_id } = b;
     if (!id) return badRequest('id required');
+    // Only touch email_template_id when the caller actually sends it (allows clearing to null).
+    const setTpl = Object.prototype.hasOwnProperty.call(b, 'email_template_id') ? 1 : 0;
     try {
       const r = await db.query(
         `UPDATE screening_events SET
@@ -71,12 +73,12 @@ exports.handler = async (event, context) => {
            start_date=COALESCE($4,start_date), event_date=COALESCE($4,event_date),
            end_date=COALESCE($5,end_date), status=COALESCE($6,status),
            description=COALESCE($7,description), notes=COALESCE($8,notes),
-           email_subject=COALESCE($9,email_subject), email_html=COALESCE($10,email_html)
+           email_template_id=CASE WHEN $9=1 THEN $10 ELSE email_template_id END
          OUTPUT INSERTED.*
          WHERE id=$1`,
         [id, name || null, org_id || null, start_date || null, end_date || null,
          status || null, description || null, notes || null,
-         email_subject ?? null, email_html ?? null]
+         setTpl, (email_template_id || null)]
       );
       if (!r.rows.length) return notFound();
       return ok(r.rows[0]);
