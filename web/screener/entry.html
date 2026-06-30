@@ -565,7 +565,8 @@ function metSyndrome(r, sex){
   if(r.hdl_cholesterol!=null)        crit.push({name:`HDL <${female?50:40}`, met:Number(r.hdl_cholesterol)<(female?50:40)});
   if(r.systolic_bp!=null||r.diastolic_bp!=null)
                                      crit.push({name:'BP ≥130/85', met:(Number(r.systolic_bp)>=130||Number(r.diastolic_bp)>=85)});
-  if(r.blood_glucose!=null)          crit.push({name:'Glucose ≥100', met:Number(r.blood_glucose)>=100});
+  if(r.hba1c!=null)                  crit.push({name:'HbA1c ≥5.7', met:Number(r.hba1c)>=5.7});
+  else if(r.blood_glucose!=null){ const thr=r.fasting_flag?100:140; crit.push({name:`Glucose ≥${thr}`, met:Number(r.blood_glucose)>=thr}); }
   return { measured:crit.length, metCount:crit.filter(c=>c.met).length, crit };
 }
 function fmtDate(d){ return d?new Date(d.includes('T')?d:d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''; }
