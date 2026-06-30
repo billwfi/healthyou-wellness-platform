@@ -144,24 +144,10 @@
 
     <!-- Eligibility tab -->
     <div id="tab-eligibility" style="display:none;">
-      <!-- Upload card -->
-      <div class="card" style="margin-bottom:20px;">
-        <div class="card-title">Upload Eligibility File</div>
-        <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:14px;">
-          Upload a CSV to <strong>replace all</strong> eligibility records for this organization.
-          Accepted columns: <code style="font-size:.78rem;background:var(--gray-100);padding:1px 6px;border-radius:4px;">employee_id, first_name, last_name, email, date_of_birth, department, location, status, coverage_tier, effective_date, termination_date</code>
-        </p>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <input type="file" id="elig-file" accept=".csv,.txt" onchange="previewEligibility()" style="flex:1;min-width:200px;font-size:.85rem;"/>
-          <button class="btn btn-primary" id="elig-upload-btn" onclick="uploadEligibility()" disabled>Upload &amp; Replace</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);" onclick="clearEligibility()">Clear All</button>
-        </div>
-        <div id="elig-preview" style="display:none;margin-top:16px;">
-          <div style="font-size:.82rem;margin-bottom:8px;" id="elig-preview-label"></div>
-          <div style="overflow-x:auto;max-height:180px;border:1px solid var(--gray-200);border-radius:var(--radius);">
-            <table class="data-table" id="elig-preview-table" style="font-size:.78rem;"></table>
-          </div>
-        </div>
+      <!-- Source note (eligibility comes from iStrata; read-only) -->
+      <div class="card" style="margin-bottom:20px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:1.2rem;">🔗</span>
+        <div style="font-size:.85rem;color:var(--gray-600);">Eligibility is sourced live from <strong>iStrata</strong> (vw_full_eligibility) and matched to this group by Group ID. It is read-only here.</div>
       </div>
 
       <!-- Stats -->
@@ -169,7 +155,7 @@
         <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-value" id="elig-stat-total">—</div><div class="stat-label">Total Records</div></div>
         <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value" id="elig-stat-active" style="color:var(--green);">—</div><div class="stat-label">Active</div></div>
         <div class="stat-card"><div class="stat-icon">⛔</div><div class="stat-value" id="elig-stat-other" style="color:var(--red);">—</div><div class="stat-label">Inactive / Term.</div></div>
-        <div class="stat-card"><div class="stat-icon">🕐</div><div class="stat-value" style="font-size:.95rem;" id="elig-stat-date">—</div><div class="stat-label">Last Upload</div></div>
+        <div class="stat-card"><div class="stat-icon">🔗</div><div class="stat-value" style="font-size:.95rem;" id="elig-stat-date">iStrata</div><div class="stat-label">Data Source</div></div>
       </div>
 
       <!-- Records table -->
@@ -700,12 +686,12 @@ async function clearEligibility() {
 async function loadEligibility(offset=0) {
   eligOffset=offset; eligLoaded=true;
   const search=(document.getElementById('elig-search')||{}).value||'';
-  const url=`/api/eligibility?org_id=${orgId}&limit=${ELIG_LIMIT}&offset=${offset}`+(search?'&search='+encodeURIComponent(search):'');
+  const url=`/api/group-eligibility?group_id=${orgId}&limit=${ELIG_LIMIT}&offset=${offset}`+(search?'&search='+encodeURIComponent(search):'');
   try {
     const data=await fetch(url,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
     eligTotal=data.total;
     renderEligibility(data.records, data.total);
-    updateEligStats(data.total, data.status_counts||{}, data.last_upload);
+    updateEligStats(data.total, data.status_counts||{});
   } catch(e){showToast('Error loading eligibility');}
 }
 
@@ -733,12 +719,12 @@ function renderEligibility(records, total) {
     </div>`;
 }
 
-function updateEligStats(total, counts, lastUpload) {
+function updateEligStats(total, counts) {
   document.getElementById('elig-stat-total').textContent=total.toLocaleString();
   document.getElementById('elig-stat-active').textContent=(counts['active']||0).toLocaleString();
   const other=Object.entries(counts).filter(([k])=>k!=='active').reduce((s,[,v])=>s+parseInt(v),0);
   document.getElementById('elig-stat-other').textContent=other.toLocaleString();
-  document.getElementById('elig-stat-date').textContent=lastUpload?new Date(lastUpload).toLocaleDateString():'—';
+  document.getElementById('elig-stat-date').textContent='iStrata';
 }
 
 function debounceEligSearch(){
