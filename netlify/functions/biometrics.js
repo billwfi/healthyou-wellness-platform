@@ -77,7 +77,7 @@ exports.handler = async (event, context) => {
       height_in, weight_lbs, waist_circumference_in, body_fat_pct,
       systolic_bp, diastolic_bp, heart_rate,
       total_cholesterol, hdl_cholesterol, ldl_cholesterol, triglycerides,
-      blood_glucose, hba1c, notes, fasting_flag, pregnant, non_hdl, cholesterol_ratio,
+      blood_glucose, hba1c, notes, fasting_flag, pregnant, diabetic, non_hdl, cholesterol_ratio,
       grip_strength,
       fruit_veg_servings, activity_minutes, muscle_strengthening, stress_level,
       alcohol_drinks, tobacco_use, sleep_hours
@@ -129,6 +129,7 @@ exports.handler = async (event, context) => {
       waist_height_category,
       fasting_flag: fasting_flag ? 1 : 0,
       pregnant: pregnant ? 1 : 0,
+      diabetic: diabetic ? 1 : 0,
       grip_strength: grip_strength ?? null,
       fruit_veg_servings: fruit_veg_servings ?? null,
       activity_minutes: activity_minutes ?? null,

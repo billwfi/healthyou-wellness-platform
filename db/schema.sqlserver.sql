@@ -580,6 +580,8 @@ IF COL_LENGTH('dbo.biometric_results','fasting_flag') IS NULL           ALTER TA
 GO
 IF COL_LENGTH('dbo.biometric_results','pregnant') IS NULL               ALTER TABLE dbo.biometric_results ADD pregnant BIT;
 GO
+IF COL_LENGTH('dbo.biometric_results','diabetic') IS NULL               ALTER TABLE dbo.biometric_results ADD diabetic BIT;
+GO
 IF COL_LENGTH('dbo.biometric_results','non_hdl') IS NULL                ALTER TABLE dbo.biometric_results ADD non_hdl INT;
 GO
 IF COL_LENGTH('dbo.biometric_results','waist_height_ratio') IS NULL     ALTER TABLE dbo.biometric_results ADD waist_height_ratio DECIMAL(4,2);

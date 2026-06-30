@@ -53,6 +53,7 @@
         <div style="display:flex;gap:24px;align-items:center;font-size:.9rem;margin-bottom:16px;">
           <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-fasting"> Fasting</label>
           <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-pregnant" onchange="applyPregnant()"> Pregnant</label>
+          <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-diabetic"> Diabetic</label>
         </div>
         <div id="preg-note" style="display:none;font-size:.82rem;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:16px;">Pregnancy mode: only Blood Pressure, Blood Glucose/HbA1c, Grip Strength, and the Lifestyle questions are collected. Other measurements are disabled.</div>
         <div class="form-grid cols-3" id="anthro-fields">
@@ -388,6 +389,7 @@ async function submitForm(e) {
     hba1c:parseFloat(document.getElementById('f-hba1c').value)||null,
     fasting_flag:document.getElementById('f-fasting').checked,
     pregnant:document.getElementById('f-pregnant').checked,
+    diabetic:document.getElementById('f-diabetic').checked,
     fruit_veg_servings:document.getElementById('f-fruitveg').value!==''?parseInt(document.getElementById('f-fruitveg').value):null,
     activity_minutes:parseInt(document.getElementById('f-activity').value),
     muscle_strengthening:radioVal('f-muscle'),
@@ -528,6 +530,7 @@ function prefillRecord(b){
   set('f-notes',b.notes);
   document.getElementById('f-fasting').checked=!!b.fasting_flag;
   document.getElementById('f-pregnant').checked=!!b.pregnant;
+  document.getElementById('f-diabetic').checked=!!b.diabetic;
   set('f-fruitveg',b.fruit_veg_servings); set('f-activity',b.activity_minutes);
   set('f-stress',b.stress_level); set('f-alcohol',b.alcohol_drinks); set('f-sleep',b.sleep_hours);
   if(b.muscle_strengthening!=null) checkRadio('f-muscle', b.muscle_strengthening?'1':'0');
