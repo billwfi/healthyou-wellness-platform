@@ -52,9 +52,10 @@
         <div class="form-section-title" style="margin-bottom:16px;">Anthropometrics</div>
         <div style="display:flex;gap:24px;align-items:center;font-size:.9rem;margin-bottom:16px;">
           <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-fasting"> Fasting</label>
-          <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-pregnant"> Pregnant</label>
+          <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-pregnant" onchange="applyPregnant()"> Pregnant</label>
         </div>
-        <div class="form-grid cols-3">
+        <div id="preg-note" style="display:none;font-size:.82rem;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:16px;">Pregnancy mode: only Blood Pressure, Blood Glucose/HbA1c, Grip Strength, and the Lifestyle questions are collected. Other measurements are disabled.</div>
+        <div class="form-grid cols-3" id="anthro-fields">
           <div class="form-group">
             <label>Height (inches)</label>
             <input id="f-height" type="number" step="0.5" min="36" max="96" placeholder="e.g. 67" oninput="calcBmi();calcWhr()"/>
@@ -118,7 +119,7 @@
       </div>
 
       <!-- Cholesterol -->
-      <div class="card">
+      <div class="card" id="sec-cholesterol">
         <div class="form-section-title" style="margin-bottom:16px;">Cholesterol Panel</div>
         <div class="form-grid cols-3">
           <div class="form-group">
@@ -364,22 +365,25 @@ function checkBp() {
 async function submitForm(e) {
   e.preventDefault();
   const btn=document.getElementById('submit-btn'); btn.disabled=true; btn.textContent='Saving…';
+  const preg=document.getElementById('f-pregnant').checked;
+  // When pregnant, anthropometrics & cholesterol are not collected (grayed out).
+  const ifNotPreg=v=>preg?null:v;
   const body={
     participant_id:parseInt(participantId),
     event_id:eventId?parseInt(eventId):null,
-    height_in:parseFloat(document.getElementById('f-height').value)||null,
-    weight_lbs:parseFloat(document.getElementById('f-weight').value)||null,
-    waist_circumference_in:parseFloat(document.getElementById('f-waist').value)||null,
+    height_in:ifNotPreg(parseFloat(document.getElementById('f-height').value)||null),
+    weight_lbs:ifNotPreg(parseFloat(document.getElementById('f-weight').value)||null),
+    waist_circumference_in:ifNotPreg(parseFloat(document.getElementById('f-waist').value)||null),
     grip_strength:parseFloat(document.getElementById('f-grip').value)||null,
     systolic_bp:parseInt(document.getElementById('f-sys').value)||null,
     diastolic_bp:parseInt(document.getElementById('f-dia').value)||null,
     heart_rate:parseInt(document.getElementById('f-hr').value)||null,
-    total_cholesterol:parseInt(document.getElementById('f-tchol').value)||null,
-    hdl_cholesterol:parseInt(document.getElementById('f-hdl').value)||null,
-    ldl_cholesterol:parseInt(document.getElementById('f-ldl').value)||null,
-    triglycerides:parseInt(document.getElementById('f-trig').value)||null,
-    non_hdl:parseInt(document.getElementById('f-nonhdl').value)||null,
-    cholesterol_ratio:parseFloat(document.getElementById('f-cratio').value)||null,
+    total_cholesterol:ifNotPreg(parseInt(document.getElementById('f-tchol').value)||null),
+    hdl_cholesterol:ifNotPreg(parseInt(document.getElementById('f-hdl').value)||null),
+    ldl_cholesterol:ifNotPreg(parseInt(document.getElementById('f-ldl').value)||null),
+    triglycerides:ifNotPreg(parseInt(document.getElementById('f-trig').value)||null),
+    non_hdl:ifNotPreg(parseInt(document.getElementById('f-nonhdl').value)||null),
+    cholesterol_ratio:ifNotPreg(parseInt(document.getElementById('f-cratio').value)||null),
     blood_glucose:parseInt(document.getElementById('f-glucose').value)||null,
     hba1c:parseFloat(document.getElementById('f-hba1c').value)||null,
     fasting_flag:document.getElementById('f-fasting').checked,
@@ -495,6 +499,23 @@ function setAlcoholRange(gender){
 function radioVal(name){ const r=document.querySelector('input[name="'+name+'"]:checked'); return r?(r.value==='1'):null; }
 function checkRadio(name,val){ const r=document.querySelector('input[name="'+name+'"][value="'+val+'"]'); if(r) r.checked=true; }
 
+// Pregnancy mode: gray out / disable measurements that aren't collected when pregnant.
+// Kept active: Blood Pressure & Vitals, Blood Glucose/HbA1c, Grip Strength, Lifestyle.
+// Disabled: Anthropometrics (height/weight/BMI/waist/WHR) and the Cholesterol Panel.
+function setSectionEnabled(el, enabled){
+  if(!el) return;
+  el.querySelectorAll('input,select,textarea,button').forEach(i=>{ i.disabled=!enabled; });
+  el.style.opacity=enabled?'':'0.45';
+  el.style.pointerEvents=enabled?'':'none';
+}
+function applyPregnant(){
+  const preg=document.getElementById('f-pregnant').checked;
+  document.getElementById('preg-note').style.display=preg?'':'none';
+  setSectionEnabled(document.getElementById('anthro-fields'), !preg);
+  setSectionEnabled(document.getElementById('bmi-preview'), !preg);
+  setSectionEnabled(document.getElementById('sec-cholesterol'), !preg);
+}
+
 // Load a previously saved biometric record back into the form for editing.
 function prefillRecord(b){
   const set=(id,v)=>{ const el=document.getElementById(id); if(el&&v!=null&&v!=='') el.value=v; };
@@ -514,6 +535,7 @@ function prefillRecord(b){
   // recompute derived fields + slider labels
   calcBmi(); calcWhr(); checkBp();
   ['fruitveg','activity','stress','alcohol','sleep'].forEach(lifeLabel);
+  applyPregnant();
 }
 
 // Metabolic Syndrome (harmonized NCEP ATP III): syndrome present when >=3 of 5
