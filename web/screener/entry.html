@@ -261,6 +261,7 @@
 <div class="toast" id="toast"></div>
 <script>
 let authToken=null, participantId=null, eventId=null, participantSex='';
+const IDEAL_RANGE={bmi:'Ideal 18.5–24.9',waist_circumference:'Ideal M&lt;40 · F&lt;35',waist_height:'Ideal &lt;0.50',blood_pressure:'Ideal &lt;120/80',blood_glucose:'Ideal ≤99 fasting',hba1c:'Ideal &lt;5.7%',hdl:'Ideal M&gt;40 · F&gt;50',ldl:'Ideal &lt;100',triglycerides:'Ideal &lt;150 fasting',non_hdl:'Ideal &lt;130',total_cholesterol:'Ideal ≤199',cholesterol_ratio:'Ideal &lt;4.0',grip_strength:'Higher is better'};
 const qs=new URLSearchParams(location.search);
 participantId=qs.get('participant_id');
 eventId=qs.get('event_id');
@@ -422,7 +423,7 @@ function educationHTML(M){
   const G='var(--green)',A='var(--amber)',R='var(--red)';
   const item=(name,key,desc,ranges,extra)=>{
     const cur=M[key]?M[key].level:null;
-    return `<div style="margin-bottom:13px;">
+    return `<div style="margin-bottom:13px;break-inside:avoid;-webkit-column-break-inside:avoid;">
       <div style="font-weight:700;font-size:.82rem;color:var(--gray-800);">${name}</div>
       <div style="font-size:.74rem;color:var(--gray-500);line-height:1.45;margin:2px 0 5px;">${desc}</div>
       ${ranges.map(x=>{const on=cur&&cur===x[2];return `<div style="font-size:.74rem;color:var(--gray-700);display:flex;gap:6px;align-items:flex-start;padding:1px 4px;border-radius:4px;${on?'background:#eef2ff;font-weight:700;':''}"><span style="width:8px;height:8px;border-radius:2px;background:${x[0]};flex:none;margin-top:4px;"></span><span>${x[1]}${on?' <span style="color:var(--teal);">— your result</span>':''}</span></div>`;}).join('')}
@@ -431,6 +432,7 @@ function educationHTML(M){
   };
   return `<div style="font-size:.8rem;color:var(--teal);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:700;">Understanding Your Results</div>`
    + `<div style="font-size:.72rem;color:var(--gray-400);font-style:italic;line-height:1.45;margin-bottom:12px;">These ranges are for education and are not a diagnosis. Please discuss your results with your healthcare provider.</div>`
+   + `<div style="column-count:2;column-gap:20px;">`
    + item('BMI','bmi','Body Mass Index estimates body fat from height and weight.',[[G,'Ideal 18.5–24.9','ideal'],[A,'Borderline 25.0–29.9','borderline'],[R,'High &lt;18.5 or ≥30','high']])
    + item('Waist Circumference','waist_circumference','Abdominal fat — a key cardiometabolic risk marker.',[[G,'Ideal: M &lt;40 in · F &lt;35 in','ideal'],[R,'High: M ≥40 · F ≥35','high']])
    + item('Waist-to-Height','waist_height','Waist ÷ height; central fat distribution.',[[G,'Ideal &lt;0.50','ideal'],[A,'Borderline 0.50–0.59','borderline'],[R,'High ≥0.60','high']])
@@ -443,7 +445,8 @@ function educationHTML(M){
    + item('Non-HDL','non_hdl','Total cholesterol minus HDL — all artery-clogging cholesterol.',[[G,'Ideal &lt;130','ideal'],[A,'Borderline 130–169','borderline'],[R,'High ≥170','high']])
    + item('Total Cholesterol','total_cholesterol','All cholesterol in the blood.',[[G,'Ideal ≤199','ideal'],[A,'Borderline 200–239','borderline'],[R,'High ≥240','high']])
    + item('Cholesterol Ratio','cholesterol_ratio','Total cholesterol ÷ HDL.',[[G,'Ideal &lt;4.0','ideal'],[A,'Borderline 4.0–4.49','borderline'],[R,'High ≥4.5','high']],'Critical &gt;6.0')
-   + item('Grip Strength','grip_strength','Hand strength — a marker of overall muscle health. Cutoffs vary by age &amp; sex.',[[G,'Ideal: above age/sex cutoff','ideal'],[R,'Low: at or below cutoff','high']]);
+   + item('Grip Strength','grip_strength','Hand strength — a marker of overall muscle health. Cutoffs vary by age &amp; sex.',[[G,'Ideal: above age/sex cutoff','ideal'],[R,'Low: at or below cutoff','high']])
+   + `</div>`;
 }
 
 function showResults(r) {
@@ -501,9 +504,10 @@ function showResults(r) {
     ${emergencyList.length?`<div style="margin-bottom:12px;padding:12px 14px;background:var(--red-light);border:1px solid #fca5a5;border-radius:8px;font-size:.88rem;font-weight:700;color:#991b1b;">🚑 Medical Emergency — refer to the ER immediately: ${esc(emergencyList.join(', '))}.</div>`:''}
     ${crList.length?`<div style="margin-bottom:18px;padding:12px 14px;background:var(--amber-light);border:1px solid #fcd34d;border-radius:8px;font-size:.86rem;font-weight:600;color:#92400e;">⚠️ Critical Risk — recommend HealthYou follow-up: ${esc(crList.join(', '))}.</div>`:''}
     <div class="result-preview-grid">
-      ${tiles.map(t=>{ const c=tileColor(t.key); return `<div class="result-tile" style="${c?'border-color:'+c+';':''}">
+      ${tiles.map(t=>{ const c=tileColor(t.key); const ideal=t.key&&IDEAL_RANGE[t.key]; return `<div class="result-tile" style="${c?'border-color:'+c+';':''}">
         <div class="result-tile-val" style="${c?'color:'+c+';':''}">${esc(String(t.val))}</div>
         <div class="result-tile-label">${t.label}</div>
+        ${ideal?`<div style="font-size:.62rem;color:var(--gray-400);margin-top:3px;">${ideal}</div>`:''}
       </div>`;}).join('')}
     </div>
     ${ms.measured?`
@@ -528,7 +532,7 @@ function showResults(r) {
   document.getElementById('results-summary').innerHTML=
     `<div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
        <div style="flex:1;min-width:300px;">${eduBody}</div>
-       <div style="width:290px;flex:none;border-left:1px solid var(--gray-200);padding-left:20px;">${educationHTML(M)}</div>
+       <div style="width:430px;flex:none;border-left:1px solid var(--gray-200);padding-left:20px;">${educationHTML(M)}</div>
      </div>`;
 }
 
