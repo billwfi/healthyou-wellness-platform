@@ -155,15 +155,68 @@ function selectEvent(id, name, date) {
   document.getElementById('event-date-label').textContent=fmtDate(date);
   document.getElementById('step-event').style.display='none';
   document.getElementById('step-participants').style.display='';
-  document.getElementById('search').focus();
+  document.getElementById('search').value='';
+  document.getElementById('search').placeholder='Filter registered participants by name or email…';
+  loadRegistrants();
+}
+
+let eventRegistrants=[], displayed=[];
+async function loadRegistrants(){
+  const host=document.getElementById('participant-results');
+  host.innerHTML='<div class="empty">Loading registered participants…</div>';
+  try{
+    const data=await fetch(`/api/event-participants?event_id=${selectedEvent.id}&limit=1000`,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+    eventRegistrants=(data&&Array.isArray(data.records))?data.records:[];
+    renderRegistrants(eventRegistrants);
+  }catch(e){ host.innerHTML='<div class="empty">Error loading registrants.</div>'; showToast('Error: '+e.message); }
+}
+function renderRegistrants(rows){
+  displayed=rows;
+  const host=document.getElementById('participant-results');
+  if(!rows.length){ host.innerHTML='<div class="empty">No one is registered for this event yet.<br><button class="btn btn-ghost btn-sm" style="margin-top:8px;" onclick="openAddParticipant()">Add a walk-in</button></div>'; return; }
+  host.innerHTML=rows.map((p,i)=>{
+    const isAppt=p.kind==='appointment';
+    const screened=!!p.bio_id;
+    const when=isAppt&&p.appointment_date?fmtDate(p.appointment_date)+(p.appointment_time?' · '+fmtTime(p.appointment_time):''):'';
+    const sub=[p.email||'', when, p.department||''].filter(Boolean).join(' · ');
+    const badge=screened?'<span class="badge badge-completed">Screened</span>'
+      :(p.status==='cancelled'?'<span class="badge badge-cancelled">Cancelled</span>':'<span class="badge badge-scheduled">Registered</span>');
+    return `<div class="checkin-row">
+      <div>
+        <div style="font-weight:600;font-size:.9rem;">${esc(p.last_name)}, ${esc(p.first_name)} ${badge}</div>
+        <div style="font-size:.78rem;color:var(--gray-400);">${esc(sub)}</div>
+      </div>
+      <button class="btn ${p.status==='cancelled'?'btn-ghost':'btn-primary'} btn-sm" ${p.status==='cancelled'?'disabled':''} onclick="screenRow(${i})">Screen →</button>
+    </div>`;
+  }).join('');
+}
+async function screenRow(i){
+  const p=displayed[i]; if(!p) return;
+  if(p.participant_id){ goScreen(p.participant_id); return; }
+  // Public appointment registrant: find-or-create the participant by email, then screen.
+  if(!p.email){ showToast('No email on file — add as walk-in to screen.'); return; }
+  try{
+    const found=await fetch(`/api/participants?search=${encodeURIComponent(p.email)}`,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+    const match=Array.isArray(found)?found.find(x=>(x.email||'').toLowerCase()===p.email.toLowerCase()):null;
+    let pid=match?match.id:null;
+    if(!pid){
+      const c=await fetch('/api/participants',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({first_name:p.first_name,last_name:p.last_name,email:p.email,phone:p.phone||null})}).then(r=>r.json());
+      pid=c.id;
+    }
+    if(pid) location.href=buildScreenUrl(pid);
+    else showToast('Could not open screening for this registrant.');
+  }catch(e){ showToast('Error: '+e.message); }
 }
 
 function showWalkIn() {
-  selectedEvent=null;
+  selectedEvent=null; eventRegistrants=[]; displayed=[];
   document.getElementById('event-label').textContent='Walk-in (No Event)';
   document.getElementById('event-date-label').textContent='';
   document.getElementById('step-event').style.display='none';
   document.getElementById('step-participants').style.display='';
+  document.getElementById('search').value='';
+  document.getElementById('search').placeholder='Search by name or email…';
+  document.getElementById('participant-results').innerHTML='<div class="empty">Search for a participant above, or add a walk-in.</div>';
 }
 
 function backToEvents() {
@@ -177,6 +230,14 @@ function backToEvents() {
 
 let searchTimer;
 function searchParticipants() {
+  // With an event selected, filter the loaded registrants live; otherwise global search.
+  if(selectedEvent){
+    const q=document.getElementById('search').value.trim().toLowerCase();
+    if(!q){ renderRegistrants(eventRegistrants); return; }
+    renderRegistrants(eventRegistrants.filter(p=>
+      (`${p.first_name} ${p.last_name}`).toLowerCase().includes(q) || (p.email||'').toLowerCase().includes(q)));
+    return;
+  }
   clearTimeout(searchTimer);
   searchTimer=setTimeout(doSearch, 280);
 }
@@ -251,6 +312,7 @@ function showWfErr(m){ const e=document.getElementById('wf-err'); e.textContent=
 function closeWalkin(){ document.getElementById('walkin-modal').style.display='none'; }
 function closeOuter(e){ if(e.target===document.getElementById('walkin-modal'))closeWalkin(); }
 function fmtDate(d){ return d?new Date(d.includes('T')?d:d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''; }
+function fmtTime(t){ if(!t) return ''; const p=String(t).split(':'); let h=parseInt(p[0],10); if(isNaN(h)) return t; const m=(p[1]||'00').slice(0,2); const ap=h<12?'AM':'PM'; h=h%12||12; return `${h}:${m} ${ap}`; }
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
