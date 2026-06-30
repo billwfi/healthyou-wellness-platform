@@ -69,6 +69,29 @@ CREATE TABLE dbo.screening_events (
 );
 GO
 
+-- Event category (Screening Event / Flu Clinic / Lunch & Learn …) — distinct from the
+-- legacy event_type modality column. Options live in dbo.event_categories (extensible).
+IF COL_LENGTH('dbo.screening_events','event_category') IS NULL ALTER TABLE dbo.screening_events ADD event_category NVARCHAR(100);
+GO
+UPDATE dbo.screening_events SET event_category='Screening Event' WHERE event_category IS NULL;
+GO
+
+IF OBJECT_ID('dbo.event_categories','U') IS NULL
+CREATE TABLE dbo.event_categories (
+  id         INT IDENTITY(1,1) PRIMARY KEY,
+  name       NVARCHAR(100) NOT NULL UNIQUE,
+  active     BIT DEFAULT 1,
+  sort_order INT DEFAULT 0,
+  created_at DATETIME2(3) DEFAULT SYSUTCDATETIME()
+);
+GO
+-- Seed the starter categories (idempotent).
+MERGE dbo.event_categories AS t
+USING (VALUES ('Screening Event',0),('Flu Clinic',1),('Lunch & Learn',2)) AS s(name,sort_order)
+  ON t.name=s.name
+WHEN NOT MATCHED THEN INSERT (name,sort_order) VALUES (s.name,s.sort_order);
+GO
+
 -- ── Biometric Results ─────────────────────────────────────────────────────────
 IF OBJECT_ID('dbo.biometric_results','U') IS NULL
 CREATE TABLE dbo.biometric_results (

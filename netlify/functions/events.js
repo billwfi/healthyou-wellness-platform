@@ -40,17 +40,17 @@ exports.handler = async (event, context) => {
 
   if (event.httpMethod === 'POST') {
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return badRequest('Invalid JSON'); }
-    const { name, org_id, start_date, end_date, status, description, notes } = b;
+    const { name, org_id, start_date, end_date, status, description, notes, event_category } = b;
     if (!name || !start_date) return badRequest('name and start_date required');
     // event_date column is legacy + NOT NULL — keep it in sync with start_date.
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const r = await db.query(
           `INSERT INTO screening_events
-             (name, org_id, event_date, start_date, end_date, status, description, notes, public_slug)
-           OUTPUT INSERTED.* VALUES ($1,$2,$3,$3,$4,$5,$6,$7,$8)`,
+             (name, org_id, event_date, start_date, end_date, status, description, notes, event_category, public_slug)
+           OUTPUT INSERTED.* VALUES ($1,$2,$3,$3,$4,$5,$6,$7,$8,$9)`,
           [name, org_id || null, start_date, end_date || null, status || 'scheduled',
-           description || null, notes || null, slugify(name)]
+           description || null, notes || null, event_category || 'Screening Event', slugify(name)]
         );
         return created(r.rows[0]);
       } catch (e) {
@@ -62,7 +62,7 @@ exports.handler = async (event, context) => {
 
   if (event.httpMethod === 'PUT') {
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return badRequest('Invalid JSON'); }
-    const { id, name, org_id, start_date, end_date, status, description, notes, email_template_id } = b;
+    const { id, name, org_id, start_date, end_date, status, description, notes, email_template_id, event_category } = b;
     if (!id) return badRequest('id required');
     // Only touch email_template_id when the caller actually sends it (allows clearing to null).
     const setTpl = Object.prototype.hasOwnProperty.call(b, 'email_template_id') ? 1 : 0;
@@ -73,12 +73,13 @@ exports.handler = async (event, context) => {
            start_date=COALESCE($4,start_date), event_date=COALESCE($4,event_date),
            end_date=COALESCE($5,end_date), status=COALESCE($6,status),
            description=COALESCE($7,description), notes=COALESCE($8,notes),
-           email_template_id=CASE WHEN $9=1 THEN $10 ELSE email_template_id END
+           email_template_id=CASE WHEN $9=1 THEN $10 ELSE email_template_id END,
+           event_category=COALESCE($11,event_category)
          OUTPUT INSERTED.*
          WHERE id=$1`,
         [id, name || null, org_id || null, start_date || null, end_date || null,
          status || null, description || null, notes || null,
-         setTpl, (email_template_id || null)]
+         setTpl, (email_template_id || null), event_category || null]
       );
       if (!r.rows.length) return notFound();
       return ok(r.rows[0]);

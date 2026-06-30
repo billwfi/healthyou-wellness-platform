@@ -331,6 +331,7 @@
     <div class="modal-title" id="em-title">New Screening Event</div>
     <div class="form-grid" style="gap:14px;">
       <div class="form-group span-2"><label>Event Name *</label><input id="em-name" type="text" placeholder="Q3 Wellness Drive"/></div>
+      <div class="form-group span-2"><label>Event Type</label><select id="em-category" onchange="onCategoryChange()"></select></div>
       <div class="form-group span-2"><label>Group</label><select id="em-org"><option value="">— none —</option></select></div>
       <div class="form-group"><label>Start Date *</label><input id="em-start" type="date"/></div>
       <div class="form-group"><label>End Date</label><input id="em-end" type="date"/></div>
@@ -427,7 +428,36 @@ async function boot(u) {
   orgs=await fetch('/api/groups',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
   const sel=document.getElementById('em-org');
   orgs.forEach(o=>sel.add(new Option(o.name,o.id)));
+  await loadCategories();
   load();
+}
+
+// ── Event Type (category) dropdown — extensible on the fly ──
+let categories=[];
+async function loadCategories(){
+  try{ categories=await fetch('/api/event-categories',{headers:auth()}).then(r=>r.json()); if(!Array.isArray(categories)) categories=[]; }
+  catch(e){ categories=[]; }
+  fillCategorySelect();
+}
+function fillCategorySelect(selected){
+  const sel=document.getElementById('em-category');
+  const val=selected!==undefined?selected:sel.value;
+  sel.innerHTML=categories.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')
+    +'<option value="__add">+ Add new type…</option>';
+  if(val && categories.some(c=>c.name===val)) sel.value=val;
+}
+async function onCategoryChange(){
+  const sel=document.getElementById('em-category');
+  if(sel.value!=='__add') return;
+  const name=(prompt('New event type name:')||'').trim();
+  if(!name){ fillCategorySelect(categories[0]?.name); return; }
+  try{
+    const r=await fetch('/api/event-categories',{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify({name})});
+    if(!r.ok){ showToast('Could not add type'); fillCategorySelect(categories[0]?.name); return; }
+    const c=await r.json();
+    if(!categories.some(x=>x.name===c.name)) categories.push(c);
+    fillCategorySelect(c.name);
+  }catch(e){ showToast('Error: '+e.message); fillCategorySelect(categories[0]?.name); }
 }
 
 async function load() {
@@ -867,9 +897,11 @@ function openEventModal(id) {
     document.getElementById('em-end').value=d(ev.end_date);
     document.getElementById('em-desc').value=ev.description||'';
     document.getElementById('em-notes').value=ev.notes||'';
+    fillCategorySelect(ev.event_category||categories[0]?.name);
   } else {
     ['em-name','em-start','em-end','em-desc','em-notes'].forEach(i=>document.getElementById(i).value='');
     document.getElementById('em-org').value='';
+    fillCategorySelect(categories[0]?.name);
   }
   document.getElementById('event-modal').style.display='flex';
 }
@@ -879,10 +911,12 @@ async function saveEvent() {
   if(!name||!start){showErr('em-err','Name and start date are required.');return;}
   const btn=document.getElementById('em-btn'); btn.disabled=true; btn.textContent='Saving…';
   try {
+    const catSel=document.getElementById('em-category').value;
     const body={name,start_date:start,
       end_date:document.getElementById('em-end').value||null,
       org_id:document.getElementById('em-org').value||null,
       description:document.getElementById('em-desc').value||null,
+      event_category:(catSel && catSel!=='__add')?catSel:'Screening Event',
       notes:document.getElementById('em-notes').value||null};
     if(editEventId) body.id=editEventId;
     const r=await fetch('/api/events',{method:editEventId?'PUT':'POST',

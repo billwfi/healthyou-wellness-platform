@@ -78,7 +78,7 @@
       <div class="step" id="step-confirm" style="display:none;">
         <div class="card"><div class="card-title">Review</div><div id="review"></div></div>
         <div id="confirm-err" style="display:none;margin-top:10px;color:var(--red);font-size:.85rem;"></div>
-        <div class="nav"><button class="btn btn-ghost" onclick="goStep('forms')">← Back</button><button class="btn btn-primary" id="submit-btn" onclick="submitReg()">Confirm Registration</button></div>
+        <div class="nav"><button class="btn btn-ghost" onclick="goStep(hasForms()?'forms':'details')">← Back</button><button class="btn btn-primary" id="submit-btn" onclick="submitReg()">Confirm Registration</button></div>
       </div>
 
       <!-- Step: done -->
@@ -96,7 +96,8 @@
 </main>
 <div class="toast" id="toast"></div>
 <script>
-const STEPS=[['location','Location'],['datetime','Date & Time'],['details','Details'],['forms','Forms'],['confirm','Confirm']];
+let STEPS=[['location','Location'],['datetime','Date & Time'],['details','Details'],['forms','Forms'],['confirm','Confirm']];
+function hasForms(){ return !!(data && data.forms && data.forms.length); }
 let data=null, current='location', pendingFiles=[];
 const qs=new URLSearchParams(location.search);
 const slug=qs.get('e')||qs.get('event')||qs.get('slug');
@@ -108,6 +109,7 @@ const slug=qs.get('e')||qs.get('event')||qs.get('slug');
     if(!data){ show('notfound'); return; }
   }catch(e){ show('notfound'); return; }
   data.state={ location:null, date:null, time:null, details:{}, answers:[], files:[] };
+  if(!hasForms()) STEPS=STEPS.filter(s=>s[0]!=='forms');   // skip the Forms step when the event has none
   document.getElementById('loading').style.display='none';
   document.getElementById('wizard').style.display='';
   document.getElementById('ev-name').textContent=data.event.name;
@@ -181,7 +183,8 @@ function afterDetails(){
   const first=document.getElementById('d-first').value.trim(), last=document.getElementById('d-last').value.trim();
   if(!first||!last){ showToast('First and last name are required.'); return; }
   data.state.details={ first_name:first, last_name:last, phone:document.getElementById('d-phone').value.trim()||null, email:document.getElementById('d-email').value.trim()||null };
-  renderForms(); goStep('forms');
+  if(hasForms()){ renderForms(); goStep('forms'); }
+  else { renderReview(); goStep('confirm'); }   // no forms → straight to review
 }
 
 // ── Forms ──
