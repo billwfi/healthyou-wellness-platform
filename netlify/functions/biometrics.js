@@ -1,69 +1,98 @@
 const { getPool } = require('./_db');
 const { getUser, ok, created, badRequest, unauthorized, notFound, serverError, options } = require('./_auth');
 
-// ── Risk model ────────────────────────────────────────────────────────────────
-// Per-measure status: green (0) / yellow (1) / red (2) / critical (3, red+alert).
-// Thresholds follow ACC/AHA (BP), ADA (glucose, HbA1c), ATP III (lipids), WHO (BMI).
-// Legacy *_risk category strings are derived from these for back-compat.
-function lvl(level, critical) { return { level, critical: !!critical }; }
+// ── Risk model (HealthYou Biometric Ranges spec) ──────────────────────────────
+// Per-measure status: level 'ideal'(green)/'borderline'(yellow)/'high'(red),
+// plus cr = Critical Risk (HealthYou follow-up) and emergency = Medical Emergency
+// (immediate ER referral). Sex/age/fasting/diabetic context drives several measures.
+function st(level, cr, emergency) { return { level, cr: !!cr, emergency: !!emergency }; }
 
-function bpStatus(sys, dia) {
-  if (!sys || !dia) return null;
-  if (sys >= 180 || dia >= 120) return lvl('red', true);          // hypertensive crisis
-  if (sys >= 140 || dia >= 90)  return lvl('red');                // stage 2
-  if (sys >= 130 || dia >= 80)  return lvl('yellow');             // stage 1
-  if (sys >= 120)               return lvl('yellow');             // elevated
-  return lvl('green');
+function bmiStatus(b) { if (!b) return null; if (b < 18.5) return st('high'); if (b < 25) return st('ideal'); if (b < 30) return st('borderline'); return st('high'); }
+function waistStatus(w, sex) { if (!w || !sex) return null; const thr = sex === 'F' ? 35 : 40; return w >= thr ? st('high') : st('ideal'); }
+function systolicStatus(s) { if (!s) return null; const lvl = s >= 140 ? 'high' : s >= 120 ? 'borderline' : 'ideal'; return st(lvl, s >= 150, s >= 180); }
+function diastolicStatus(d) { if (!d) return null; const lvl = d >= 90 ? 'high' : d >= 80 ? 'borderline' : 'ideal'; return st(lvl, d >= 100, d >= 120); }
+function worse(a, b) { // combine two statuses (e.g. systolic+diastolic) → worst
+  if (!a) return b; if (!b) return a;
+  const rank = { ideal: 0, borderline: 1, high: 2 };
+  const level = rank[a.level] >= rank[b.level] ? a.level : b.level;
+  return st(level, a.cr || b.cr, a.emergency || b.emergency);
 }
-function glucoseStatus(fg) {
-  if (!fg) return null;
-  if (fg >= 300 || fg < 54) return lvl('red', true);              // severe hyper/hypoglycemia
-  if (fg >= 126) return lvl('red');                               // diabetes range
-  if (fg >= 100) return lvl('yellow');                            // prediabetes
-  return lvl('green');
+function glucoseStatus(g, fasting, diabetic) {
+  if (!g) return null;
+  const emergency = g > 300;
+  if (fasting) {
+    const lvl = g >= 126 ? 'high' : g >= 100 ? 'borderline' : 'ideal';
+    return st(lvl, g >= (diabetic ? 180 : 140), emergency);
+  }
+  const lvl = g >= 200 ? 'high' : g >= 140 ? 'borderline' : 'ideal';
+  return st(lvl, g >= (diabetic ? 240 : 200), emergency);
 }
-function hba1cStatus(a) {
+function hba1cStatus(a, diabetic) {
   if (!a) return null;
-  if (a >= 10)  return lvl('red', true);
-  if (a >= 6.5) return lvl('red');
-  if (a >= 5.7) return lvl('yellow');
-  return lvl('green');
+  const lvl = a >= 6.5 ? 'high' : a >= 5.7 ? 'borderline' : 'ideal';
+  return st(lvl, diabetic ? a >= 8.0 : a > 6.4, a > 12.0);
 }
-function totalCholStatus(t) { if (!t) return null; return t >= 240 ? lvl('red') : t >= 200 ? lvl('yellow') : lvl('green'); }
-function hdlStatus(h) { if (!h) return null; return h < 40 ? lvl('red') : h < 60 ? lvl('yellow') : lvl('green'); }
-function ldlStatus(l) { if (!l) return null; if (l >= 190) return lvl('red', true); return l >= 160 ? lvl('red') : l >= 100 ? lvl('yellow') : lvl('green'); }
-function trigStatus(t) { if (!t) return null; if (t >= 500) return lvl('red', true); return t >= 200 ? lvl('red') : t >= 150 ? lvl('yellow') : lvl('green'); }
-function bmiStatus(b) { if (!b) return null; if (b >= 40) return lvl('red', true); if (b >= 30) return lvl('red'); if (b >= 25 || b < 18.5) return lvl('yellow'); return lvl('green'); }
-function whrStatus(r) { if (r == null) return null; return r >= 0.6 ? lvl('red') : r >= 0.5 ? lvl('yellow') : lvl('green'); }
+function hdlStatus(h, sex) {
+  if (!h || !sex) return null;
+  if (sex === 'F') return h > 50 ? st('ideal') : h >= 41 ? st('borderline') : st('high');
+  return h > 40 ? st('ideal') : h >= 31 ? st('borderline') : st('high');
+}
+function ldlStatus(l) { if (!l) return null; const lvl = l >= 140 ? 'high' : l >= 100 ? 'borderline' : 'ideal'; return st(lvl, l > 160); }
+function trigStatus(t, fasting) {
+  if (!t) return null;
+  if (fasting) { const lvl = t >= 200 ? 'high' : t >= 150 ? 'borderline' : 'ideal'; return st(lvl, t >= 400); }
+  const lvl = t >= 250 ? 'high' : t >= 200 ? 'borderline' : 'ideal'; return st(lvl, t >= 500);
+}
+function totalCholStatus(t) { if (!t) return null; return t >= 240 ? st('high') : t >= 200 ? st('borderline') : st('ideal'); }
+function ratioStatus(r) { if (!r) return null; const lvl = r >= 4.5 ? 'high' : r >= 4.0 ? 'borderline' : 'ideal'; return st(lvl, r > 6.0); }
+function gripThreshold(age, sex) {
+  let m, f;
+  if (age == null)      return null;
+  if (age < 20)         { m = 78; f = 42; }
+  else if (age < 30)    { m = 81; f = 47; }
+  else if (age < 40)    { m = 79; f = 47; }
+  else if (age < 50)    { m = 78; f = 42; }
+  else if (age < 60)    { m = 72; f = 40; }
+  else                  { m = 66; f = 38; }
+  return sex === 'F' ? f : m;
+}
+function gripStatus(g, age, sex) { if (!g || !sex || age == null) return null; const thr = gripThreshold(age, sex); return g > thr ? st('ideal') : st('high'); }
 
-// Compute the full risk object: per-measure levels, overall score, level, critical flag.
-function computeRisk(v) {
+// Compute the full risk object. ctx: { sex:'M'|'F'|null, age:number|null, fasting:bool, diabetic:bool }
+function computeRisk(v, ctx) {
+  const c = ctx || {};
   const measures = {
-    blood_pressure: bpStatus(v.systolic_bp, v.diastolic_bp),
-    blood_glucose:  glucoseStatus(v.blood_glucose),
-    hba1c:          hba1cStatus(v.hba1c),
-    total_cholesterol: totalCholStatus(v.total_cholesterol),
-    hdl:            hdlStatus(v.hdl_cholesterol),
-    ldl:            ldlStatus(v.ldl_cholesterol),
-    triglycerides:  trigStatus(v.triglycerides),
-    bmi:            bmiStatus(v.bmi),
-    waist_height:   whrStatus(v.waist_height_ratio),
+    bmi:                bmiStatus(v.bmi),
+    waist_circumference: waistStatus(v.waist_circumference_in, c.sex),
+    blood_pressure:     worse(systolicStatus(v.systolic_bp), diastolicStatus(v.diastolic_bp)),
+    blood_glucose:      glucoseStatus(v.blood_glucose, c.fasting, c.diabetic),
+    hba1c:              hba1cStatus(v.hba1c, c.diabetic),
+    hdl:                hdlStatus(v.hdl_cholesterol, c.sex),
+    ldl:                ldlStatus(v.ldl_cholesterol),
+    triglycerides:      trigStatus(v.triglycerides, c.fasting),
+    total_cholesterol:  totalCholStatus(v.total_cholesterol),
+    cholesterol_ratio:  ratioStatus(v.cholesterol_ratio),
+    grip_strength:      gripStatus(v.grip_strength, c.age, c.sex),
   };
-  const pts = { green: 0, yellow: 1, red: 2 };
-  let score = 0, reds = 0, criticals = 0;
+  const pts = { ideal: 0, borderline: 1, high: 2 };
+  let score = 0, highs = 0, borderlines = 0, crs = 0, emergencies = 0;
   for (const k in measures) {
     const m = measures[k]; if (!m) continue;
-    score += m.critical ? 3 : pts[m.level];
-    if (m.level === 'red') reds++;
-    if (m.critical) criticals++;
+    score += pts[m.level];
+    if (m.level === 'high') highs++;
+    if (m.level === 'borderline') borderlines++;
+    if (m.cr) crs++;
+    if (m.emergency) emergencies++;
   }
   let level;
-  if (criticals > 0) level = 'critical';
-  else if (reds >= 2 || score >= 5) level = 'high';
-  else if (reds >= 1 || score >= 2) level = 'moderate';
+  if (emergencies > 0 || crs > 0) level = 'critical';
+  else if (highs >= 2) level = 'high';
+  else if (highs >= 1 || borderlines >= 2) level = 'moderate';
   else level = 'low';
-  return { score, level, critical: criticals > 0, measures };
+  return { score, level, critical: crs > 0 || emergencies > 0, emergency: emergencies > 0, measures };
 }
+
+exports.computeRisk = computeRisk; // exposed for tests
 
 // Legacy category strings (kept for existing consumers / reports).
 function bpRisk(sys, dia) { if (!sys || !dia) return null; if (sys>=180||dia>=120) return 'crisis'; if (sys>=140||dia>=90) return 'high_2'; if (sys>=130||dia>=80) return 'high_1'; if (sys>=120) return 'elevated'; return 'normal'; }
@@ -117,6 +146,16 @@ exports.handler = async (event, context) => {
 
     if (!participant_id) return badRequest('participant_id required');
 
+    // Participant sex + age drive several spec thresholds (waist, HDL, grip).
+    let sex = null, age = null;
+    try {
+      const pr = await db.query('SELECT gender, CONVERT(varchar(10), date_of_birth, 23) AS dob FROM participants WHERE id=$1', [participant_id]);
+      const g = (pr.rows[0]?.gender || '').toString().trim().toUpperCase();
+      sex = g.startsWith('M') ? 'M' : g.startsWith('F') ? 'F' : null;
+      const dob = pr.rows[0]?.dob;
+      if (dob) { const d = new Date(dob + 'T00:00:00Z'), now = new Date(); age = now.getUTCFullYear() - d.getUTCFullYear() - ((now.getUTCMonth() < d.getUTCMonth() || (now.getUTCMonth() === d.getUTCMonth() && now.getUTCDate() < d.getUTCDate())) ? 1 : 0); }
+    } catch (e) { /* sex/age optional */ }
+
     // Auto-calculate BMI and ratio
     const bmi = (height_in && weight_lbs)
       ? +(703 * weight_lbs / (height_in * height_in)).toFixed(2)
@@ -130,12 +169,12 @@ exports.handler = async (event, context) => {
       : waist_height_ratio < 0.5 ? 'ideal'
       : waist_height_ratio < 0.6 ? 'borderline' : 'high';
 
-    // Risk model (per-measure colors + critical + overall score)
+    // Risk model (per-measure colors + critical + overall score) per HY spec
     const risk = computeRisk({
       systolic_bp, diastolic_bp, blood_glucose, hba1c,
       total_cholesterol, hdl_cholesterol, ldl_cholesterol, triglycerides,
-      bmi, waist_height_ratio,
-    });
+      cholesterol_ratio, bmi, waist_circumference_in, grip_strength,
+    }, { sex, age, fasting: !!fasting_flag, diabetic: !!diabetic });
     // Legacy category strings (back-compat)
     const bp_risk         = bpRisk(systolic_bp, diastolic_bp);
     const cholesterol_risk = cholRisk(total_cholesterol, hdl_cholesterol);

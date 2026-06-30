@@ -419,9 +419,9 @@ function showResults(r) {
   if(r.height_in) tiles.push({label:'Height',val:Number(r.height_in)+' in'});
   if(r.weight_lbs) tiles.push({label:'Weight',val:r.weight_lbs+' lbs'});
   if(r.bmi) tiles.push({label:'BMI',val:Number(r.bmi).toFixed(1),key:'bmi'});
-  if(r.waist_circumference_in) tiles.push({label:'Waist',val:Number(r.waist_circumference_in)+' in'});
-  if(r.waist_height_ratio) tiles.push({label:'Waist/Height',val:Number(r.waist_height_ratio).toFixed(2),key:'waist_height'});
-  if(r.grip_strength) tiles.push({label:'Grip Strength',val:Number(r.grip_strength)+' lbs'});
+  if(r.waist_circumference_in) tiles.push({label:'Waist',val:Number(r.waist_circumference_in)+' in',key:'waist_circumference'});
+  if(r.waist_height_ratio) tiles.push({label:'Waist/Height',val:Number(r.waist_height_ratio).toFixed(2)});
+  if(r.grip_strength) tiles.push({label:'Grip Strength',val:Number(r.grip_strength)+' lbs',key:'grip_strength'});
   if(r.systolic_bp) tiles.push({label:'Blood Pressure',val:`${r.systolic_bp}/${r.diastolic_bp}`,key:'blood_pressure'});
   if(r.heart_rate) tiles.push({label:'Heart Rate',val:r.heart_rate+' bpm'});
   if(r.total_cholesterol) tiles.push({label:'Total Chol.',val:r.total_cholesterol+' mg/dL',key:'total_cholesterol'});
@@ -445,11 +445,12 @@ function showResults(r) {
   pushL('Tobacco / vaping / nicotine', r.tobacco_use==null?null:(r.tobacco_use?'Yes':'No'));
   pushL('Quality sleep', lifeDisp('f-sleep', r.sleep_hours, ' hrs'));
 
-  const levelColor={green:'var(--green)',yellow:'var(--amber)',red:'var(--red)',critical:'var(--red)'};
-  const tileColor=key=>{ const m=key&&M[key]; return m?levelColor[m.critical?'critical':m.level]:null; };
+  const levelColor={ideal:'var(--green)',borderline:'var(--amber)',high:'var(--red)'};
+  const tileColor=key=>{ const m=key&&M[key]; return m?levelColor[m.level]:null; };
   const overallColor={low:'#10b981',moderate:'#f59e0b',high:'#ef4444',critical:'#b91c1c'}[r.overall_risk]||'#6b7280';
-  const MLBL={blood_pressure:'Blood Pressure',blood_glucose:'Blood Glucose',hba1c:'HbA1c',total_cholesterol:'Total Cholesterol',hdl:'HDL',ldl:'LDL',triglycerides:'Triglycerides',bmi:'BMI',waist_height:'Waist-to-Height'};
-  const critList=Object.keys(M).filter(k=>M[k]&&M[k].critical).map(k=>MLBL[k]||k);
+  const MLBL={bmi:'BMI',waist_circumference:'Waist Circumference',blood_pressure:'Blood Pressure',blood_glucose:'Blood Glucose',hba1c:'HbA1c',hdl:'HDL',ldl:'LDL',triglycerides:'Triglycerides',total_cholesterol:'Total Cholesterol',cholesterol_ratio:'Cholesterol Ratio',grip_strength:'Grip Strength'};
+  const emergencyList=Object.keys(M).filter(k=>M[k]&&M[k].emergency).map(k=>MLBL[k]||k);
+  const crList=Object.keys(M).filter(k=>M[k]&&M[k].cr&&!M[k].emergency).map(k=>MLBL[k]||k);
 
   const ms=metSyndrome(r, participantSex);
   const msColor = ms.metCount>=3?'var(--red)':ms.metCount===2?'var(--amber)':'var(--green)';
@@ -462,7 +463,8 @@ function showResults(r) {
       <div style="font-size:2rem;font-weight:800;color:${overallColor};text-transform:capitalize;">${r.overall_risk||'—'}</div>
       ${risk.score!=null?`<div style="font-size:.78rem;color:var(--gray-400);">Risk score: ${risk.score}</div>`:''}
     </div>
-    ${critList.length?`<div style="margin-bottom:18px;padding:12px 14px;background:var(--red-light);border:1px solid #fca5a5;border-radius:8px;font-size:.88rem;font-weight:600;color:#991b1b;">⚠️ Critical values — refer for immediate medical attention: ${esc(critList.join(', '))}.</div>`:''}
+    ${emergencyList.length?`<div style="margin-bottom:12px;padding:12px 14px;background:var(--red-light);border:1px solid #fca5a5;border-radius:8px;font-size:.88rem;font-weight:700;color:#991b1b;">🚑 Medical Emergency — refer to the ER immediately: ${esc(emergencyList.join(', '))}.</div>`:''}
+    ${crList.length?`<div style="margin-bottom:18px;padding:12px 14px;background:var(--amber-light);border:1px solid #fcd34d;border-radius:8px;font-size:.86rem;font-weight:600;color:#92400e;">⚠️ Critical Risk — recommend HealthYou follow-up: ${esc(crList.join(', '))}.</div>`:''}
     <div class="result-preview-grid">
       ${tiles.map(t=>{ const c=tileColor(t.key); return `<div class="result-tile" style="${c?'border-color:'+c+';':''}">
         <div class="result-tile-val" style="${c?'color:'+c+';':''}">${esc(String(t.val))}</div>
@@ -486,7 +488,6 @@ function showResults(r) {
         ${lifeRows.map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--gray-100);padding:5px 0;"><span style="color:var(--gray-600);">${esc(k)}</span><span style="font-weight:600;white-space:nowrap;">${esc(v)}</span></div>`).join('')}
       </div>
     </div>`:''}
-    ${M.blood_pressure&&M.blood_pressure.critical?`<div style="margin-top:16px;padding:12px;background:var(--red-light);border:1px solid #fca5a5;border-radius:6px;font-size:.85rem;font-weight:600;color:#991b1b;">⚠️ Hypertensive Crisis — Refer to emergency care immediately.</div>`:''}
     ${r.overall_risk==='high'?`<div style="margin-top:12px;padding:10px;background:var(--amber-light);border:1px solid #fcd34d;border-radius:6px;font-size:.82rem;color:#92400e;">High risk identified — recommend physician follow-up within 1–2 weeks.</div>`:''}
   `;
 }
