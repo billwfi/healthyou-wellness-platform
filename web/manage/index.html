@@ -29,7 +29,8 @@
           <button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);" onclick="cancelAppt()">Cancel appointment</button>
         </div>
         <div id="resched" style="display:none;margin-top:16px;border-top:1px solid var(--gray-100);padding-top:16px;">
-          <div class="form-group" style="max-width:280px;"><label>New date</label><select id="rs-date" onchange="rsSlots()"></select></div>
+          <div class="form-group" id="rs-loc-wrap" style="max-width:360px;display:none;"><label>Location</label><select id="rs-loc" onchange="onRsLoc()"></select></div>
+          <div class="form-group" style="max-width:280px;margin-top:10px;"><label>New date</label><select id="rs-date" onchange="rsSlots()"></select></div>
           <div id="rs-slots" style="margin-top:12px;"></div>
           <div style="margin-top:12px;"><button class="btn btn-primary" id="rs-confirm" onclick="confirmReschedule()" disabled>Confirm new time</button></div>
         </div>
@@ -40,7 +41,8 @@
 <div class="toast" id="toast"></div>
 <script>
 const token=new URLSearchParams(location.search).get('t');
-let appt=null, newTime=null;
+let appt=null, newTime=null, rsLocId=null;
+function curLoc(){ return (appt.locations||[]).find(l=>String(l.id)===String(rsLocId)) || null; }
 
 (async function(){
   if(!token){ show('notfound'); return; }
@@ -76,12 +78,28 @@ async function cancelAppt(){
 }
 
 function startReschedule(){
-  const box=document.getElementById('resched'); box.style.display=box.style.display==='none'?'':'none';
-  if(box.style.display!=='none') buildDates();
+  const box=document.getElementById('resched'); const showing=box.style.display==='none'; box.style.display=showing?'':'none';
+  if(!showing) return;
+  rsLocId=appt.location_id; newTime=null;
+  const locs=appt.locations||[];
+  const wrap=document.getElementById('rs-loc-wrap'), sel=document.getElementById('rs-loc');
+  if(locs.length>1){
+    sel.innerHTML=locs.map(l=>`<option value="${l.id}">${esc(l.name)}${l.city?' — '+esc([l.city,l.state].filter(Boolean).join(', ')):''}</option>`).join('');
+    sel.value=String(rsLocId); wrap.style.display='';
+  } else { wrap.style.display='none'; }
+  buildDates();
+  document.getElementById('rs-slots').innerHTML='';
+  document.getElementById('rs-confirm').disabled=true;
+}
+function onRsLoc(){
+  rsLocId=document.getElementById('rs-loc').value;
+  newTime=null; document.getElementById('rs-slots').innerHTML=''; document.getElementById('rs-confirm').disabled=true;
+  buildDates();
 }
 function buildDates(){
-  const from=appt.valid_from||appt.ev_start, to=appt.valid_to||appt.ev_end||from;
-  const open=new Set(appt.open_weekdays||[]);
+  const loc=curLoc();
+  const from=(loc&&loc.valid_from)||appt.valid_from||appt.ev_start, to=(loc&&loc.valid_to)||appt.valid_to||appt.ev_end||from;
+  const open=new Set((loc?loc.open_weekdays:appt.open_weekdays)||[]);
   const sel=document.getElementById('rs-date'); sel.innerHTML='<option value="">— select date —</option>';
   if(from){ let d=new Date(from+'T00:00:00'), end=new Date((to||from)+'T00:00:00'), n=0;
     while(d<=end && n<160){ if(open.size===0||open.has(d.getDay())){
@@ -94,7 +112,7 @@ async function rsSlots(){
   const host=document.getElementById('rs-slots'); if(!date){ host.innerHTML=''; return; }
   host.innerHTML='Loading…';
   try{
-    const slots=await fetch(`/api/event-register?location_id=${appt.location_id}&date=${date}`).then(r=>r.json());
+    const slots=await fetch(`/api/event-register?location_id=${rsLocId||appt.location_id}&date=${date}`).then(r=>r.json());
     host.innerHTML=slots.length?slots.map(s=>`<span class="slot"><button class="btn ${s.remaining>0?'btn-ghost':''}" ${s.remaining>0?`onclick="pickRs('${s.time}',this)"`:'disabled'} title="${s.remaining} left">${fmtTime(s.time)}</button></span>`).join('')
       :'<span style="font-size:.85rem;color:var(--gray-400);">No times available.</span>';
   }catch(e){ host.innerHTML='Error.'; }
@@ -102,10 +120,13 @@ async function rsSlots(){
 function pickRs(t,btn){ newTime=t; document.querySelectorAll('#rs-slots .btn').forEach(b=>b.classList.remove('btn-primary')); btn.classList.add('btn-primary'); document.getElementById('rs-confirm').disabled=false; }
 async function confirmReschedule(){
   const date=document.getElementById('rs-date').value; if(!date||!newTime) return;
+  const locId=rsLocId||appt.location_id;
   try{
-    const r=await fetch('/api/manage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,action:'reschedule',appointment_date:date,appointment_time:newTime})});
+    const r=await fetch('/api/manage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,action:'reschedule',appointment_date:date,appointment_time:newTime,location_id:locId})});
     if(!r.ok){ showToast('Error: '+((await r.json()).error||'failed')); return; }
     appt.appointment_date=date; appt.appointment_time=newTime; appt.status='registered';
+    const loc=curLoc();   // reflect any location change in the displayed details
+    if(loc){ appt.location_id=loc.id; appt.location_name=loc.name; appt.address=loc.address; appt.city=loc.city; appt.state=loc.state; }
     document.getElementById('resched').style.display='none'; render(); showToast('Appointment rescheduled');
   }catch(e){ showToast('Error: '+e.message); }
 }

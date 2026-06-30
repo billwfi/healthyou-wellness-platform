@@ -17,7 +17,7 @@ exports.handler = async (event) => {
     if (!t) return badRequest('token required');
     try {
       const r = await db.query(
-        `SELECT a.id, a.status, a.first_name, a.last_name, a.location_id,
+        `SELECT a.id, a.status, a.first_name, a.last_name, a.location_id, a.event_id,
                 CONVERT(varchar(10), a.appointment_date, 23) AS appointment_date,
                 CONVERT(varchar(5),  a.appointment_time, 108) AS appointment_time,
                 e.name AS event_name, e.public_slug,
@@ -32,8 +32,18 @@ exports.handler = async (event) => {
           WHERE a.magic_token=$1`, [t]);
       if (!r.rows.length) return notFound();
       const a = r.rows[0];
-      const wd = await db.query('SELECT DISTINCT day_of_week FROM event_availability_slots WHERE location_id=$1 ORDER BY day_of_week', [a.location_id]);
-      a.open_weekdays = wd.rows.map(x => x.day_of_week);
+      // All locations for this event (so a multi-location event can be rescheduled elsewhere).
+      const locs = await db.query(
+        `SELECT id, name, address, city, state, zip,
+                CONVERT(varchar(10), valid_from, 23) AS valid_from,
+                CONVERT(varchar(10), valid_to, 23)   AS valid_to
+           FROM event_locations WHERE event_id=$1 ORDER BY sort_order, name`, [a.event_id]);
+      for (const l of locs.rows) {
+        const wd = await db.query('SELECT DISTINCT day_of_week FROM event_availability_slots WHERE location_id=$1 ORDER BY day_of_week', [l.id]);
+        l.open_weekdays = wd.rows.map(x => x.day_of_week);
+      }
+      a.locations = locs.rows;
+      a.open_weekdays = (locs.rows.find(l => l.id === a.location_id) || {}).open_weekdays || [];
       return ok(a);
     } catch (e) { return serverError(e); }
   }
@@ -43,7 +53,7 @@ exports.handler = async (event) => {
     const { token, action } = b;
     if (!token || !action) return badRequest('token and action required');
     try {
-      const r = await db.query('SELECT id, location_id FROM event_appointments WHERE magic_token=$1', [token]);
+      const r = await db.query('SELECT id, location_id, event_id FROM event_appointments WHERE magic_token=$1', [token]);
       if (!r.rows.length) return notFound();
       const appt = r.rows[0];
 
@@ -54,21 +64,28 @@ exports.handler = async (event) => {
       if (action === 'reschedule') {
         const { appointment_date, appointment_time } = b;
         if (!appointment_date || !appointment_time) return badRequest('appointment_date and appointment_time required');
-        const upd = await db.withTransaction(async (q) => {
+        // Allow moving to another location of the same event (multi-location events).
+        let targetLoc = appt.location_id;
+        if (b.location_id && Number(b.location_id) !== appt.location_id) {
+          const lc = await db.query('SELECT id FROM event_locations WHERE id=$1 AND event_id=$2', [b.location_id, appt.event_id]);
+          if (!lc.rows.length) return badRequest('That location is not part of this event');
+          targetLoc = Number(b.location_id);
+        }
+        await db.withTransaction(async (q) => {
           const cap = await q(
             `SELECT (SELECT capacity FROM event_availability_slots
                       WHERE location_id=$1 AND day_of_week=$2 AND CONVERT(varchar(5),start_time,108)=$3) AS capacity,
                     (SELECT COUNT(*) FROM event_appointments
                       WHERE location_id=$1 AND appointment_date=$4 AND CONVERT(varchar(5),appointment_time,108)=$3
                         AND status='registered' AND id<>$5) AS booked`,
-            [appt.location_id, weekdayOf(appointment_date), appointment_time, appointment_date, appt.id]);
+            [targetLoc, weekdayOf(appointment_date), appointment_time, appointment_date, appt.id]);
           const c = cap.rows[0] || {};
           if (c.capacity != null && c.booked >= c.capacity) throw new Error('That time slot is full');
-          await q("UPDATE event_appointments SET appointment_date=$2, appointment_time=$3, status='registered' WHERE id=$1",
-            [appt.id, appointment_date, appointment_time]);
+          await q("UPDATE event_appointments SET location_id=$2, appointment_date=$3, appointment_time=$4, status='registered' WHERE id=$1",
+            [appt.id, targetLoc, appointment_date, appointment_time]);
           return true;
         });
-        return ok({ status: 'rescheduled', appointment_date, appointment_time });
+        return ok({ status: 'rescheduled', location_id: targetLoc, appointment_date, appointment_time });
       }
       return badRequest('unknown action');
     } catch (e) {
