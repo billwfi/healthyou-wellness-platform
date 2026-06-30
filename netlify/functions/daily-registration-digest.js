@@ -23,19 +23,26 @@ exports.handler = async (event) => {
   const to = process.env.DIGEST_TO || 'support@myhealthyou.com';
   const db = getPool();
 
-  try {
-    const r = await db.query(
-      `SELECT a.id, a.first_name, a.last_name, a.email, a.phone, a.status,
+  const SELECT = `SELECT a.id, a.first_name, a.last_name, a.email, a.phone, a.status,
               CONVERT(varchar(10), a.appointment_date, 23) AS appointment_date,
               CONVERT(varchar(5),  a.appointment_time, 108) AS appointment_time,
               e.name AS event_name, g.GroupName AS group_name, l.name AS location_name
          FROM event_appointments a
          JOIN screening_events e ON e.id = a.event_id
          LEFT JOIN event_locations l ON l.id = a.location_id
-         LEFT JOIN iStrata.dbo.is_groups g ON g.id = e.org_id
-        WHERE CAST(a.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Mountain Standard Time' AS DATE) = $1
-        ORDER BY g.GroupName, e.name, l.name, a.last_name, a.first_name`, [day]);
-    const rows = r.rows;
+         LEFT JOIN iStrata.dbo.is_groups g ON g.id = e.org_id`;
+  const ORDER = ` ORDER BY g.GroupName, e.name, l.name, a.last_name, a.first_name`;
+  const MT = (col) => `CAST(${col} AT TIME ZONE 'UTC' AT TIME ZONE 'Mountain Standard Time' AS DATE)`;
+  const byActivity = (action) => db.query(
+    `${SELECT} WHERE a.id IN (SELECT act.appointment_id FROM event_appointment_activity act
+       WHERE act.action='${action}' AND ${MT('act.at')} = $1) ${ORDER}`, [day]).then(x => x.rows);
+
+  try {
+    const [rows, cancelled, rescheduled] = await Promise.all([
+      db.query(`${SELECT} WHERE ${MT('a.created_at')} = $1 ${ORDER}`, [day]).then(x => x.rows),
+      byActivity('cancelled'),
+      byActivity('rescheduled'),
+    ]);
 
     const dayLabel = fmtDate(day);
     const tally = (key) => {
@@ -50,39 +57,43 @@ exports.handler = async (event) => {
         </table>
       </div>`;
 
-    const detailRows = rows.map(x => `
-      <tr>
-        <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:13px;"><strong>${esc(x.last_name)}, ${esc(x.first_name)}</strong>${x.status==='cancelled'?' <span style="color:#b91c1c;font-size:11px;">(cancelled)</span>':''}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;">${esc(x.group_name||'—')}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;">${esc(x.event_name||'—')}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;">${esc(x.location_name||'—')}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;white-space:nowrap;">${esc(fmtDate(x.appointment_date))}${x.appointment_time?'<br>'+esc(fmtTime(x.appointment_time)):''}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;"><a href="${site}/admin/appointment.html?id=${x.id}" style="color:#0d9488;font-weight:600;">Review →</a></td>
-      </tr>`).join('');
+    const detailTable = (list, accent) => `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:8px;">
+        <tr style="background:#f8fafc;">${['Name','Group','Event','Location','Appt',''].map(h=>`<td style="padding:7px 8px;font-size:11px;text-transform:uppercase;color:#94a3b8;">${h}</td>`).join('')}</tr>
+        ${list.map(x => `<tr>
+          <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:13px;"><strong>${esc(x.last_name)}, ${esc(x.first_name)}</strong></td>
+          <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;">${esc(x.group_name||'—')}</td>
+          <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;">${esc(x.event_name||'—')}</td>
+          <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;">${esc(x.location_name||'—')}</td>
+          <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;white-space:nowrap;">${esc(fmtDate(x.appointment_date))}${x.appointment_time?'<br>'+esc(fmtTime(x.appointment_time)):''}</td>
+          <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;"><a href="${site}/admin/appointment.html?id=${x.id}" style="color:${accent||'#0d9488'};font-weight:600;">Review →</a></td>
+        </tr>`).join('')}
+      </table>`;
+    const sectionHead = (label, n, color) => `<div style="font-size:13px;font-weight:700;color:${color};margin:18px 0 6px;">${label} — ${n}</div>`;
 
     const logo = `${site}/assets/img/hylogo.png`;
     const html = `<div style="font-family:Inter,Arial,sans-serif;max-width:760px;margin:auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
       <div style="background:#0d9488;padding:18px;text-align:center;"><img src="${logo}" alt="HealthYou" height="34" style="background:#fff;padding:4px 12px;border-radius:8px;"></div>
       <div style="padding:24px;color:#334155;">
         <h1 style="font-size:18px;margin:0 0 2px;color:#0f172a;">Daily Registration Summary</h1>
-        <div style="font-size:13px;color:#64748b;margin-bottom:18px;">Registrations submitted on ${esc(dayLabel)} · <strong>${rows.length}</strong> total</div>
-        ${rows.length===0 ? `<p style="font-size:14px;color:#64748b;">No new registrations were submitted.</p>` : `
+        <div style="font-size:13px;color:#64748b;margin-bottom:18px;">Activity on ${esc(dayLabel)} (by submission date) · <strong>${rows.length}</strong> new · ${rescheduled.length} rescheduled · ${cancelled.length} cancelled</div>
+        ${rows.length ? `
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
           <td width="33%" valign="top" style="padding-right:10px;">${countTable('By Group', tally('group_name'))}</td>
           <td width="34%" valign="top" style="padding:0 5px;">${countTable('By Event', tally('event_name'))}</td>
           <td width="33%" valign="top" style="padding-left:10px;">${countTable('By Location', tally('location_name'))}</td>
         </tr></table>
-        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#0d9488;margin:18px 0 6px;">Registrants</div>
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
-          <tr style="background:#f8fafc;"><td style="padding:7px 8px;font-size:11px;text-transform:uppercase;color:#94a3b8;">Name</td><td style="padding:7px 8px;font-size:11px;text-transform:uppercase;color:#94a3b8;">Group</td><td style="padding:7px 8px;font-size:11px;text-transform:uppercase;color:#94a3b8;">Event</td><td style="padding:7px 8px;font-size:11px;text-transform:uppercase;color:#94a3b8;">Location</td><td style="padding:7px 8px;font-size:11px;text-transform:uppercase;color:#94a3b8;">Appt</td><td style="padding:7px 8px;"></td></tr>
-          ${detailRows}
-        </table>`}
+        ${sectionHead('New registrations', rows.length, '#0d9488')}${detailTable(rows)}` :
+        `<p style="font-size:14px;color:#64748b;">No new registrations were submitted.</p>`}
+        ${rescheduled.length ? sectionHead('Rescheduled', rescheduled.length, '#b45309')+detailTable(rescheduled,'#b45309') : ''}
+        ${cancelled.length ? sectionHead('Cancelled', cancelled.length, '#b91c1c')+detailTable(cancelled,'#b91c1c') : ''}
         <p style="font-size:12px;color:#94a3b8;margin-top:18px;">Review links open the appointment in the HealthYou admin (sign-in required).</p>
       </div></div>`;
 
-    if (!mailEnabled()) return { statusCode: 200, body: `Mail not configured; ${rows.length} registrations for ${day}` };
-    await sendEmail({ to, subject: `HealthYou — ${rows.length} new registration${rows.length===1?'':'s'} (${dayLabel})`, html });
-    return { statusCode: 200, body: `Sent digest for ${day}: ${rows.length} registrations to ${to}` };
+    const total = rows.length;
+    if (!mailEnabled()) return { statusCode: 200, body: `Mail not configured; ${total} new / ${rescheduled.length} resched / ${cancelled.length} cancelled for ${day}` };
+    await sendEmail({ to, subject: `HealthYou — ${total} new, ${rescheduled.length} rescheduled, ${cancelled.length} cancelled (${dayLabel})`, html });
+    return { statusCode: 200, body: `Sent digest for ${day}: ${total} new, ${rescheduled.length} rescheduled, ${cancelled.length} cancelled to ${to}` };
   } catch (e) {
     return { statusCode: 500, body: 'Digest error: ' + e.message };
   }

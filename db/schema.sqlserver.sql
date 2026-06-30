@@ -680,6 +680,19 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='uq_appt_token')  CREATE UNIQUE INDEX uq_appt_token ON dbo.event_appointments(magic_token) WHERE magic_token IS NOT NULL;
 GO
 
+-- Appointment activity log (drives the daily digest: registered/cancelled/rescheduled/updated).
+IF OBJECT_ID('dbo.event_appointment_activity','U') IS NULL
+CREATE TABLE dbo.event_appointment_activity (
+  id             INT IDENTITY(1,1) PRIMARY KEY,
+  appointment_id INT NOT NULL,
+  action         NVARCHAR(20) NOT NULL,
+  detail         NVARCHAR(255),
+  at             DATETIME2(3) DEFAULT SYSUTCDATETIME()
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='idx_appt_activity') CREATE INDEX idx_appt_activity ON dbo.event_appointment_activity(action, at);
+GO
+
 IF OBJECT_ID('dbo.event_appointment_answers','U') IS NULL
 CREATE TABLE dbo.event_appointment_answers (
   id             INT IDENTITY(1,1) PRIMARY KEY,

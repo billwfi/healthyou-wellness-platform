@@ -1,5 +1,6 @@
 const { getPool } = require('./_db');
 const { getUser, ok, badRequest, unauthorized, notFound, serverError, options } = require('./_auth');
+const { logActivity } = require('./_activity');
 
 // Admin: view/edit a single public appointment on behalf of a registrant.
 //   GET /api/appointment?id=N   -> appointment + event + that event's locations
@@ -47,6 +48,11 @@ exports.handler = async (event, context) => {
     if (!b.id) return badRequest('id required');
     if (!b.first_name || !b.last_name) return badRequest('First and last name are required');
     try {
+      // Prior state (to log cancel vs reschedule).
+      const prevR = await db.query(
+        `SELECT status, location_id, CONVERT(varchar(10),appointment_date,23) AS d, CONVERT(varchar(5),appointment_time,108) AS t
+           FROM event_appointments WHERE id=$1`, [b.id]);
+      const prev = prevR.rows[0] || {};
       // If a location is provided, ensure it belongs to this appointment's event.
       if (b.location_id) {
         const lc = await db.query(
@@ -68,6 +74,13 @@ exports.handler = async (event, context) => {
          b.date_of_birth || null, b.gender || null, b.location_id || null,
          b.appointment_date || null, b.appointment_time || null, b.status || null]);
       if (!r.rows.length) return notFound();
+      // Log the meaningful change for the daily digest.
+      const dateChg = b.appointment_date && b.appointment_date !== prev.d;
+      const timeChg = b.appointment_time && b.appointment_time !== prev.t;
+      const locChg  = b.location_id && Number(b.location_id) !== prev.location_id;
+      if (b.status === 'cancelled' && prev.status !== 'cancelled') await logActivity(db, b.id, 'cancelled', 'by admin');
+      else if (dateChg || timeChg || locChg) await logActivity(db, b.id, 'rescheduled', 'by admin');
+      else await logActivity(db, b.id, 'updated', 'by admin');
       return ok({ saved: true });
     } catch (e) { return serverError(e); }
   }

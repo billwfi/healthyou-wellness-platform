@@ -1,6 +1,7 @@
 const { getPool, parseJson, sql } = require('./_db');
 const { ok, badRequest, notFound, serverError, options } = require('./_auth');
 const { sendAppointmentConfirmation } = require('./_confirmation');
+const { logActivity } = require('./_activity');
 const crypto = require('crypto');
 
 // PUBLIC (no auth) multi-step registration backend.
@@ -116,6 +117,7 @@ exports.handler = async (event) => {
         return id;
       });
 
+      await logActivity(db, apptId, 'registered');
       // confirmation email (best-effort)
       let email_error = null;
       if (email) { try { await sendAppointmentConfirmation(db, apptId); } catch (e) { email_error = e.message; } }

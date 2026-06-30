@@ -1,5 +1,6 @@
 const { getPool } = require('./_db');
 const { ok, badRequest, notFound, serverError, options } = require('./_auth');
+const { logActivity } = require('./_activity');
 
 // PUBLIC magic-link management of an appointment (no password).
 //   GET  /api/manage?t=TOKEN                                   -> appointment + location info
@@ -59,6 +60,7 @@ exports.handler = async (event) => {
 
       if (action === 'cancel') {
         await db.query("UPDATE event_appointments SET status='cancelled' WHERE id=$1", [appt.id]);
+        await logActivity(db, appt.id, 'cancelled', 'via manage link');
         return ok({ status: 'cancelled' });
       }
       if (action === 'reschedule') {
@@ -85,6 +87,7 @@ exports.handler = async (event) => {
             [appt.id, targetLoc, appointment_date, appointment_time]);
           return true;
         });
+        await logActivity(db, appt.id, 'rescheduled', `to ${appointment_date} ${appointment_time}`);
         return ok({ status: 'rescheduled', location_id: targetLoc, appointment_date, appointment_time });
       }
       return badRequest('unknown action');
