@@ -222,7 +222,7 @@
       <div id="et-forms" style="display:none;">
         <div class="card">
           <div class="card-title">Registration Forms</div>
-          <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:14px;">Select the forms participants complete during registration for this event. Build forms under <a href="/admin/forms.html" style="color:var(--teal);">Forms</a>.</p>
+          <p style="font-size:.84rem;color:var(--gray-400);margin-bottom:14px;">Select one or more forms participants complete during registration for this event. Build forms under <a href="/admin/forms.html" style="color:var(--teal);">Event Management → Forms</a>.</p>
           <div id="ef-list"><span style="font-size:.85rem;color:var(--gray-400);">Loading…</span></div>
           <div class="save-bar"><button class="btn btn-primary" onclick="saveEventForms()">Save Forms</button></div>
         </div>
@@ -1000,9 +1000,21 @@ async function loadEventForms(){
     ]);
     const allForms=Array.isArray(all)?all:[]; const sel=new Set((Array.isArray(assigned)?assigned:[]).map(f=>f.id));
     const c=document.getElementById('ef-list');
-    c.innerHTML = allForms.length ? allForms.map(f=>`<label style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:.9rem;">
-      <input type="checkbox" value="${f.id}" ${sel.has(f.id)?'checked':''}> ${esc(f.name)} <span style="color:var(--gray-400);font-size:.8rem;">${(f.schema_json&&f.schema_json.fields?f.schema_json.fields.length:0)} field(s)</span></label>`).join('')
-      : '<span style="font-size:.85rem;color:var(--gray-400);">No active forms yet. Create one under Forms.</span>';
+    if(!allForms.length){
+      c.innerHTML='<div style="font-size:.85rem;color:var(--gray-400);padding:8px 0;">No active forms yet. Create one under <a href="/admin/forms.html" style="color:var(--teal);">Forms</a>.</div>';
+      return;
+    }
+    c.innerHTML='<div style="border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;">'+allForms.map((f,i)=>{
+      const n=(f.schema_json&&f.schema_json.fields?f.schema_json.fields.length:0);
+      const meta=[`${n} field${n===1?'':'s'}`]; if(f.requires_ack) meta.push('Acknowledgement required');
+      return `<label style="display:flex;align-items:flex-start;gap:11px;padding:12px 14px;cursor:pointer;${i?'border-top:1px solid var(--gray-100);':''}">
+        <input type="checkbox" value="${f.id}" ${sel.has(f.id)?'checked':''} style="width:auto;margin-top:2px;flex:none;">
+        <span style="display:flex;flex-direction:column;gap:2px;">
+          <span style="font-weight:600;font-size:.9rem;color:var(--gray-800);">${esc(f.name)}</span>
+          <span style="font-size:.78rem;color:var(--gray-400);">${meta.join(' · ')}</span>
+        </span>
+      </label>`;
+    }).join('')+'</div>';
   }catch(e){ showToast('Error loading forms'); }
 }
 async function saveEventForms(){
