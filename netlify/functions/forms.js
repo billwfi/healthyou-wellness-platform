@@ -35,9 +35,10 @@ exports.handler = async (event, context) => {
     const schema = typeof b.schema_json === 'object' ? JSON.stringify(b.schema_json) : (b.schema_json || '{"fields":[]}');
     try {
       const r = await db.query(
-        `INSERT INTO forms (name, description, schema_json, active)
-         OUTPUT INSERTED.* VALUES ($1,$2,$3,$4)`,
-        [b.name, b.description || null, schema, b.active === false ? 0 : 1]);
+        `INSERT INTO forms (name, description, body_html, requires_ack, schema_json, active)
+         OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,$6)`,
+        [b.name, b.description || null, b.body_html || null, b.requires_ack ? 1 : 0,
+         schema, b.active === false ? 0 : 1]);
       return created(parseJson(r.rows[0], ['schema_json']));
     } catch (e) { return serverError(e); }
   }
@@ -51,11 +52,13 @@ exports.handler = async (event, context) => {
       const r = await db.query(
         `UPDATE forms SET
            name=COALESCE($2,name), description=COALESCE($3,description),
-           schema_json=COALESCE($4,schema_json), active=COALESCE($5,active),
+           body_html=COALESCE($4,body_html), requires_ack=COALESCE($5,requires_ack),
+           schema_json=COALESCE($6,schema_json), active=COALESCE($7,active),
            updated_at=SYSUTCDATETIME()
          OUTPUT INSERTED.* WHERE id=$1`,
-        [b.id, b.name || null, b.description ?? null, schema,
-         (b.active === undefined ? null : (b.active ? 1 : 0))]);
+        [b.id, b.name || null, b.description ?? null,
+         b.body_html ?? null, (b.requires_ack === undefined ? null : (b.requires_ack ? 1 : 0)),
+         schema, (b.active === undefined ? null : (b.active ? 1 : 0))]);
       if (!r.rows.length) return notFound();
       return ok(parseJson(r.rows[0], ['schema_json']));
     } catch (e) { return serverError(e); }

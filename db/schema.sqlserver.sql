@@ -590,14 +590,21 @@ GO
 -- ════════════════════════════════════════════════════════════════════════════
 IF OBJECT_ID('dbo.forms','U') IS NULL
 CREATE TABLE dbo.forms (
-  id          INT IDENTITY(1,1) PRIMARY KEY,
-  name        NVARCHAR(255) NOT NULL,
-  description NVARCHAR(MAX),
-  schema_json NVARCHAR(MAX) DEFAULT '{"fields":[]}',   -- { fields:[{key,type,label,required,options}] }
-  active      BIT DEFAULT 1,
-  created_at  DATETIME2(3) DEFAULT SYSUTCDATETIME(),
-  updated_at  DATETIME2(3) DEFAULT SYSUTCDATETIME()
+  id           INT IDENTITY(1,1) PRIMARY KEY,
+  name         NVARCHAR(255) NOT NULL,
+  description  NVARCHAR(MAX),
+  body_html    NVARCHAR(MAX),                            -- WYSIWYG content shown above the fields
+  requires_ack BIT DEFAULT 0,                            -- 1 = participant must acknowledge; 0 = information only
+  schema_json  NVARCHAR(MAX) DEFAULT '{"fields":[]}',    -- { fields:[{key,type,label,required,options}] }
+  active       BIT DEFAULT 1,
+  created_at   DATETIME2(3) DEFAULT SYSUTCDATETIME(),
+  updated_at   DATETIME2(3) DEFAULT SYSUTCDATETIME()
 );
+GO
+-- Backfill columns on existing installations.
+IF COL_LENGTH('dbo.forms','body_html')    IS NULL ALTER TABLE dbo.forms ADD body_html    NVARCHAR(MAX);
+GO
+IF COL_LENGTH('dbo.forms','requires_ack') IS NULL ALTER TABLE dbo.forms ADD requires_ack BIT DEFAULT 0;
 GO
 
 IF OBJECT_ID('dbo.event_forms','U') IS NULL

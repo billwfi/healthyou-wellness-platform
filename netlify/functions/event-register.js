@@ -64,7 +64,7 @@ exports.handler = async (event) => {
         l.open_weekdays = wd.rows.map(r => r.day_of_week);
       }
       const forms = await db.query(
-        `SELECT f.id, f.name, f.schema_json FROM event_forms ef JOIN forms f ON f.id=ef.form_id
+        `SELECT f.id, f.name, f.body_html, f.requires_ack, f.schema_json FROM event_forms ef JOIN forms f ON f.id=ef.form_id
           WHERE ef.event_id=$1 AND f.active=1 ORDER BY ef.sort_order, f.name`, [e.id]);
       parseJson(forms.rows, ['schema_json']);
       return ok({ event: e, group_name: grp.rows[0]?.name || null, locations: locs.rows, forms: forms.rows });

@@ -60,10 +60,31 @@
         <div class="form-grid" style="gap:14px;">
           <div class="form-group span-2"><label>Form Name *</label><input id="fm-name" type="text" placeholder="RYP Intake Questions"/></div>
           <div class="form-group span-2"><label>Description</label><input id="fm-desc" type="text"/></div>
+          <div class="form-group"><label>Type</label><select id="fm-ack"><option value="0">Information only</option><option value="1">Acknowledgement required</option></select></div>
           <div class="form-group"><label>Status</label><select id="fm-active"><option value="1">Active</option><option value="0">Inactive</option></select></div>
         </div>
       </div>
-      <div class="section-header" style="margin-bottom:14px;">
+
+      <div class="section-header" style="margin-bottom:14px;"><h3>Content</h3>
+        <span style="font-size:.78rem;color:var(--gray-400);">Rich text shown to the participant above any fields.</span></div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div id="rte-toolbar" style="display:flex;flex-wrap:wrap;gap:4px;padding:8px 10px;border-bottom:1px solid var(--gray-200);background:#f8fafc;">
+          <button type="button" class="btn btn-ghost btn-sm" title="Bold" onmousedown="event.preventDefault()" onclick="rte('bold')"><b>B</b></button>
+          <button type="button" class="btn btn-ghost btn-sm" title="Italic" onmousedown="event.preventDefault()" onclick="rte('italic')"><i>I</i></button>
+          <button type="button" class="btn btn-ghost btn-sm" title="Underline" onmousedown="event.preventDefault()" onclick="rte('underline')"><u>U</u></button>
+          <span style="width:1px;background:var(--gray-200);margin:2px 4px;"></span>
+          <button type="button" class="btn btn-ghost btn-sm" title="Heading" onmousedown="event.preventDefault()" onclick="rte('formatBlock','H3')">H</button>
+          <button type="button" class="btn btn-ghost btn-sm" title="Paragraph" onmousedown="event.preventDefault()" onclick="rte('formatBlock','P')">¶</button>
+          <button type="button" class="btn btn-ghost btn-sm" title="Bulleted list" onmousedown="event.preventDefault()" onclick="rte('insertUnorderedList')">• List</button>
+          <button type="button" class="btn btn-ghost btn-sm" title="Numbered list" onmousedown="event.preventDefault()" onclick="rte('insertOrderedList')">1. List</button>
+          <span style="width:1px;background:var(--gray-200);margin:2px 4px;"></span>
+          <button type="button" class="btn btn-ghost btn-sm" title="Add link" onmousedown="event.preventDefault()" onclick="rteLink()">🔗 Link</button>
+          <button type="button" class="btn btn-ghost btn-sm" title="Remove formatting" onmousedown="event.preventDefault()" onclick="rte('removeFormat')">⨯ Clear</button>
+        </div>
+        <div id="fm-body" contenteditable="true" style="min-height:160px;padding:14px 16px;font-size:.92rem;line-height:1.55;outline:none;"></div>
+      </div>
+
+      <div class="section-header" style="margin:18px 0 14px;">
         <h3>Fields</h3>
         <select id="fm-add-type" class="btn btn-ghost btn-sm" style="padding:5px 10px;width:auto;">
           <option value="text">Text</option><option value="textarea">Paragraph</option>
@@ -108,7 +129,7 @@ function renderList(){
   document.getElementById('tbody').innerHTML=!forms.length
     ?'<tr><td colspan="4" class="empty">No forms yet. Create one to attach to events.</td></tr>'
     :forms.map(f=>`<tr>
-        <td><strong>${esc(f.name)}</strong>${f.description?`<br><span style="font-size:.78rem;color:var(--gray-400);">${esc(f.description)}</span>`:''}</td>
+        <td><strong>${esc(f.name)}</strong>${f.requires_ack?' <span class="badge" style="background:#fef3c7;color:#92400e;">Acknowledgement</span>':''}${f.description?`<br><span style="font-size:.78rem;color:var(--gray-400);">${esc(f.description)}</span>`:''}</td>
         <td style="text-align:center;">${(f.schema_json&&f.schema_json.fields?f.schema_json.fields.length:0)}</td>
         <td><span class="badge badge-${f.active?'active':'inactive'}">${f.active?'Active':'Inactive'}</span></td>
         <td><div class="actions">
@@ -118,15 +139,21 @@ function renderList(){
       </tr>`).join('');
 }
 
-function newForm(){ editId=null; fields=[]; fillEditor({name:'',description:'',active:1}); showEditor(); }
+function newForm(){ editId=null; fields=[]; fillEditor({name:'',description:'',active:1,requires_ack:0,body_html:''}); showEditor(); }
 function editForm(id){ const f=forms.find(x=>x.id===id); editId=id; fields=(f.schema_json&&Array.isArray(f.schema_json.fields))?JSON.parse(JSON.stringify(f.schema_json.fields)):[]; fillEditor(f); showEditor(); }
 function fillEditor(f){
   document.getElementById('fm-name').value=f.name||'';
   document.getElementById('fm-desc').value=f.description||'';
+  document.getElementById('fm-ack').value=f.requires_ack?'1':'0';
   document.getElementById('fm-active').value=f.active?'1':'0';
+  document.getElementById('fm-body').innerHTML=f.body_html||'';
   document.getElementById('fm-err').style.display='none';
   renderFields();
 }
+
+// ── WYSIWYG editor ──
+function rte(cmd,val){ document.getElementById('fm-body').focus(); document.execCommand(cmd,false,val||null); }
+function rteLink(){ const url=prompt('Link URL:','https://'); if(url) rte('createLink',url); }
 function showEditor(){ document.getElementById('view-list').style.display='none'; document.getElementById('view-edit').style.display=''; }
 function backToList(){ document.getElementById('view-edit').style.display='none'; document.getElementById('view-list').style.display=''; }
 
@@ -166,7 +193,11 @@ async function saveForm(){
     let k=f.key||slug(f.label); while(seen[k]) k=k+'_2'; seen[k]=1;
     out.push({key:k,type:f.type,label:f.label.trim(),required:!!f.required,options:needsOptions(f.type)?(f.options||[]):undefined});
   }
+  let bodyHtml=document.getElementById('fm-body').innerHTML.trim();
+  if(/^(<br\s*\/?>)*$/i.test(bodyHtml)) bodyHtml='';   // treat empty editor as blank
   const body={ name, description:document.getElementById('fm-desc').value||null,
+    body_html:bodyHtml,
+    requires_ack:document.getElementById('fm-ack').value==='1',
     active:document.getElementById('fm-active').value==='1', schema_json:{fields:out} };
   if(editId) body.id=editId;
   const btn=document.getElementById('fm-save'); btn.disabled=true; btn.textContent='Saving…';

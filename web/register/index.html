@@ -188,7 +188,14 @@ function afterDetails(){
 function renderForms(){
   const host=document.getElementById('forms-host');
   if(!data.forms.length){ host.innerHTML='<div class="card"><span style="font-size:.85rem;color:var(--gray-400);">No additional forms — continue to review.</span></div>'; return; }
-  host.innerHTML=data.forms.map(f=>`<div class="card"><div class="card-title">${esc(f.name)}</div><div class="form-grid full" style="gap:14px;">${((f.schema_json&&f.schema_json.fields)||[]).map(fl=>fieldHtml(f.id,fl)).join('')}</div></div>`).join('');
+  host.innerHTML=data.forms.map(f=>{
+    const flds=(f.schema_json&&f.schema_json.fields)||[];
+    return `<div class="card"><div class="card-title">${esc(f.name)}</div>`
+      +(f.body_html?`<div class="form-content" style="font-size:.92rem;line-height:1.55;${flds.length||f.requires_ack?'margin-bottom:16px;':''}">${f.body_html}</div>`:'')
+      +(flds.length?`<div class="form-grid full" style="gap:14px;">${flds.map(fl=>fieldHtml(f.id,fl)).join('')}</div>`:'')
+      +(f.requires_ack?`<label style="display:flex;gap:8px;align-items:flex-start;font-size:.9rem;margin-top:14px;padding-top:14px;border-top:1px solid var(--gray-200);"><input type="checkbox" id="ack-${f.id}" style="margin-top:3px;width:auto;"> <span>I have read and acknowledge the information above. *</span></label>`:'')
+      +`</div>`;
+  }).join('');
 }
 function fieldHtml(formId,fl){
   const id=`fld-${formId}-${fl.key}`; const req=fl.required?' *':'';
@@ -222,6 +229,11 @@ function afterForms(){
       else { const el=document.getElementById(id); v=el?(el.value||null):null; }
       vals[fl.key]=v;
       if(fl.required && (v===null||v===''||v===false)) missing=missing||fl.label;
+    }
+    if(f.requires_ack){
+      const ack=document.getElementById('ack-'+f.id), checked=!!(ack&&ack.checked);
+      vals.__ack=checked;
+      if(!checked) missing=missing||(f.name+' — acknowledgement');
     }
     answers.push({ form_id:f.id, values:vals });
   }
