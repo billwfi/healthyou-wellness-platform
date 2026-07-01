@@ -30,6 +30,10 @@
     .goal-dot.paused    { background:var(--amber); }
     .goal-dot.abandoned { background:var(--red); }
     .goal-row { border:1px solid var(--gray-200); border-radius:10px; padding:14px; margin-bottom:12px; background:var(--gray-50); }
+    .goal-row-head { display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; }
+    .goal-row-summary { font-size:.85rem; flex:1; }
+    .goal-row-toggle { color:var(--gray-400); font-size:.75rem; }
+    .goal-row-body { margin-top:12px; }
     .smart-grid { display:grid; grid-template-columns:1fr; gap:10px; }
     .goal-row textarea { min-height:38px; }
     .smart-lead { display:inline-flex;width:18px;height:18px;border-radius:4px;background:var(--teal);color:#fff;font-size:.7rem;font-weight:700;align-items:center;justify-content:center;margin-right:6px; }
@@ -317,25 +321,35 @@ async function selectSession(id) {
 // ── Inline SMART goal rows ────────────────────────────────────────────────────
 const STAGE_OPTS=['precontemplation','contemplation','preparation','action','maintenance'];
 const STAGE_LABEL={precontemplation:'Precontemplation',contemplation:'Contemplation',preparation:'Preparation',action:'Action',maintenance:'Maintenance'};
-function goalRowEl(g){
+function goalSummaryHtml(g){
+  const t=(g.title||g.smart_specific||'').trim()||'New goal';
+  const stage=g.stage_of_change?`<span class="badge badge-scheduled" style="margin-left:6px;">${STAGE_LABEL[g.stage_of_change]||g.stage_of_change}</span>`:'';
+  return `<span style="font-weight:600;">${esc(t)}</span>${stage}`;
+}
+function goalRowEl(g, expanded){
   g=g||{};
   const div=document.createElement('div');
   div.className='goal-row'; div.dataset.gid=g.id||'';
   div.innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <strong style="font-size:.85rem;">SMART Goal</strong>
-      <button type="button" class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="removeGoalRow(this)">Remove</button>
+    <div class="goal-row-head" onclick="toggleGoalRow(this)">
+      <div class="goal-row-summary">${goalSummaryHtml(g)}</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="goal-row-toggle">${expanded?'▾':'▸'}</span>
+        <button type="button" class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="event.stopPropagation();removeGoalRow(this)">Remove</button>
+      </div>
     </div>
-    <div class="form-group" style="margin-bottom:10px;"><label>Goal</label><input class="g-title" type="text" placeholder="What is the goal?"></div>
-    <div class="form-group" style="margin-bottom:10px;"><label>Stage of Change</label>
-      <select class="g-stage">${['<option value="">Select…</option>'].concat(STAGE_OPTS.map(s=>`<option value="${s}">${STAGE_LABEL[s]}</option>`)).join('')}</select>
-    </div>
-    <div class="smart-grid">
-      <div class="form-group"><label><span class="smart-lead">S</span>Specific</label><textarea class="g-s" rows="1"></textarea></div>
-      <div class="form-group"><label><span class="smart-lead">M</span>Measurable</label><textarea class="g-m" rows="1"></textarea></div>
-      <div class="form-group"><label><span class="smart-lead">A</span>Achievable</label><textarea class="g-a" rows="1"></textarea></div>
-      <div class="form-group"><label><span class="smart-lead">R</span>Relevant</label><textarea class="g-r" rows="1"></textarea></div>
-      <div class="form-group"><label><span class="smart-lead">T</span>Time-bound</label><textarea class="g-t" rows="1"></textarea></div>
+    <div class="goal-row-body" style="display:${expanded?'block':'none'};">
+      <div class="form-group" style="margin-bottom:10px;"><label>Goal</label><input class="g-title" type="text" placeholder="What is the goal?"></div>
+      <div class="form-group" style="margin-bottom:10px;"><label>Stage of Change</label>
+        <select class="g-stage">${['<option value="">Select…</option>'].concat(STAGE_OPTS.map(s=>`<option value="${s}">${STAGE_LABEL[s]}</option>`)).join('')}</select>
+      </div>
+      <div class="smart-grid">
+        <div class="form-group"><label><span class="smart-lead">S</span>Specific</label><textarea class="g-s" rows="1"></textarea></div>
+        <div class="form-group"><label><span class="smart-lead">M</span>Measurable</label><textarea class="g-m" rows="1"></textarea></div>
+        <div class="form-group"><label><span class="smart-lead">A</span>Achievable</label><textarea class="g-a" rows="1"></textarea></div>
+        <div class="form-group"><label><span class="smart-lead">R</span>Relevant</label><textarea class="g-r" rows="1"></textarea></div>
+        <div class="form-group"><label><span class="smart-lead">T</span>Time-bound</label><textarea class="g-t" rows="1"></textarea></div>
+      </div>
     </div>`;
   div.querySelector('.g-title').value=g.title||'';
   div.querySelector('.g-stage').value=g.stage_of_change||'';
@@ -346,11 +360,25 @@ function goalRowEl(g){
   div.querySelector('.g-t').value=g.smart_time_bound||'';
   return div;
 }
+function toggleGoalRow(head){
+  const row=head.closest('.goal-row'), body=row.querySelector('.goal-row-body');
+  const open=body.style.display!=='none';
+  if(open){
+    // collapsing — refresh the summary from current field values
+    head.querySelector('.goal-row-summary').innerHTML=goalSummaryHtml({
+      title:row.querySelector('.g-title').value.trim(),
+      smart_specific:row.querySelector('.g-s').value.trim(),
+      stage_of_change:row.querySelector('.g-stage').value });
+    body.style.display='none'; head.querySelector('.goal-row-toggle').textContent='▸';
+  } else {
+    body.style.display='block'; head.querySelector('.goal-row-toggle').textContent='▾';
+  }
+}
 function renderGoalRows(list){
   const host=document.getElementById('goal-rows'); host.innerHTML='';
-  list.forEach(g=>host.appendChild(goalRowEl(g)));
+  list.forEach(g=>host.appendChild(goalRowEl(g,false)));   // saved goals start collapsed
 }
-function addGoalRow(){ document.getElementById('goal-rows').appendChild(goalRowEl({})); }
+function addGoalRow(){ document.getElementById('goal-rows').appendChild(goalRowEl({},true)); }  // new goal starts expanded
 function removeGoalRow(btn){ const row=btn.closest('.goal-row'); if(row.dataset.gid) removedGoalIds.push(row.dataset.gid); row.remove(); }
 
 async function saveNotes() {
