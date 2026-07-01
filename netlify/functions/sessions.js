@@ -102,14 +102,20 @@ exports.handler = async (event, context) => {
       // On completion, email the participant a summary with the session notes (once).
       if (status === 'completed' && !prev.completion_email_sent && mailEnabled()) {
         try {
-          const notesR = await db.query('SELECT session_notes FROM coaching_notes WHERE session_id=$1', [id]);
-          const notes = notesR.rows.length ? notesR.rows[0].session_notes : null;
+          const notesR = await db.query('SELECT session_notes, educational_materials FROM coaching_notes WHERE session_id=$1', [id]);
+          const nrow = notesR.rows[0] || {};
+          const goalsR = await db.query(
+            `SELECT title, stage_of_change, smart_specific, smart_measurable, smart_achievable, smart_relevant, smart_time_bound
+               FROM goals WHERE session_id=$1 ORDER BY created_at`, [id]);
           const pr = await db.query('SELECT email, first_name, last_name FROM participants WHERE id=$1', [prev.participant_id]);
           const p = pr.rows[0];
           let coachName = 'Your Health Coach';
           if (prev.coach_id) { const c = await db.query('SELECT name FROM coaches WHERE id=$1', [prev.coach_id]); if (c.rows.length) coachName = c.rows[0].name; }
           if (p && p.email) {
-            await sendCompletionEmail({ to: p.email, firstName: p.first_name, coachName, scheduledAt: prev.scheduled_at, notes });
+            await sendCompletionEmail({
+              to: p.email, firstName: p.first_name, coachName, scheduledAt: prev.scheduled_at,
+              notes: nrow.session_notes, goals: goalsR.rows, educationalMaterials: nrow.educational_materials,
+            });
             await db.query('UPDATE coaching_sessions SET completion_email_sent=1 WHERE id=$1', [id]);
           }
         } catch (e) { console.error('Completion email failed:', e.message); }
@@ -121,12 +127,44 @@ exports.handler = async (event, context) => {
   return badRequest('Method not supported');
 };
 
-// ── Session-completed summary email ──────────────────────────────────────────
-async function sendCompletionEmail({ to, firstName, coachName, scheduledAt, notes }) {
+// ── Session-completed summary email (all items from the session) ─────────────
+const STAGE_LABEL = { precontemplation: 'Precontemplation', contemplation: 'Contemplation', preparation: 'Preparation', action: 'Action', maintenance: 'Maintenance' };
+async function sendCompletionEmail({ to, firstName, coachName, scheduledAt, notes, goals, educationalMaterials }) {
   const dt = new Date(scheduledAt);
   const dateStr = dt.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   const esc = s => (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const notesHtml = notes ? esc(notes).replace(/\n/g, '<br>') : '<em style="color:#9ca3af;">No notes were recorded for this session.</em>';
+  const section = (title, inner) => `<h2 style="font-size:14px;color:#0d9488;margin:22px 0 8px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">${title}</h2>${inner}`;
+  const box = inner => `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px 18px;font-size:14px;color:#1f2937;line-height:1.7;">${inner}</div>`;
+
+  // Notes
+  const notesHtml = section('Session Notes', box(notes ? esc(notes).replace(/\n/g, '<br>') : '<em style="color:#9ca3af;">No notes were recorded.</em>'));
+
+  // Goals (SMART + stage)
+  let goalsHtml = '';
+  if (Array.isArray(goals) && goals.length) {
+    const smartLine = (lead, v) => v ? `<div style="font-size:13px;"><strong style="color:#0d9488;">${lead}</strong> &mdash; ${esc(v)}</div>` : '';
+    const items = goals.map(g => {
+      const head = esc(g.title || g.smart_specific || 'Goal');
+      const stage = g.stage_of_change ? ` <span style="font-size:12px;color:#6b7280;">(Stage: ${esc(STAGE_LABEL[g.stage_of_change] || g.stage_of_change)})</span>` : '';
+      const smart = [smartLine('S', g.smart_specific), smartLine('M', g.smart_measurable), smartLine('A', g.smart_achievable), smartLine('R', g.smart_relevant), smartLine('T', g.smart_time_bound)].join('');
+      return `<div style="margin-bottom:12px;"><div style="font-weight:600;font-size:14px;">${head}${stage}</div>${smart}</div>`;
+    }).join('');
+    goalsHtml = section('Goals', box(items));
+  }
+
+  // Educational materials (list of library items, or free text)
+  let eduHtml = '';
+  if (educationalMaterials) {
+    let items = null;
+    try { items = JSON.parse(educationalMaterials); } catch { items = null; }
+    if (Array.isArray(items) && items.length) {
+      const lis = items.map(it => `<li style="margin-bottom:4px;">${it.url ? `<a href="${esc(it.url)}" style="color:#0d9488;">${esc(it.title)}</a>` : esc(it.title)}${it.category ? ` <span style="color:#9ca3af;font-size:12px;">(${esc(it.category)})</span>` : ''}</li>`).join('');
+      eduHtml = section('Educational Materials & Other Referrals', box(`<ul style="margin:0;padding-left:18px;">${lis}</ul>`));
+    } else if (typeof educationalMaterials === 'string' && educationalMaterials.trim() && educationalMaterials.trim()[0] !== '[') {
+      eduHtml = section('Educational Materials & Other Referrals', box(esc(educationalMaterials).replace(/\n/g, '<br>')));
+    }
+  }
+
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f3f4f6;"><tr><td align="center" style="padding:40px 20px;">
@@ -134,12 +172,14 @@ async function sendCompletionEmail({ to, firstName, coachName, scheduledAt, note
   <tr><td align="center" style="background:#0d9488;padding:28px 40px;">
     <img src="https://healthyou-wellness-platform.netlify.app/assets/img/hylogo-white.png" alt="HealthYou" height="40" style="display:block;">
   </td></tr>
-  <tr><td style="background:#fff;padding:36px 48px 32px;">
-    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#0d9488;text-align:center;">Your session summary</h1>
-    <p style="margin:0 0 22px;font-size:14px;color:#4b5563;line-height:1.7;text-align:center;">
-      Thank you for meeting with ${esc(coachName)} on ${dateStr}. Here are the notes from your session:
+  <tr><td style="background:#fff;padding:32px 48px 28px;">
+    <h1 style="margin:0 0 10px;font-size:22px;font-weight:700;color:#0d9488;text-align:center;">Your session summary</h1>
+    <p style="margin:0 0 6px;font-size:14px;color:#4b5563;line-height:1.7;text-align:center;">
+      Thank you for meeting with ${esc(coachName)} on ${dateStr}. Here is a summary of your session:
     </p>
-    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:18px 20px;font-size:14px;color:#1f2937;line-height:1.7;">${notesHtml}</div>
+    ${notesHtml}
+    ${goalsHtml}
+    ${eduHtml}
   </td></tr>
   <tr><td align="center" style="background:#fff;padding:0 48px 34px;border-top:1px solid #f3f4f6;">
     <p style="margin:16px 0 0;font-size:13px;color:#6b7280;line-height:1.6;">
