@@ -34,6 +34,19 @@
     .goal-row-summary { font-size:.85rem; flex:1; }
     .goal-row-toggle { color:var(--gray-400); font-size:.75rem; }
     .goal-row-body { margin-top:12px; }
+    .ns-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+    @media(max-width:560px){ .ns-grid{grid-template-columns:1fr;} }
+    .ns-cal-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+    .ns-cal { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; text-align:center; }
+    .ns-dow { font-size:.62rem; font-weight:700; color:var(--gray-400); }
+    .ns-day { aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:50%; font-size:.8rem; color:var(--gray-300); }
+    .ns-day.avail { color:var(--gray-800); cursor:pointer; }
+    .ns-day.avail:hover { background:var(--teal-bg); color:var(--teal); }
+    .ns-day.sel { background:var(--teal); color:#fff!important; }
+    .ns-slots { max-height:230px; overflow:auto; display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:6px; }
+    .ns-slot { padding:8px; border:1px solid var(--gray-200); border-radius:6px; font-size:.82rem; text-align:center; cursor:pointer; }
+    .ns-slot:hover { border-color:var(--teal); color:var(--teal); }
+    .ns-slot.sel { background:var(--teal); color:#fff; border-color:var(--teal); }
     .smart-grid { display:grid; grid-template-columns:1fr; gap:10px; }
     .goal-row textarea { min-height:38px; }
     .smart-lead { display:inline-flex;width:18px;height:18px;border-radius:4px;background:var(--teal);color:#fff;font-size:.7rem;font-weight:700;align-items:center;justify-content:center;margin-right:6px; }
@@ -96,7 +109,7 @@
     <div id="tab-sessions">
       <div class="section-header" style="margin-bottom:14px;">
         <h3>Coaching Sessions</h3>
-        <button class="btn btn-primary btn-sm" onclick="openSessionModal()">+ New Session</button>
+        <button class="btn btn-primary btn-sm" onclick="openSessionModal()">+ Next Session</button>
       </div>
       <div class="session-split">
         <div>
@@ -165,38 +178,30 @@
 <!-- Printable biometric report overlay -->
 <div id="bio-report"></div>
 
-<!-- New Session Modal -->
+<!-- Next Session Modal -->
 <div id="session-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'session-modal')">
-  <div class="modal">
-    <div class="modal-title">New Coaching Session</div>
-    <div class="form-grid full" style="gap:14px;">
-      <div class="form-group">
-        <label>Date &amp; Time *</label>
-        <input id="sm-date" type="datetime-local"/>
+  <div class="modal modal-lg">
+    <div class="modal-title">Schedule Next Session</div>
+    <p style="font-size:.82rem;color:var(--gray-400);margin-top:-10px;margin-bottom:14px;">Pick a date and time from your availability. The participant will be emailed a confirmation.</p>
+    <div class="ns-grid">
+      <div>
+        <div class="ns-cal-hdr">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="nsMove(-1)">&#8249;</button>
+          <span id="ns-label" style="font-weight:600;font-size:.9rem;"></span>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="nsMove(1)">&#8250;</button>
+        </div>
+        <div id="ns-cal" class="ns-cal"></div>
       </div>
-      <div class="form-group">
-        <label>Session Type</label>
-        <select id="sm-type">
-          <option value="initial">Initial</option>
-          <option value="follow_up" selected>Follow-up</option>
-          <option value="goal_review">Goal Review</option>
-          <option value="crisis">Crisis</option>
-          <option value="final">Final</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Duration (minutes)</label>
-        <input id="sm-dur" type="number" value="30" min="15" step="15"/>
-      </div>
-      <div class="form-group">
-        <label>Intake Notes</label>
-        <textarea id="sm-intake" rows="2" placeholder="Pre-session notes…"></textarea>
+      <div>
+        <label style="font-size:.82rem;font-weight:600;color:var(--gray-700);">Available times</label>
+        <div id="ns-slots" class="ns-slots"><p style="color:var(--gray-400);font-size:.85rem;">Select a date.</p></div>
       </div>
     </div>
+    <div class="form-group" style="margin-top:12px;"><label>Notes for this session (optional)</label><textarea id="sm-intake" rows="2" placeholder="Pre-session notes…"></textarea></div>
     <div id="sm-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('session-modal')">Cancel</button>
-      <button class="btn btn-primary" id="sm-btn" onclick="saveSession()">Schedule Session</button>
+      <button class="btn btn-primary" id="sm-btn" onclick="saveSession()" disabled>Schedule Next Session</button>
     </div>
   </div>
 </div>
@@ -388,12 +393,12 @@ async function saveNotes() {
   const btn=document.getElementById('save-notes-btn'); btn.disabled=true; btn.textContent='Saving…';
   const hdr={'Content-Type':'application/json','Authorization':'Bearer '+authToken};
   try {
-    // 1) status
+    // 1) session notes first (so a Completed status can email the saved notes)
+    await fetch('/api/notes',{method:'PUT',headers:hdr,body:JSON.stringify({ session_id:selectedSession.id, coach_id:myCoachId, session_notes:document.getElementById('nf-notes').value||null, educational_materials:document.getElementById('nf-edu').value||null })});
+    // 2) status (marking Completed emails the participant a summary)
     await fetch('/api/sessions',{method:'PATCH',headers:hdr,body:JSON.stringify({id:selectedSession.id,status})});
     const idx=sessions.findIndex(s=>s.id===selectedSession.id);
     if(idx>=0){ sessions[idx].status=status; selectedSession.status=status; }
-    // 2) session notes
-    await fetch('/api/notes',{method:'PUT',headers:hdr,body:JSON.stringify({ session_id:selectedSession.id, coach_id:myCoachId, session_notes:document.getElementById('nf-notes').value||null, educational_materials:document.getElementById('nf-edu').value||null })});
     // 3) goals (create/update each row; delete removed)
     for(const row of [...document.querySelectorAll('#goal-rows .goal-row')]){
       const g={ title:row.querySelector('.g-title').value.trim()||null,
@@ -558,35 +563,62 @@ function switchTab(tab,el) {
   ['sessions','biometrics'].forEach(t=>document.getElementById('tab-'+t).style.display=t===tab?'':'none');
 }
 
-// Session modal
-function openSessionModal() {
-  const now=new Date(); now.setMinutes(0,0,0);
-  now.setDate(now.getDate()+1);
-  document.getElementById('sm-date').value=now.toISOString().slice(0,16);
+// ── Next Session modal (schedule from the coach's availability) ───────────────
+let nsY, nsM, nsAv=new Set(), nsDate=null, nsSlot=null;
+async function openSessionModal() {
   document.getElementById('sm-err').style.display='none';
+  document.getElementById('sm-intake').value='';
+  nsDate=null; nsSlot=null; document.getElementById('sm-btn').disabled=true;
+  document.getElementById('ns-slots').innerHTML='<p style="color:var(--gray-400);font-size:.85rem;">Select a date.</p>';
+  const now=new Date(); nsY=now.getFullYear(); nsM=now.getMonth();
+  nsAv=new Set();
+  try{ const av=await fetch('/api/coach-availability?coach_id='+myCoachId,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json()); (Array.isArray(av)?av:[]).forEach(a=>nsAv.add(a.day_of_week)); }catch{}
+  nsRenderCal();
   document.getElementById('session-modal').style.display='flex';
 }
+function nsMove(d){ nsM+=d; if(nsM<0){nsM=11;nsY--;} else if(nsM>11){nsM=0;nsY++;} const n=new Date(); if(nsY<n.getFullYear()||(nsY===n.getFullYear()&&nsM<n.getMonth())){nsY=n.getFullYear();nsM=n.getMonth();} nsRenderCal(); }
+function nsRenderCal(){
+  const MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('ns-label').textContent=MON[nsM]+' '+nsY;
+  const first=new Date(nsY,nsM,1).getDay(), days=new Date(nsY,nsM+1,0).getDate();
+  const today=new Date(); today.setHours(0,0,0,0);
+  const max=new Date(today.getTime()+90*86400000);
+  let html=['S','M','T','W','T','F','S'].map(d=>`<div class="ns-dow">${d}</div>`).join('');
+  for(let i=0;i<first;i++) html+='<div class="ns-day"></div>';
+  for(let d=1;d<=days;d++){ const dt=new Date(nsY,nsM,d); const ds=`${nsY}-${String(nsM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const avail=nsAv.has(dt.getDay())&&dt>=today&&dt<=max; const sel=ds===nsDate;
+    html+=`<div class="ns-day${avail?' avail':''}${sel?' sel':''}"${avail?` onclick="nsPickDate('${ds}')"`:''}>${d}</div>`; }
+  document.getElementById('ns-cal').innerHTML=html;
+}
+async function nsPickDate(ds){
+  nsDate=ds; nsSlot=null; document.getElementById('sm-btn').disabled=true; nsRenderCal();
+  const box=document.getElementById('ns-slots'); box.innerHTML='<p style="color:var(--gray-400);font-size:.85rem;">Loading…</p>';
+  try{
+    const slots=await fetch(`/api/available-slots?coach_id=${myCoachId}&date=${ds}`,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+    if(!Array.isArray(slots)||!slots.length){ box.innerHTML='<p style="color:var(--gray-600);font-size:.85rem;">No open times on this date.</p>'; return; }
+    box.innerHTML=slots.map(s=>`<div class="ns-slot" onclick="nsPickSlot('${s}',this)">${fmtSlot(s)}</div>`).join('');
+  }catch(e){ box.innerHTML='<p style="color:var(--red);font-size:.85rem;">Error loading times.</p>'; }
+}
+function nsPickSlot(t,el){ nsSlot=t; document.querySelectorAll('#ns-slots .ns-slot').forEach(x=>x.classList.remove('sel')); el.classList.add('sel'); document.getElementById('sm-btn').disabled=false; }
+function fmtSlot(hm){ const[h,m]=hm.split(':').map(Number); return `${h%12||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`; }
 
 async function saveSession() {
-  const dt=document.getElementById('sm-date').value;
-  if(!dt){ showSmErr('Date and time required'); return; }
-  const btn=document.getElementById('sm-btn'); btn.disabled=true; btn.textContent='Saving…';
+  if(!nsDate||!nsSlot){ showSmErr('Please pick a date and time.'); return; }
+  const btn=document.getElementById('sm-btn'); btn.disabled=true; btn.textContent='Scheduling…';
   try {
     const r=await fetch('/api/sessions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({
-      participant_id:parseInt(pid),
-      scheduled_at:dt,
-      session_type:document.getElementById('sm-type').value,
-      duration_minutes:parseInt(document.getElementById('sm-dur').value)||30,
-      intake_notes:document.getElementById('sm-intake').value||null,
+      participant_id:parseInt(pid), coach_id:myCoachId,
+      scheduled_at:`${nsDate}T${nsSlot}:00`, session_type:'follow_up',
+      duration_minutes:30, intake_notes:document.getElementById('sm-intake').value||null,
     })});
     if(!r.ok) throw new Error((await r.json()).error||'Failed');
     const s=await r.json();
-    sessions.unshift({...s,stage_of_change:null,status:'scheduled'});
+    sessions.unshift({...s});
     renderSessions();
     closeModal('session-modal');
-    showToast('Session scheduled');
-  } catch(e){ showSmErr(e.message); }
-  finally{ btn.disabled=false; btn.textContent='Schedule Session'; }
+    showToast('Follow-up #'+(s.followup_number||'')+' scheduled — email sent to participant');
+  } catch(e){ showSmErr(e.message); btn.disabled=false; }
+  finally{ btn.textContent='Schedule Next Session'; }
 }
 function showSmErr(m){ const e=document.getElementById('sm-err'); e.textContent=m; e.style.display=''; }
 

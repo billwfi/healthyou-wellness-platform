@@ -875,3 +875,9 @@ GO
 -- Coach session-notes: "Educational Materials & Other Referrals" free-text.
 IF COL_LENGTH('dbo.coaching_notes','educational_materials') IS NULL ALTER TABLE dbo.coaching_notes ADD educational_materials NVARCHAR(MAX);
 GO
+
+-- Follow-up ("Next Session") tracking + completion-email guard on coaching sessions.
+IF COL_LENGTH('dbo.coaching_sessions','followup_number')      IS NULL ALTER TABLE dbo.coaching_sessions ADD followup_number INT NULL;
+GO
+IF COL_LENGTH('dbo.coaching_sessions','completion_email_sent') IS NULL ALTER TABLE dbo.coaching_sessions ADD completion_email_sent BIT NULL;
+GO
