@@ -69,7 +69,7 @@
         </div>
         <div class="card" id="flu-card" style="display:none;">
           <div class="card-title">Flu Shot</div>
-          <p style="font-size:.9rem;color:var(--gray-600);margin:0 0 12px;">A flu shot will be offered at this event. Would you like to participate in a flu shot?</p>
+          <p style="font-size:.9rem;color:var(--gray-600);margin:0 0 12px;">A flu shot will be offered at this event. Would you like to receive a flu shot?</p>
           <div style="display:flex;gap:22px;">
             <label style="display:flex;gap:7px;align-items:center;font-size:.95rem;"><input type="radio" name="flu" value="yes"> Yes</label>
             <label style="display:flex;gap:7px;align-items:center;font-size:.95rem;"><input type="radio" name="flu" value="no"> No</label>
@@ -221,7 +221,7 @@ async function loadSlots(){
     host.innerHTML=slots.map(s=>`<span class="slot"><button class="btn ${s.remaining>0?'btn-ghost':''}" ${s.remaining>0?`onclick="pickTime('${s.time}',this)"`:'disabled'} title="${s.remaining} left">${fmtTime(s.time)}</button></span>`).join('');
   }catch(e){ host.innerHTML='Error loading times.'; }
 }
-function pickTime(t,btn){ data.state.time=t; document.querySelectorAll('#dt-slots .btn').forEach(b=>b.classList.remove('btn-primary')); btn.classList.add('btn-primary'); document.getElementById('dt-next').disabled=false; }
+function pickTime(t,btn){ data.state.time=t; document.querySelectorAll('#dt-slots .btn').forEach(b=>{ if(!b.disabled){ b.classList.remove('btn-primary'); b.classList.add('btn-ghost'); } }); btn.classList.remove('btn-ghost'); btn.classList.add('btn-primary'); document.getElementById('dt-next').disabled=false; }
 
 // ── Details ──
 async function afterDetails(){

@@ -742,3 +742,28 @@ GO
 -- An event points at the email template used for its confirmation email.
 IF COL_LENGTH('dbo.screening_events','email_template_id') IS NULL ALTER TABLE dbo.screening_events ADD email_template_id INT;
 GO
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- Application users (admin Settings → User Management + admin portal login).
+-- password_hash stores a scrypt hash: scrypt$<salt>$<hash> (see functions/users.js
+-- and functions/login.js). Login authenticates against this table.
+-- ════════════════════════════════════════════════════════════════════════════
+IF OBJECT_ID('dbo.app_users','U') IS NULL
+CREATE TABLE dbo.app_users (
+  id              INT IDENTITY(1,1) PRIMARY KEY,
+  first_name      NVARCHAR(100),
+  last_name       NVARCHAR(100),
+  phone           NVARCHAR(40),
+  email           NVARCHAR(256),
+  role            NVARCHAR(40),              -- Admin | User | Health Coach
+  nav_categories  NVARCHAR(MAX),             -- JSON array of nav category keys
+  coach_portal    BIT DEFAULT 0,
+  screener_portal BIT DEFAULT 0,
+  active          BIT DEFAULT 1,
+  password_hash   NVARCHAR(MAX),             -- scrypt$<salt>$<hash>
+  created_at      DATETIME2(3) DEFAULT SYSUTCDATETIME()
+);
+GO
+-- Add password_hash to pre-existing app_users tables that predate password login.
+IF COL_LENGTH('dbo.app_users','password_hash') IS NULL ALTER TABLE dbo.app_users ADD password_hash NVARCHAR(MAX);
+GO

@@ -5,7 +5,7 @@
   <title>Screening Events — HealYou Admin</title>
   <link rel="stylesheet" href="/assets/css/style.css"/>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <script src="/assets/auth.js"></script>
   <style id="report-css">
     .result-preview-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-top:10px; }
     .result-tile { text-align:center; padding:10px; background:#fff; border-radius:6px; border:1px solid var(--teal-light); }
@@ -26,9 +26,8 @@
     <div class="sidebar-section">Admin Portal</div>
     <a href="/admin/" class="sidebar-item">Control Panel</a>
     <a href="/admin/groups.html" class="sidebar-item">Groups</a>
-    <div class="sidebar-section" style="margin-top:12px;">Health Coaching Admin</div>
-    <a href="/admin/participants.html" class="sidebar-item">Participants</a>
     <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <a href="/admin/eligibility-search.html" class="sidebar-item">Eligibility Search</a>
     <div class="sidebar-section" style="margin-top:12px;">Event Management</div>
     <a href="/admin/events.html" class="sidebar-item active">Events</a>
     <a href="/admin/calendar.html" class="sidebar-item">Calendar</a>

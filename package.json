@@ -6,7 +6,8 @@
   "scripts": {
     "import:umbraco": "node scripts/import-umbraco.js",
     "db:setup": "node scripts/setup-sqlserver-schema.js",
-    "db:migrate": "node scripts/migrate-pg-to-sqlserver.js"
+    "db:migrate": "node scripts/migrate-pg-to-sqlserver.js",
+    "user:seed": "node scripts/seed-admin-user.js"
   },
   "dependencies": {
     "mssql": "^11.0.1",
