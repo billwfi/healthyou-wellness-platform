@@ -13,6 +13,9 @@ exports.handler = async (event, context) => {
     const where = [], vals = [];
     if (qs.participant_id) where.push(`cs.participant_id=$${vals.push(qs.participant_id)}`);
     if (qs.coach_id)       where.push(`cs.coach_id=$${vals.push(qs.coach_id)}`);
+    // Optional date range (e.g. a calendar month). `to` is exclusive.
+    if (qs.from)           where.push(`cs.scheduled_at >= $${vals.push(qs.from)}`);
+    if (qs.to)             where.push(`cs.scheduled_at <  $${vals.push(qs.to)}`);
 
     try {
       const r = await db.query(

@@ -95,18 +95,11 @@
   <div class="modal" style="max-width:460px;">
     <div class="modal-title">Welcome Email Sent</div>
     <p style="font-size:.88rem;color:var(--gray-500);margin-top:-8px;margin-bottom:20px;">
-      A welcome email with login credentials has been sent to <strong id="wm-email"></strong>.
+      A welcome email with a link to sign in to the Coach Portal has been sent to <strong id="wm-email"></strong>.
+      Coaches sign in passwordlessly — they'll request a one-time link from the portal.
     </p>
-    <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
-      <p style="margin:0 0 8px;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#92400e;">Temporary Password</p>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <code id="wm-pass" style="font-size:1.25rem;font-weight:700;letter-spacing:.12em;color:#1f2937;font-family:monospace;flex:1;"></code>
-        <button class="btn btn-ghost btn-sm" id="copy-btn" onclick="copyTempPass()">Copy</button>
-      </div>
-      <p style="margin:10px 0 0;font-size:.8rem;color:#92400e;">Ask the coach to change this password after first login.</p>
-    </div>
     <p id="wm-no-key" style="display:none;font-size:.83rem;color:var(--gray-400);background:var(--gray-100);border-radius:8px;padding:10px 14px;margin-bottom:16px;">
-      Email was <strong>not</strong> sent — RESEND_API_KEY is not configured. Share the password above manually.
+      Email was <strong>not</strong> sent — no email transport is configured (set SMTP_* env vars).
     </p>
     <p id="wm-email-err" style="display:none;font-size:.83rem;color:var(--red);background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;margin-bottom:16px;">
       Email failed: <span id="wm-email-err-msg"></span>
@@ -300,13 +293,11 @@ async function sendWelcome(id, btn){
     if(!r.ok){ showToast(data.error||'Welcome failed'); return; }
     const c=coaches.find(x=>x.id===id);
     document.getElementById('wm-email').textContent=data.email||c?.email||'';
-    document.getElementById('wm-pass').textContent=data.temp_password;
     const hasErr=!!(data.email_error);
     const noKey=!data.email_sent&&!hasErr;
     document.getElementById('wm-no-key').style.display=noKey?'':'none';
     document.getElementById('wm-email-err').style.display=hasErr?'':'none';
     if(hasErr) document.getElementById('wm-email-err-msg').textContent=data.email_error;
-    document.getElementById('copy-btn').textContent='Copy';
     document.getElementById('welcome-modal').style.display='flex';
   } catch(e){ showToast('Error: '+e.message); } finally { btn.disabled=false; btn.textContent='Welcome'; }
 }

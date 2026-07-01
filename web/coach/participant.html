@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Participant — HealYou Coach</title>
+  <title>Participant — HealthYou Coach</title>
   <link rel="stylesheet" href="/assets/css/style.css"/>
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <script src="/assets/coach-auth.js"></script>
   <style>
     .session-split { display:grid; grid-template-columns:300px 1fr; gap:20px; align-items:start; }
     @media(max-width:760px){ .session-split { grid-template-columns:1fr; } }
@@ -37,15 +37,15 @@
   <div style="display:flex;align-items:center;gap:12px;">
     <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
     <span style="font-size:.75rem;opacity:.6;padding:2px 8px;border:1px solid rgba(255,255,255,.4);border-radius:99px;">Coach</span>
-    <button class="btn btn-ghost btn-sm" id="logout-btn" style="display:none;background:transparent;color:#fff;border-color:rgba(255,255,255,.6);" onclick="netlifyIdentity.logout()">Log Out</button>
+    <button class="btn btn-ghost btn-sm" id="logout-btn" style="display:none;background:transparent;color:#fff;border-color:rgba(255,255,255,.6);" onclick="logout()">Log Out</button>
   </div>
 </header>
 
 <main class="container">
   <div id="login-wall" class="login-wall">
     <h2>Coach Portal</h2>
-    <p>Sign in to view participant details.</p>
-    <button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button>
+    <p>Please sign in to view participant details.</p>
+    <a class="btn btn-primary" href="/coach/">Go to sign in</a>
   </div>
 
   <div id="content" style="display:none;">
@@ -256,16 +256,21 @@
 let authToken=null, participant=null, sessions=[], goals=[], selectedSession=null, currentTab='sessions', editGoalId=null;
 const pid = new URLSearchParams(location.search).get('id');
 
-netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} });
-netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
-netlifyIdentity.on('logout',()=>{ document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; document.getElementById('logout-btn').style.display='none'; });
+function logout(){ hyCoach.clearToken(); location.href='/coach/'; }
+
+(function init(){
+  const c=hyCoach.claims();
+  if(!c){ document.getElementById('login-wall').style.display=''; document.getElementById('content').style.display='none'; return; }
+  authToken=hyCoach.getToken();
+  boot(c);
+})();
 
 async function boot(user) {
   if (!pid) { location.href='/coach/'; return; }
   document.getElementById('login-wall').style.display='none';
   document.getElementById('content').style.display='';
   document.getElementById('logout-btn').style.display='';
-  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+  document.getElementById('header-name').textContent=user.full_name||user.email;
 
   const hdr={Authorization:'Bearer '+authToken};
   [participant, sessions, goals] = await Promise.all([

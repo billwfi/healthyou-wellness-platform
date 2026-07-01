@@ -60,6 +60,8 @@ function getUser(event, context) {
         email: claims.email,
         sub: claims.sub,
         role: claims.role || 'User',
+        coach_id: claims.coach_id || null,
+        portal: claims.portal || null,
         nav_categories: Array.isArray(claims.nav_categories) ? claims.nav_categories : [],
         coach_portal: !!claims.coach_portal,
         screener_portal: !!claims.screener_portal,
