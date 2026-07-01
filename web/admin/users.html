@@ -80,6 +80,12 @@
       <div class="form-group"><label>Status</label>
         <select id="f-active"><option value="1" selected>Active</option><option value="0">Inactive</option></select>
       </div>
+      <div class="form-group"><label>Password <span id="pw-hint" style="color:var(--gray-400);font-weight:400;">(min 6 characters)</span></label>
+        <input id="f-password" type="password" autocomplete="new-password" placeholder="Set a password"/>
+      </div>
+      <div class="form-group" style="display:flex;align-items:flex-end;">
+        <label style="display:flex;gap:8px;align-items:center;font-weight:400;"><input type="checkbox" id="f-showpw" style="width:auto;" onchange="document.getElementById('f-password').type=this.checked?'text':'password'"> Show password</label>
+      </div>
     </div>
 
     <div style="margin-top:8px;">
@@ -164,7 +170,7 @@ function renderTable(rows){
     const navTxt=nav.length?nav.map(k=>NAV_LABEL[k]||k).join(', '):'<span style="color:var(--gray-400);">None</span>';
     const portals=[u.coach_portal?'Coach':'', u.screener_portal?'Screener':''].filter(Boolean).join(', ')||'<span style="color:var(--gray-400);">—</span>';
     return `<tr>
-      <td><strong>${esc(u.last_name||'')}, ${esc(u.first_name||'')}</strong>${u.email?`<div style="font-size:.76rem;color:var(--gray-400);">${esc(u.email)}</div>`:''}</td>
+      <td><strong>${esc(u.last_name||'')}, ${esc(u.first_name||'')}</strong>${u.email?`<div style="font-size:.76rem;color:var(--gray-400);">${esc(u.email)}</div>`:''}${u.has_password?`<div style="font-size:.72rem;color:var(--teal);">🔑 Password set</div>`:''}</td>
       <td>${esc(u.phone||'—')}</td>
       <td>${roleBadge(u.role)}</td>
       <td style="font-size:.82rem;">${portals}</td>
@@ -191,6 +197,8 @@ function openModal(id){
   document.getElementById('f-active').value=(u?(u.active?'1':'0'):'1');
   document.getElementById('f-coach-portal').checked=!!u?.coach_portal;
   document.getElementById('f-screener-portal').checked=!!u?.screener_portal;
+  const pw=document.getElementById('f-password'); pw.value=''; pw.type='password'; document.getElementById('f-showpw').checked=false;
+  document.getElementById('pw-hint').textContent=(u&&u.has_password)?'(password set — leave blank to keep it)':'(min 6 characters)';
   const nav=u?parseNav(u):[];
   NAV_CATEGORIES.forEach(c=>{ const el=document.getElementById('nav-'+c.key); if(el) el.checked=nav.includes(c.key); });
   document.getElementById('modal-backdrop').style.display='flex';
@@ -200,6 +208,8 @@ function closeOuter(e){ if(e.target===document.getElementById('modal-backdrop'))
 async function save(){
   const first=document.getElementById('f-fname').value.trim(), last=document.getElementById('f-lname').value.trim();
   if(!first||!last){ showErr('First and last name are required.'); return; }
+  const pw=document.getElementById('f-password').value;
+  if(pw && pw.length<6){ showErr('Password must be at least 6 characters.'); return; }
   const nav_categories=NAV_CATEGORIES.filter(c=>document.getElementById('nav-'+c.key).checked).map(c=>c.key);
   const body={ first_name:first, last_name:last,
     phone:document.getElementById('f-phone').value.trim()||null,
@@ -209,6 +219,7 @@ async function save(){
     coach_portal:document.getElementById('f-coach-portal').checked,
     screener_portal:document.getElementById('f-screener-portal').checked,
     active:document.getElementById('f-active').value==='1' };
+  if(pw) body.password=pw;
   if(editId) body.id=editId;
   const btn=document.getElementById('save-btn'); btn.disabled=true; btn.textContent='Saving…';
   try{

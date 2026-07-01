@@ -6,8 +6,16 @@
 //   DELETE /api/users?id=N      -> delete
 const { getPool } = require('./_db');
 const { getUser, ok, created, badRequest, unauthorized, notFound, serverError, options } = require('./_auth');
+const crypto = require('crypto');
 
 const ROLES = ['Admin', 'User', 'Health Coach'];
+
+// Password hashing via Node's built-in scrypt: stored as scrypt$<salt>$<hash>.
+function hashPassword(pw) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(pw), salt, 64).toString('hex');
+  return `scrypt$${salt}$${hash}`;
+}
 
 function clean(b) {
   return {
@@ -35,6 +43,7 @@ exports.handler = async (event, context) => {
       const r = await db.query(
         `SELECT id, first_name, last_name, phone, email, role, nav_categories,
                 coach_portal, screener_portal, active,
+                CAST(CASE WHEN password_hash IS NULL OR password_hash='' THEN 0 ELSE 1 END AS BIT) AS has_password,
                 CONVERT(varchar(33), created_at, 126) AS created_at
            FROM app_users ORDER BY last_name, first_name`);
       return ok(r.rows);
@@ -44,28 +53,34 @@ exports.handler = async (event, context) => {
   if (event.httpMethod === 'POST') {
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return badRequest('Invalid JSON'); }
     if (!(b.first_name || '').trim() || !(b.last_name || '').trim()) return badRequest('First and last name are required');
+    if (b.password != null && b.password !== '' && String(b.password).length < 6) return badRequest('Password must be at least 6 characters');
     const c = clean(b);
+    const pwHash = (b.password != null && b.password !== '') ? hashPassword(b.password) : null;
     try {
       const r = await db.query(
-        `INSERT INTO app_users (first_name, last_name, phone, email, role, nav_categories, coach_portal, screener_portal, active)
-         OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [c.first_name, c.last_name, c.phone, c.email, c.role, c.nav_categories, c.coach_portal, c.screener_portal, c.active]);
-      return created(r.rows[0]);
+        `INSERT INTO app_users (first_name, last_name, phone, email, role, nav_categories, coach_portal, screener_portal, active, password_hash)
+         OUTPUT INSERTED.id VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [c.first_name, c.last_name, c.phone, c.email, c.role, c.nav_categories, c.coach_portal, c.screener_portal, c.active, pwHash]);
+      return created({ id: r.rows[0].id });
     } catch (e) { return serverError(e); }
   }
 
   if (event.httpMethod === 'PUT') {
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return badRequest('Invalid JSON'); }
     if (!b.id) return badRequest('id required');
+    if (b.password != null && b.password !== '' && String(b.password).length < 6) return badRequest('Password must be at least 6 characters');
     const c = clean(b);
+    // Only change the password when a new one is supplied ($11 null → keep existing).
+    const pwHash = (b.password != null && b.password !== '') ? hashPassword(b.password) : null;
     try {
       const r = await db.query(
         `UPDATE app_users SET first_name=$2, last_name=$3, phone=$4, email=$5, role=$6,
-                nav_categories=$7, coach_portal=$8, screener_portal=$9, active=$10
-         OUTPUT INSERTED.* WHERE id=$1`,
-        [b.id, c.first_name, c.last_name, c.phone, c.email, c.role, c.nav_categories, c.coach_portal, c.screener_portal, c.active]);
+                nav_categories=$7, coach_portal=$8, screener_portal=$9, active=$10,
+                password_hash=COALESCE($11, password_hash)
+         OUTPUT INSERTED.id WHERE id=$1`,
+        [b.id, c.first_name, c.last_name, c.phone, c.email, c.role, c.nav_categories, c.coach_portal, c.screener_portal, c.active, pwHash]);
       if (!r.rows.length) return notFound();
-      return ok(r.rows[0]);
+      return ok({ id: r.rows[0].id });
     } catch (e) { return serverError(e); }
   }
 
