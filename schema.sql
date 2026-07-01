@@ -387,3 +387,6 @@ CREATE TABLE IF NOT EXISTS app_users (
   active          BOOLEAN DEFAULT TRUE,
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Flu-shot consent review captured on the screening form when the event offers flu shots.
+-- ALTER TABLE biometric_results ADD flu_consent_reviewed BIT NULL;  (applied to live SQL Server)

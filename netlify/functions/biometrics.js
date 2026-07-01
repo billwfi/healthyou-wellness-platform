@@ -154,7 +154,7 @@ exports.handler = async (event, context) => {
       blood_glucose, hba1c, notes, fasting_flag, pregnant, diabetic, gender, non_hdl, cholesterol_ratio,
       grip_strength,
       fruit_veg_servings, activity_minutes, muscle_strengthening, stress_level,
-      alcohol_drinks, tobacco_use, sleep_hours
+      alcohol_drinks, tobacco_use, sleep_hours, flu_consent_reviewed
     } = b;
 
     if (!participant_id) return badRequest('participant_id required');
@@ -234,6 +234,7 @@ exports.handler = async (event, context) => {
       alcohol_drinks: alcohol_drinks ?? null,
       tobacco_use: tobacco_use ?? null,
       sleep_hours: sleep_hours ?? null,
+      flu_consent_reviewed: flu_consent_reviewed ? 1 : 0,
       bp_risk, cholesterol_risk, glucose_risk,
       bmi_category: bmi_cat,
       overall_risk: overall,

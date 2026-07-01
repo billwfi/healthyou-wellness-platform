@@ -51,9 +51,6 @@
       <div class="card">
         <div class="form-section-title" style="margin-bottom:16px;">Anthropometrics</div>
         <div style="display:flex;gap:24px;align-items:center;font-size:.9rem;margin-bottom:16px;flex-wrap:wrap;">
-          <label style="display:flex;gap:6px;align-items:center;">Sex
-            <select id="f-sex" style="width:auto;padding:4px 8px;"><option value="">—</option><option value="M">Male</option><option value="F">Female</option></select>
-          </label>
           <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-fasting"> Fasting</label>
           <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-pregnant" onchange="applyPregnant()"> Pregnant</label>
           <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="f-diabetic"> Diabetic</label>
@@ -170,6 +167,22 @@
       </div><!-- /left column -->
 
       <div>
+      <!-- Flu Shot Consent Review (shown only when the event offers flu shots) -->
+      <div class="card" id="flu-consent-card" style="display:none;border-color:var(--teal);">
+        <div class="form-section-title" style="margin-bottom:8px;">Flu Shot — Consent Review</div>
+        <p style="font-size:.82rem;color:var(--gray-500);margin:0 0 10px;">Influenza Vaccine Information — U.S. Department of Health and Human Services, Centers for Disease Control and Prevention. Review the following with the participant:</p>
+        <ul style="margin:0 0 14px 18px;font-size:.9rem;color:var(--gray-700);line-height:1.6;">
+          <li>I have read or have had explained to me the information about influenza and influenza vaccine.</li>
+          <li>I have had an opportunity to discuss the benefits and risks of influenza vaccine with a healthcare provider of my choice before coming here today.</li>
+          <li>I have had a chance to ask questions which were answered to my satisfaction.</li>
+          <li>I understand the benefits and risks of influenza vaccine and request that the vaccine be given to me.</li>
+        </ul>
+        <label style="display:flex;gap:9px;align-items:flex-start;font-size:.9rem;background:#f9fafb;border:1px solid var(--gray-200);border-radius:8px;padding:11px 13px;">
+          <input type="checkbox" id="f-flu-reviewed" style="margin-top:2px;width:auto;">
+          <span>These items were reviewed with the participant.</span>
+        </label>
+      </div>
+
       <!-- Lifestyle Risk Assessment -->
       <div class="card">
         <div class="form-section-title" style="margin-bottom:16px;">Lifestyle Risk Assessment</div>
@@ -335,7 +348,6 @@ async function boot(user) {
     if(p.org_name) meta.push(p.org_name);
     document.getElementById('p-meta').textContent=meta.join(' · ');
     participantSex=(p.gender||'').toLowerCase();
-    document.getElementById('f-sex').value = participantSex.startsWith('m')?'M':participantSex.startsWith('f')?'F':'';
     setAlcoholRange(p.gender);
 
     // If this participant already has a record for THIS event, load it for
@@ -354,6 +366,13 @@ async function boot(user) {
       }
     }
   } catch(e){ showToast('Error loading participant'); }
+  // Show the Flu Shot consent review only when this event offers flu shots.
+  if(eventId){
+    try{
+      const ev=await fetch(`/api/events?id=${eventId}`,{headers:hdr}).then(r=>r.json());
+      if(ev && ev.offers_flu_shot) document.getElementById('flu-consent-card').style.display='';
+    }catch(e){}
+  }
   loadDocuments();
 }
 
@@ -486,7 +505,7 @@ async function submitForm(e) {
     fasting_flag:document.getElementById('f-fasting').checked,
     pregnant:document.getElementById('f-pregnant').checked,
     diabetic:document.getElementById('f-diabetic').checked,
-    gender:({M:'Male',F:'Female'})[document.getElementById('f-sex').value]||null,
+    gender:(participantSex.startsWith('m')?'Male':participantSex.startsWith('f')?'Female':null),
     fruit_veg_servings:document.getElementById('f-fruitveg').value!==''?parseInt(document.getElementById('f-fruitveg').value):null,
     activity_minutes:parseInt(document.getElementById('f-activity').value),
     muscle_strengthening:radioVal('f-muscle'),
@@ -494,6 +513,7 @@ async function submitForm(e) {
     alcohol_drinks:parseInt(document.getElementById('f-alcohol').value),
     tobacco_use:radioVal('f-tobacco'),
     sleep_hours:parseFloat(document.getElementById('f-sleep').value),
+    flu_consent_reviewed:document.getElementById('f-flu-reviewed').checked,
     notes:document.getElementById('f-notes').value||null,
     screened_at:new Date().toISOString(),
   };
@@ -836,6 +856,7 @@ function prefillRecord(b){
   document.getElementById('f-fasting').checked=!!b.fasting_flag;
   document.getElementById('f-pregnant').checked=!!b.pregnant;
   document.getElementById('f-diabetic').checked=!!b.diabetic;
+  document.getElementById('f-flu-reviewed').checked=!!b.flu_consent_reviewed;
   set('f-fruitveg',b.fruit_veg_servings); set('f-activity',b.activity_minutes);
   set('f-stress',b.stress_level); set('f-alcohol',b.alcohol_drinks); set('f-sleep',b.sleep_hours);
   if(b.muscle_strengthening!=null) checkRadio('f-muscle', b.muscle_strengthening?'1':'0');
