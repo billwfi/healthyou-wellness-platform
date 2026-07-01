@@ -81,6 +81,7 @@
         <div style="min-width:120px;text-align:right;font-size:.82rem;color:var(--gray-400);" id="cal-count"></div>
       </div>
       <div class="cal-grid" id="cal-grid"></div>
+      <div id="cal-legend" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:14px;"></div>
     </div>
 
     <!-- Caseload list view -->
@@ -279,12 +280,21 @@ function renderCalendar(){
       const name=`${s.last_name||''}${s.first_name?', '+s.first_name[0]+'.':''}`.trim()||'Participant';
       const cls=(s.status==='cancelled'||s.status==='no_show')?'appt-chip cancelled':'appt-chip';
       const gi=sessions.indexOf(s);
-      return `<button class="${cls}" onclick="openAppt(${gi})" title="${esc(apptTime(s.scheduled_at))} — ${esc(name)}">${esc(apptTime(s.scheduled_at))} ${esc(name)}</button>`;
+      const st=(s.group_color && cls==='appt-chip')?` style="border-left-color:${s.group_color};background:${s.group_color}22;color:#374151;"`:'';
+      return `<button class="${cls}"${st} onclick="openAppt(${gi})" title="${esc(apptTime(s.scheduled_at))} — ${esc(name)}">${esc(apptTime(s.scheduled_at))} ${esc(name)}</button>`;
     }).join('');
     const more=appts.length>3?`<div class="cal-more">+${appts.length-3} more</div>`:'';
     html+=`<div class="cal-cell${isToday?' today':''}"><div class="cal-daynum">${dayNum}</div>${shown}${more}</div>`;
   }
   document.getElementById('cal-grid').innerHTML=html;
+  renderLegend();
+}
+function renderLegend(){
+  const seen=new Map();
+  sessions.forEach(s=>{ if(s.group_color && s.group_name && !seen.has(s.group_name)) seen.set(s.group_name, s.group_color); });
+  const items=[...seen.entries()].map(([n,c])=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:.78rem;color:var(--gray-600);"><span style="width:12px;height:12px;border-radius:3px;background:${c};display:inline-block;"></span>${esc(n)}</span>`).join('');
+  document.getElementById('cal-legend').innerHTML = items
+    ? `<span style="font-size:.72rem;color:var(--gray-400);font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Groups:</span>`+items : '';
 }
 
 // ── Appointment detail ────────────────────────────────────────────────────────
@@ -299,6 +309,7 @@ function openAppt(i){
     row('Time',esc(apptTime(s.scheduled_at))+' &middot; '+(s.duration_minutes||30)+' min')+
     row('Type',esc(s.session_type||'session'))+
     row('Status',esc(s.status||'scheduled'))+
+    (s.group_name?row('Group',`<span style="display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:middle;margin-right:6px;background:${s.group_color||'transparent'};border:1px solid #ddd;"></span>`+esc(s.group_name)):'')+
     (s.participant_email?row('Email',esc(s.participant_email)):'');
   const open=document.getElementById('am-open');
   if(s.participant_id){ open.style.display=''; open.href=`/coach/participant.html?id=${s.participant_id}`; }

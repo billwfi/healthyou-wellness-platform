@@ -844,3 +844,13 @@ GO
 -- cancel-cutoff + duration enforcement).
 IF COL_LENGTH('dbo.coaching_sessions','booking_detail_id') IS NULL ALTER TABLE dbo.coaching_sessions ADD booking_detail_id INT NULL;
 GO
+
+-- Per-group display color (Groups admin). group_id references iStrata is_groups.id
+-- (cross-DB, so kept local). Used to colour coach-portal calendar appointments.
+IF OBJECT_ID('dbo.group_colors','U') IS NULL
+CREATE TABLE dbo.group_colors (
+  group_id   INT PRIMARY KEY,
+  color      NVARCHAR(20),
+  updated_at DATETIME2(3) DEFAULT SYSUTCDATETIME()
+);
+GO

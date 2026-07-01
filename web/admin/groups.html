@@ -80,6 +80,13 @@
       <div class="form-group"><label>PEPM Rate</label><input id="f-pepm_rate" type="number" step="0.01" min="0"/></div>
       <div class="form-group"><label>OP Group Code</label><input id="f-op_group_code" type="text"/></div>
       <div class="form-group"><label>Industry</label><input id="f-industry" type="text"/></div>
+      <div class="form-group"><label>Group Color</label>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input id="f-color" type="color" value="#0d9488" style="width:46px;height:34px;padding:2px;border:1px solid var(--gray-200);border-radius:6px;cursor:pointer;" oninput="colorSet=true;document.getElementById('color-none').style.display='none';">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="clearColor()">No color</button>
+          <span id="color-none" style="font-size:.8rem;color:var(--gray-400);display:none;">No color</span>
+        </div>
+      </div>
     </div>
     <div id="modal-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
     <div class="modal-footer">
@@ -90,8 +97,9 @@
 </div>
 <div class="toast" id="toast"></div>
 <script>
-let authToken=null, groups=[], editId=null;
+let authToken=null, groups=[], editId=null, colorSet=false;
 const FIELDS=['name','slug','address1','address2','city','state','zip','phone','email','effective_date','pepm_rate','op_group_code','industry'];
+function clearColor(){ colorSet=false; document.getElementById('color-none').style.display=''; }
 
 netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} else { location.href='/admin/login.html'; } });
 netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
@@ -118,7 +126,7 @@ function render() {
   document.getElementById('tbody').innerHTML=!rows.length
     ?'<tr><td colspan="5" class="empty">No groups found.</td></tr>'
     :rows.map(o=>`<tr>
-        <td><strong>${esc(o.name)}</strong></td>
+        <td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:middle;margin-right:8px;background:${o.color||'transparent'};border:1px solid var(--gray-200);" title="${o.color?esc(o.color):'No color'}"></span><strong>${esc(o.name)}</strong></td>
         <td style="color:var(--gray-600);font-family:monospace;font-size:.85rem;">${esc(o.slug||'—')}</td>
         <td style="font-size:.85rem;">${esc([o.city,o.state].filter(Boolean).join(', ')||'—')}</td>
         <td><span class="badge badge-${o.active?'active':'inactive'}">${esc(o.status||(o.active?'Active':'Inactive'))}</span></td>
@@ -138,9 +146,12 @@ function openModal(id) {
   if(id){ const o=groups.find(x=>x.id===id);
     FIELDS.forEach(f=>{ const el=document.getElementById('f-'+f); if(el) el.value=o[f]==null?'':o[f]; });
     document.getElementById('f-status').value=o.status||(o.active?'Active':'Inactive');
+    if(o.color){ document.getElementById('f-color').value=o.color; colorSet=true; document.getElementById('color-none').style.display='none'; }
+    else { document.getElementById('f-color').value='#0d9488'; colorSet=false; document.getElementById('color-none').style.display=''; }
   } else {
     FIELDS.forEach(f=>{ const el=document.getElementById('f-'+f); if(el) el.value=''; });
     document.getElementById('f-status').value='Active';
+    document.getElementById('f-color').value='#0d9488'; colorSet=false; document.getElementById('color-none').style.display='';
   }
   document.getElementById('modal-backdrop').style.display='flex';
 }
@@ -154,6 +165,7 @@ async function save() {
   try {
     const body={ status:document.getElementById('f-status').value };
     FIELDS.forEach(f=>{ const v=document.getElementById('f-'+f).value; body[f]=v===''?null:v; });
+    body.color = colorSet ? document.getElementById('f-color').value : null;
     if(editId) body.id=editId;
     const r=await fetch('/api/groups',{ method:editId?'PUT':'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken}, body:JSON.stringify(body) });

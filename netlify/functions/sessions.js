@@ -22,10 +22,13 @@ exports.handler = async (event, context) => {
         `SELECT cs.*,
                 p.first_name, p.last_name, p.email AS participant_email,
                 c.name AS coach_name,
+                gcol.color AS group_color, g.GroupName AS group_name,
                 cn.stage_of_change, cn.session_notes, cn.updated_at AS notes_updated_at
            FROM coaching_sessions cs
            JOIN participants p ON p.id=cs.participant_id
            LEFT JOIN coaches c ON c.id=cs.coach_id
+           LEFT JOIN dbo.group_colors gcol ON gcol.group_id=cs.group_id
+           LEFT JOIN iStrata.dbo.is_groups g ON g.id=cs.group_id
            LEFT JOIN coaching_notes cn ON cn.session_id=cs.id
           ${where.length ? 'WHERE '+where.join(' AND ') : ''}
           ORDER BY cs.scheduled_at DESC`,

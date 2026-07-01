@@ -97,6 +97,7 @@
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
                 <option value="no_show">No-Show</option>
+                <option value="coach_missed">Coach Missed</option>
               </select>
             </div>
 
@@ -321,7 +322,8 @@ function renderHeader() {
 function renderSessions() {
   const el=document.getElementById('session-list');
   if(!sessions.length){ el.innerHTML='<div class="empty" style="padding:20px;">No sessions yet.</div>'; return; }
-  el.innerHTML=sessions.map(s=>`
+  const ordered=sessions.slice().sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
+  el.innerHTML=ordered.map(s=>`
     <div class="session-item${selectedSession?.id===s.id?' active':''}" onclick="selectSession(${s.id})">
       <div class="session-item-date">${fmtDt(s.scheduled_at)}</div>
       <div class="session-item-meta">
