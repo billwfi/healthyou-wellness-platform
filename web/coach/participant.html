@@ -86,7 +86,6 @@
     <div class="tabs">
       <button class="tab active" onclick="switchTab('sessions',this)">Sessions &amp; Notes</button>
       <button class="tab" onclick="switchTab('biometrics',this)">Biometrics</button>
-      <button class="tab" onclick="switchTab('goals',this)">Goals</button>
     </div>
 
     <!-- Sessions & Notes -->
@@ -155,15 +154,6 @@
     <!-- Biometrics -->
     <div id="tab-biometrics" style="display:none;">
       <div id="bio-content"><div class="empty">No biometric data on file.</div></div>
-    </div>
-
-    <!-- Goals -->
-    <div id="tab-goals" style="display:none;">
-      <div class="section-header" style="margin-bottom:14px;">
-        <h3>Health Goals</h3>
-        <button class="btn btn-primary btn-sm" onclick="openGoalModal()">+ Add Goal</button>
-      </div>
-      <div id="goal-list"><div class="empty">No goals set yet.</div></div>
     </div>
   </div>
 </main>
@@ -270,7 +260,6 @@ async function boot(user) {
   renderHeader();
   renderSessions();
   renderBiometrics();
-  renderGoals();
 }
 
 function renderHeader() {
@@ -285,25 +274,7 @@ function renderHeader() {
   if(p.department) metaParts.push(p.department);
   if(p.date_of_birth) metaParts.push('DOB: '+fmtDate(p.date_of_birth));
   document.getElementById('p-meta').textContent=metaParts.join(' · ');
-
-  // Latest biometrics for risk strip
-  const bio=p.biometrics?.[0];
-  if(bio && bio.overall_risk) {
-    document.getElementById('p-risk-badge').innerHTML=`<span class="badge badge-${bio.overall_risk}" style="font-size:.82rem;">Overall Risk: ${bio.overall_risk}</span>`;
-    const strip=document.getElementById('risk-strip');
-    strip.style.display='flex';
-    const items=[
-      {label:'BP',value:bio.systolic_bp?`${bio.systolic_bp}/${bio.diastolic_bp}`:'—',risk:bio.bp_risk},
-      {label:'Cholesterol',value:bio.total_cholesterol?bio.total_cholesterol+' mg/dL':'—',risk:bio.cholesterol_risk},
-      {label:'Glucose',value:bio.blood_glucose?bio.blood_glucose+' mg/dL':'—',risk:bio.glucose_risk},
-      {label:'BMI',value:bio.bmi?Number(bio.bmi).toFixed(1):'—',risk:bio.bmi_category==='obese'?'high':bio.bmi_category==='overweight'?'moderate':'normal'},
-      {label:'Weight',value:bio.weight_lbs?bio.weight_lbs+' lbs':'—',risk:null},
-    ];
-    strip.innerHTML=items.map(i=>`<div class="risk-item">
-      <div class="risk-item-value">${esc(String(i.value))}</div>
-      <div class="risk-item-label">${i.label}${i.risk?` <span class="badge badge-${i.risk}" style="font-size:.62rem;padding:1px 5px;">${i.risk}</span>`:''}</div>
-    </div>`).join('');
-  }
+  // Biometrics are shown only under the Biometrics tab (not in the header).
 }
 
 function renderSessions() {
@@ -411,10 +382,7 @@ async function saveNotes() {
     }
     for(const gid of removedGoalIds){ await fetch('/api/goals?id='+gid,{method:'DELETE',headers:hdr}); }
     removedGoalIds=[];
-    // reload goals for the Goals tab + this session's rows
-    goals=await fetch(`/api/goals?participant_id=${pid}`,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
-    if(!Array.isArray(goals)) goals=[];
-    renderGoals();
+    // reload this session's goal rows
     const sg=await fetch(`/api/goals?session_id=${selectedSession.id}`,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
     renderGoalRows(Array.isArray(sg)?sg:[]);
     renderSessions();
@@ -559,7 +527,7 @@ function switchTab(tab,el) {
   currentTab=tab;
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  ['sessions','biometrics','goals'].forEach(t=>document.getElementById('tab-'+t).style.display=t===tab?'':'none');
+  ['sessions','biometrics'].forEach(t=>document.getElementById('tab-'+t).style.display=t===tab?'':'none');
 }
 
 // Session modal
