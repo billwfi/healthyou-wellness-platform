@@ -854,3 +854,20 @@ CREATE TABLE dbo.group_colors (
   updated_at DATETIME2(3) DEFAULT SYSUTCDATETIME()
 );
 GO
+
+-- SMART goals + per-goal Stage of Change (coach session-notes redesign). Goals are
+-- tagged with the session they were added in (session_id).
+IF COL_LENGTH('dbo.goals','session_id')       IS NULL ALTER TABLE dbo.goals ADD session_id INT NULL;
+GO
+IF COL_LENGTH('dbo.goals','stage_of_change')  IS NULL ALTER TABLE dbo.goals ADD stage_of_change NVARCHAR(50);
+GO
+IF COL_LENGTH('dbo.goals','smart_specific')   IS NULL ALTER TABLE dbo.goals ADD smart_specific NVARCHAR(MAX);
+GO
+IF COL_LENGTH('dbo.goals','smart_measurable') IS NULL ALTER TABLE dbo.goals ADD smart_measurable NVARCHAR(MAX);
+GO
+IF COL_LENGTH('dbo.goals','smart_achievable') IS NULL ALTER TABLE dbo.goals ADD smart_achievable NVARCHAR(MAX);
+GO
+IF COL_LENGTH('dbo.goals','smart_relevant')   IS NULL ALTER TABLE dbo.goals ADD smart_relevant NVARCHAR(MAX);
+GO
+IF COL_LENGTH('dbo.goals','smart_time_bound') IS NULL ALTER TABLE dbo.goals ADD smart_time_bound NVARCHAR(MAX);
+GO

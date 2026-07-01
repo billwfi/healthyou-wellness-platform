@@ -29,6 +29,11 @@
     .goal-dot.achieved  { background:var(--green); }
     .goal-dot.paused    { background:var(--amber); }
     .goal-dot.abandoned { background:var(--red); }
+    .goal-row { border:1px solid var(--gray-200); border-radius:10px; padding:14px; margin-bottom:12px; background:var(--gray-50); }
+    .smart-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    @media(max-width:640px){ .smart-grid { grid-template-columns:1fr; } }
+    .goal-row textarea { min-height:38px; }
+    .smart-lead { display:inline-flex;width:18px;height:18px;border-radius:4px;background:var(--teal);color:#fff;font-size:.7rem;font-weight:700;align-items:center;justify-content:center;margin-right:6px; }
   </style>
 </head>
 <body>
@@ -92,7 +97,8 @@
                 <div style="font-weight:600;font-size:.95rem;" id="nf-session-label"></div>
                 <div style="font-size:.8rem;color:var(--gray-400);margin-top:2px;" id="nf-session-meta"></div>
               </div>
-              <select id="nf-status" class="btn btn-ghost btn-sm" style="padding:4px 8px;" onchange="patchStatus()">
+              <select id="nf-status" class="btn btn-ghost btn-sm" style="padding:4px 8px;">
+                <option value="">Select status… *</option>
                 <option value="scheduled">Scheduled</option>
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
@@ -102,63 +108,19 @@
             </div>
 
             <div class="form-section">
-              <div class="form-section-title">Stage of Change</div>
-              <div class="soc-grid" id="soc-grid">
-                <div class="soc-option" data-soc="precontemplation" onclick="setSoc(this)">
-                  <span class="soc-label">Precontemplation</span>
-                  <span class="soc-desc">Not yet aware</span>
-                </div>
-                <div class="soc-option" data-soc="contemplation" onclick="setSoc(this)">
-                  <span class="soc-label">Contemplation</span>
-                  <span class="soc-desc">Aware, not ready</span>
-                </div>
-                <div class="soc-option" data-soc="preparation" onclick="setSoc(this)">
-                  <span class="soc-label">Preparation</span>
-                  <span class="soc-desc">Getting ready</span>
-                </div>
-                <div class="soc-option" data-soc="action" onclick="setSoc(this)">
-                  <span class="soc-label">Action</span>
-                  <span class="soc-desc">Making changes</span>
-                </div>
-                <div class="soc-option" data-soc="maintenance" onclick="setSoc(this)">
-                  <span class="soc-label">Maintenance</span>
-                  <span class="soc-desc">Sustaining change</span>
-                </div>
+              <div class="form-section-title">Session Notes</div>
+              <div class="form-group">
+                <textarea id="nf-notes" rows="5" placeholder="Document what was discussed this session…"></textarea>
               </div>
             </div>
 
             <div class="form-section">
-              <div class="form-section-title">Session Notes</div>
-              <div class="form-grid full" style="gap:12px;">
-                <div class="form-group">
-                  <label>Presenting Concern</label>
-                  <textarea id="nf-concern" rows="2" placeholder="What brought the client in today?"></textarea>
-                </div>
-                <div class="form-group">
-                  <label>Client Goals (as stated)</label>
-                  <textarea id="nf-goals" rows="2" placeholder="What does the client want to achieve?"></textarea>
-                </div>
-                <div class="form-group">
-                  <label>Motivational Factors</label>
-                  <textarea id="nf-motivators" rows="2" placeholder="What motivates this client?"></textarea>
-                </div>
-                <div class="form-group">
-                  <label>Barriers &amp; Challenges</label>
-                  <textarea id="nf-barriers" rows="2" placeholder="What obstacles are in the way?"></textarea>
-                </div>
-                <div class="form-group">
-                  <label>Action Steps</label>
-                  <textarea id="nf-actions" rows="3" placeholder="Agreed-upon action items for this session…"></textarea>
-                </div>
-                <div class="form-group">
-                  <label>Follow-up Plan</label>
-                  <textarea id="nf-followup" rows="2" placeholder="Plan for next contact or session…"></textarea>
-                </div>
-                <div class="form-group">
-                  <label>Additional Session Notes</label>
-                  <textarea id="nf-notes" rows="3" placeholder="Any other observations or notes…"></textarea>
-                </div>
+              <div class="form-section-title" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>Goals</span>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="addGoalRow()">+ Add Goal</button>
               </div>
+              <p style="font-size:.78rem;color:var(--gray-400);margin:-4px 0 10px;">Add one or more SMART goals. Set the Stage of Change for each.</p>
+              <div id="goal-rows"></div>
             </div>
 
             <div class="save-bar">
@@ -226,23 +188,22 @@
 <div id="goal-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'goal-modal')">
   <div class="modal">
     <div class="modal-title" id="gm-title">Add Goal</div>
-    <div class="form-grid full" style="gap:14px;">
-      <div class="form-group"><label>Goal Title *</label><input id="gm-title-input" type="text" placeholder="e.g. Walk 30 min daily"/></div>
-      <div class="form-group"><label>Category</label>
-        <select id="gm-cat">
-          <option value="nutrition">Nutrition</option>
-          <option value="fitness">Fitness</option>
-          <option value="weight">Weight</option>
-          <option value="stress">Stress Management</option>
-          <option value="sleep">Sleep</option>
-          <option value="smoking">Smoking</option>
-          <option value="alcohol">Alcohol</option>
-          <option value="mental_health">Mental Health</option>
-          <option value="other">Other</option>
+    <div class="form-grid full" style="gap:12px;">
+      <div class="form-group"><label>Stage of Change</label>
+        <select id="gm-stage">
+          <option value="">Select…</option>
+          <option value="precontemplation">Precontemplation</option>
+          <option value="contemplation">Contemplation</option>
+          <option value="preparation">Preparation</option>
+          <option value="action">Action</option>
+          <option value="maintenance">Maintenance</option>
         </select>
       </div>
-      <div class="form-group"><label>Target Date</label><input id="gm-date" type="date"/></div>
-      <div class="form-group span-2"><label>Description</label><textarea id="gm-desc" rows="2"></textarea></div>
+      <div class="form-group"><label>S — Specific</label><textarea id="gm-s" rows="2" placeholder="What exactly will be accomplished?"></textarea></div>
+      <div class="form-group"><label>M — Measurable</label><textarea id="gm-m" rows="2" placeholder="How will progress be measured?"></textarea></div>
+      <div class="form-group"><label>A — Achievable</label><textarea id="gm-a" rows="2" placeholder="Is it realistic?"></textarea></div>
+      <div class="form-group"><label>R — Relevant</label><textarea id="gm-r" rows="2" placeholder="Why does it matter?"></textarea></div>
+      <div class="form-group"><label>T — Time-bound</label><textarea id="gm-t" rows="2" placeholder="By when?"></textarea></div>
     </div>
     <div id="gm-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
     <div class="modal-footer">
@@ -255,6 +216,7 @@
 <div class="toast" id="toast"></div>
 <script>
 let authToken=null, participant=null, sessions=[], goals=[], selectedSession=null, currentTab='sessions', editGoalId=null;
+let removedGoalIds=[], myCoachId=null;
 const pid = new URLSearchParams(location.search).get('id');
 
 function logout(){ hyCoach.clearToken(); location.href='/coach/'; }
@@ -272,6 +234,7 @@ async function boot(user) {
   document.getElementById('content').style.display='';
   document.getElementById('logout-btn').style.display='';
   document.getElementById('header-name').textContent=user.full_name||user.email;
+  myCoachId=user.coach_id||null;
 
   const hdr={Authorization:'Bearer '+authToken};
   [participant, sessions, goals] = await Promise.all([
@@ -339,73 +302,97 @@ async function selectSession(id) {
   renderSessions();
 
   const hdr={Authorization:'Bearer '+authToken};
-  const notes=await fetch(`/api/notes?session_id=${id}`,{headers:hdr}).then(r=>r.json());
+  const [notes, sgoals] = await Promise.all([
+    fetch(`/api/notes?session_id=${id}`,{headers:hdr}).then(r=>r.json()),
+    fetch(`/api/goals?session_id=${id}`,{headers:hdr}).then(r=>r.json()),
+  ]);
 
   document.getElementById('notes-empty').style.display='none';
   document.getElementById('notes-form').style.display='';
-
   document.getElementById('nf-session-label').textContent=fmtDt(selectedSession.scheduled_at)+' — '+selectedSession.session_type.replace('_',' ');
   document.getElementById('nf-session-meta').textContent=`${selectedSession.duration_minutes} min`;
-  document.getElementById('nf-status').value=selectedSession.status;
-
-  // SOC
-  document.querySelectorAll('.soc-option').forEach(o=>o.classList.remove('selected'));
-  if(notes?.stage_of_change){
-    const el=document.querySelector(`.soc-option[data-soc="${notes.stage_of_change}"]`);
-    if(el) el.classList.add('selected');
-  }
-
-  document.getElementById('nf-concern').value=notes?.presenting_concern||'';
-  document.getElementById('nf-goals').value=notes?.client_goals||'';
-  document.getElementById('nf-motivators').value=notes?.motivational_factors||'';
-  document.getElementById('nf-barriers').value=notes?.barriers||'';
-  document.getElementById('nf-actions').value=notes?.action_steps||'';
-  document.getElementById('nf-followup').value=notes?.follow_up_plan||'';
+  document.getElementById('nf-status').value=selectedSession.status||'';
   document.getElementById('nf-notes').value=notes?.session_notes||'';
+  removedGoalIds=[];
+  renderGoalRows(Array.isArray(sgoals)?sgoals:[]);
   document.getElementById('notes-saved-msg').style.display='none';
 }
 
-function setSoc(el) {
-  document.querySelectorAll('.soc-option').forEach(o=>o.classList.remove('selected'));
-  el.classList.add('selected');
+// ── Inline SMART goal rows ────────────────────────────────────────────────────
+const STAGE_OPTS=['precontemplation','contemplation','preparation','action','maintenance'];
+const STAGE_LABEL={precontemplation:'Precontemplation',contemplation:'Contemplation',preparation:'Preparation',action:'Action',maintenance:'Maintenance'};
+function goalRowEl(g){
+  g=g||{};
+  const div=document.createElement('div');
+  div.className='goal-row'; div.dataset.gid=g.id||'';
+  div.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <strong style="font-size:.85rem;">SMART Goal</strong>
+      <button type="button" class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="removeGoalRow(this)">Remove</button>
+    </div>
+    <div class="form-group" style="margin-bottom:10px;"><label>Stage of Change</label>
+      <select class="g-stage">${['<option value="">Select…</option>'].concat(STAGE_OPTS.map(s=>`<option value="${s}">${STAGE_LABEL[s]}</option>`)).join('')}</select>
+    </div>
+    <div class="smart-grid">
+      <div class="form-group"><label><span class="smart-lead">S</span>Specific</label><textarea class="g-s" rows="1"></textarea></div>
+      <div class="form-group"><label><span class="smart-lead">M</span>Measurable</label><textarea class="g-m" rows="1"></textarea></div>
+      <div class="form-group"><label><span class="smart-lead">A</span>Achievable</label><textarea class="g-a" rows="1"></textarea></div>
+      <div class="form-group"><label><span class="smart-lead">R</span>Relevant</label><textarea class="g-r" rows="1"></textarea></div>
+      <div class="form-group"><label><span class="smart-lead">T</span>Time-bound</label><textarea class="g-t" rows="1"></textarea></div>
+    </div>`;
+  div.querySelector('.g-stage').value=g.stage_of_change||'';
+  div.querySelector('.g-s').value=g.smart_specific||'';
+  div.querySelector('.g-m').value=g.smart_measurable||'';
+  div.querySelector('.g-a').value=g.smart_achievable||'';
+  div.querySelector('.g-r').value=g.smart_relevant||'';
+  div.querySelector('.g-t').value=g.smart_time_bound||'';
+  return div;
 }
+function renderGoalRows(list){
+  const host=document.getElementById('goal-rows'); host.innerHTML='';
+  list.forEach(g=>host.appendChild(goalRowEl(g)));
+}
+function addGoalRow(){ document.getElementById('goal-rows').appendChild(goalRowEl({})); }
+function removeGoalRow(btn){ const row=btn.closest('.goal-row'); if(row.dataset.gid) removedGoalIds.push(row.dataset.gid); row.remove(); }
 
 async function saveNotes() {
   if(!selectedSession) return;
-  const soc=document.querySelector('.soc-option.selected')?.dataset.soc||null;
+  const status=document.getElementById('nf-status').value;
+  if(!status){ showToast('Please select a status before saving.'); document.getElementById('nf-status').focus(); return; }
   const btn=document.getElementById('save-notes-btn'); btn.disabled=true; btn.textContent='Saving…';
+  const hdr={'Content-Type':'application/json','Authorization':'Bearer '+authToken};
   try {
-    const r=await fetch('/api/notes',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({
-      session_id:selectedSession.id,
-      stage_of_change:soc,
-      presenting_concern:document.getElementById('nf-concern').value||null,
-      client_goals:document.getElementById('nf-goals').value||null,
-      motivational_factors:document.getElementById('nf-motivators').value||null,
-      barriers:document.getElementById('nf-barriers').value||null,
-      action_steps:document.getElementById('nf-actions').value||null,
-      follow_up_plan:document.getElementById('nf-followup').value||null,
-      session_notes:document.getElementById('nf-notes').value||null,
-    })});
-    if(!r.ok) throw new Error((await r.json()).error||'Save failed');
-    // Update session in memory for SOC display
+    // 1) status
+    await fetch('/api/sessions',{method:'PATCH',headers:hdr,body:JSON.stringify({id:selectedSession.id,status})});
     const idx=sessions.findIndex(s=>s.id===selectedSession.id);
-    if(idx>=0) sessions[idx].stage_of_change=soc;
+    if(idx>=0){ sessions[idx].status=status; selectedSession.status=status; }
+    // 2) session notes
+    await fetch('/api/notes',{method:'PUT',headers:hdr,body:JSON.stringify({ session_id:selectedSession.id, coach_id:myCoachId, session_notes:document.getElementById('nf-notes').value||null })});
+    // 3) goals (create/update each row; delete removed)
+    for(const row of [...document.querySelectorAll('#goal-rows .goal-row')]){
+      const g={ stage_of_change:row.querySelector('.g-stage').value||null,
+        smart_specific:row.querySelector('.g-s').value.trim()||null,
+        smart_measurable:row.querySelector('.g-m').value.trim()||null,
+        smart_achievable:row.querySelector('.g-a').value.trim()||null,
+        smart_relevant:row.querySelector('.g-r').value.trim()||null,
+        smart_time_bound:row.querySelector('.g-t').value.trim()||null };
+      const gid=row.dataset.gid;
+      const empty=!g.stage_of_change&&!g.smart_specific&&!g.smart_measurable&&!g.smart_achievable&&!g.smart_relevant&&!g.smart_time_bound;
+      if(gid){ await fetch('/api/goals',{method:'PUT',headers:hdr,body:JSON.stringify({id:parseInt(gid),...g})}); }
+      else if(!empty){ await fetch('/api/goals',{method:'POST',headers:hdr,body:JSON.stringify({participant_id:parseInt(pid),coach_id:myCoachId,session_id:selectedSession.id,...g})}); }
+    }
+    for(const gid of removedGoalIds){ await fetch('/api/goals?id='+gid,{method:'DELETE',headers:hdr}); }
+    removedGoalIds=[];
+    // reload goals for the Goals tab + this session's rows
+    goals=await fetch(`/api/goals?participant_id=${pid}`,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+    if(!Array.isArray(goals)) goals=[];
+    renderGoals();
+    const sg=await fetch(`/api/goals?session_id=${selectedSession.id}`,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
+    renderGoalRows(Array.isArray(sg)?sg:[]);
     renderSessions();
     const msg=document.getElementById('notes-saved-msg'); msg.style.display=''; setTimeout(()=>msg.style.display='none',3000);
   } catch(e){ showToast('Error: '+e.message); }
   finally{ btn.disabled=false; btn.textContent='Save Notes'; }
-}
-
-async function patchStatus() {
-  if(!selectedSession) return;
-  const status=document.getElementById('nf-status').value;
-  try {
-    await fetch('/api/sessions',{method:'PATCH',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({id:selectedSession.id,status})});
-    const idx=sessions.findIndex(s=>s.id===selectedSession.id);
-    if(idx>=0){ sessions[idx].status=status; selectedSession.status=status; }
-    renderSessions();
-    showToast('Status updated');
-  } catch(e){ showToast('Error: '+e.message); }
 }
 
 function renderBiometrics() {
@@ -438,9 +425,12 @@ function renderBiometrics() {
 
   document.getElementById('bio-content').innerHTML=`
     <div class="card" style="margin-bottom:16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-        <div class="card-title" style="margin-bottom:0;">Latest Results</div>
-        <span style="font-size:.8rem;color:var(--gray-400);">${fmtDate(latest.screened_at)}</span>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap;">
+        <div class="card-title" style="margin-bottom:0;">Latest Biometric Report</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          ${latest.overall_risk?`<span class="badge badge-${latest.overall_risk}">${esc(latest.overall_risk)} risk</span>`:''}
+          <span style="font-size:.8rem;color:var(--gray-400);">${fmtDate(latest.screened_at)}</span>
+        </div>
       </div>
       <div class="bio-row">
         ${tiles.map(t=>`<div class="bio-tile${t.risk?' '+t.risk:''}">
@@ -466,24 +456,27 @@ function riskClass(risk) {
 function renderGoals() {
   if(!goals.length){ document.getElementById('goal-list').innerHTML='<div class="empty">No goals set yet.</div>'; return; }
   const statusColors={active:'active',achieved:'achieved',paused:'paused',abandoned:'abandoned'};
-  document.getElementById('goal-list').innerHTML=goals.map(g=>`
-    <div class="goal-card">
+  document.getElementById('goal-list').innerHTML=goals.map(g=>{
+    const smart=[['S',g.smart_specific],['M',g.smart_measurable],['A',g.smart_achievable],['R',g.smart_relevant],['T',g.smart_time_bound]].filter(x=>x[1]);
+    const smartHtml=smart.length
+      ? `<div style="margin-top:6px;display:grid;gap:4px;">${smart.map(x=>`<div style="font-size:.8rem;"><span class="smart-lead">${x[0]}</span>${esc(x[1])}</div>`).join('')}</div>`
+      : (g.description?`<div style="font-size:.8rem;color:var(--gray-600);margin-top:2px;">${esc(g.description)}</div>`:'');
+    return `<div class="goal-card">
       <div class="goal-dot ${statusColors[g.status]||'active'}"></div>
       <div style="flex:1;">
-        <div style="font-weight:600;font-size:.9rem;">${esc(g.title)}</div>
-        ${g.description?`<div style="font-size:.8rem;color:var(--gray-600);margin-top:2px;">${esc(g.description)}</div>`:''}
-        <div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="font-weight:600;font-size:.9rem;">${esc(g.smart_specific||g.title||'Goal')}</div>
+        ${smartHtml}
+        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span class="badge badge-${g.status==='active'?'active':g.status==='achieved'?'achieved':'inactive'}">${g.status}</span>
-          <span style="font-size:.75rem;color:var(--gray-400);">${g.category}</span>
-          ${g.target_date?`<span style="font-size:.75rem;color:var(--gray-400);">Target: ${fmtDate(g.target_date)}</span>`:''}
+          ${g.stage_of_change?`<span class="badge badge-scheduled">${STAGE_LABEL[g.stage_of_change]||g.stage_of_change}</span>`:''}
         </div>
-        ${g.progress_notes?`<div style="margin-top:8px;font-size:.8rem;color:var(--gray-600);padding:8px;background:var(--gray-50);border-radius:6px;">${esc(g.progress_notes)}</div>`:''}
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
         <button class="btn btn-ghost btn-sm" onclick="openGoalModal(${g.id})">Edit</button>
         ${g.status!=='achieved'?`<button class="btn btn-sm" style="background:var(--green-light);color:#065f46;border:none;" onclick="markAchieved(${g.id})">✓ Done</button>`:''}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function switchTab(tab,el) {
@@ -531,38 +524,34 @@ function openGoalModal(id) {
   document.getElementById('gm-title').textContent=id?'Edit Goal':'Add Goal';
   document.getElementById('gm-btn').textContent=id?'Save Changes':'Add Goal';
   document.getElementById('gm-err').style.display='none';
-  if(id){
-    const g=goals.find(x=>x.id===id);
-    document.getElementById('gm-title-input').value=g.title;
-    document.getElementById('gm-cat').value=g.category||'other';
-    document.getElementById('gm-date').value=g.target_date?.split('T')[0]||'';
-    document.getElementById('gm-desc').value=g.description||'';
-  } else {
-    document.getElementById('gm-title-input').value='';
-    document.getElementById('gm-cat').value='other';
-    document.getElementById('gm-date').value='';
-    document.getElementById('gm-desc').value='';
-  }
+  const g=id?goals.find(x=>x.id===id):null;
+  document.getElementById('gm-stage').value=g?.stage_of_change||'';
+  document.getElementById('gm-s').value=g?.smart_specific||'';
+  document.getElementById('gm-m').value=g?.smart_measurable||'';
+  document.getElementById('gm-a').value=g?.smart_achievable||'';
+  document.getElementById('gm-r').value=g?.smart_relevant||'';
+  document.getElementById('gm-t').value=g?.smart_time_bound||'';
   document.getElementById('goal-modal').style.display='flex';
 }
 
 async function saveGoal() {
-  const title=document.getElementById('gm-title-input').value.trim();
-  if(!title){ showGmErr('Goal title required'); return; }
+  const body={
+    stage_of_change:document.getElementById('gm-stage').value||null,
+    smart_specific:document.getElementById('gm-s').value.trim()||null,
+    smart_measurable:document.getElementById('gm-m').value.trim()||null,
+    smart_achievable:document.getElementById('gm-a').value.trim()||null,
+    smart_relevant:document.getElementById('gm-r').value.trim()||null,
+    smart_time_bound:document.getElementById('gm-t').value.trim()||null,
+  };
+  if(!body.smart_specific && !body.stage_of_change){ showGmErr('Enter at least the Specific goal or a stage.'); return; }
   const btn=document.getElementById('gm-btn'); btn.disabled=true; btn.textContent='Saving…';
   try {
-    const body={
-      title,
-      category:document.getElementById('gm-cat').value,
-      target_date:document.getElementById('gm-date').value||null,
-      description:document.getElementById('gm-desc').value||null,
-    };
     let r;
     if(editGoalId){
       body.id=editGoalId;
       r=await fetch('/api/goals',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify(body)});
     } else {
-      body.participant_id=parseInt(pid);
+      body.participant_id=parseInt(pid); body.coach_id=myCoachId;
       r=await fetch('/api/goals',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify(body)});
     }
     if(!r.ok) throw new Error((await r.json()).error||'Failed');
