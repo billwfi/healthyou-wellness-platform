@@ -47,6 +47,11 @@
     .ns-slot { padding:8px; border:1px solid var(--gray-200); border-radius:6px; font-size:.82rem; text-align:center; cursor:pointer; }
     .ns-slot:hover { border-color:var(--teal); color:var(--teal); }
     .ns-slot.sel { background:var(--teal); color:#fff; border-color:var(--teal); }
+    .lib-row { display:flex; gap:10px; align-items:flex-start; padding:10px 8px; border-bottom:1px solid var(--gray-100); cursor:pointer; }
+    .lib-row:hover { background:var(--gray-50); }
+    .lib-row input { width:auto; margin-top:3px; }
+    .edu-item { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid var(--gray-100); }
+    .edu-item:last-child { border-bottom:none; }
     .smart-grid { display:grid; grid-template-columns:1fr; gap:10px; }
     .goal-row textarea { min-height:38px; }
     .smart-lead { display:inline-flex;width:18px;height:18px;border-radius:4px;background:var(--teal);color:#fff;font-size:.7rem;font-weight:700;align-items:center;justify-content:center;margin-right:6px; }
@@ -153,10 +158,11 @@
             </div>
 
             <div class="form-section">
-              <div class="form-section-title">Educational Materials &amp; Other Referrals</div>
-              <div class="form-group">
-                <textarea id="nf-edu" rows="3" placeholder="Handouts provided, referrals, resources shared…"></textarea>
+              <div class="form-section-title" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>Educational Materials &amp; Other Referrals</span>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="openLibraryPicker()">+ Add from Library</button>
               </div>
+              <div id="edu-items"></div>
             </div>
 
             <div class="save-bar">
@@ -236,10 +242,26 @@
   </div>
 </div>
 
+<!-- Library picker modal -->
+<div id="lib-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'lib-modal')">
+  <div class="modal modal-lg">
+    <div class="modal-title">Add from Library</div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+      <select id="lib-cat" onchange="renderLibList()" style="max-width:220px;"><option value="">All categories</option></select>
+      <input id="lib-search" type="text" placeholder="Search resources…" oninput="renderLibList()" style="flex:1;min-width:160px;"/>
+    </div>
+    <div id="lib-list" style="max-height:340px;overflow:auto;border:1px solid var(--gray-200);border-radius:8px;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('lib-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="addSelectedFromLibrary()">Add Selected</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <script>
 let authToken=null, participant=null, sessions=[], goals=[], selectedSession=null, currentTab='sessions', editGoalId=null;
-let removedGoalIds=[], myCoachId=null;
+let removedGoalIds=[], myCoachId=null, eduItems=[], libItems=[];
 const pid = new URLSearchParams(location.search).get('id');
 
 function logout(){ hyCoach.clearToken(); location.href='/coach/'; }
@@ -317,7 +339,9 @@ async function selectSession(id) {
   document.getElementById('nf-session-meta').textContent=`${selectedSession.duration_minutes} min`;
   document.getElementById('nf-status').value=selectedSession.status||'';
   document.getElementById('nf-notes').value=notes?.session_notes||'';
-  document.getElementById('nf-edu').value=notes?.educational_materials||'';
+  try{ eduItems=notes?.educational_materials?JSON.parse(notes.educational_materials):[]; }catch{ eduItems=[]; }
+  if(!Array.isArray(eduItems)) eduItems=[];
+  renderEduItems();
   removedGoalIds=[];
   renderGoalRows(Array.isArray(sgoals)?sgoals:[]);
   document.getElementById('notes-saved-msg').style.display='none';
@@ -386,6 +410,50 @@ function renderGoalRows(list){
 function addGoalRow(){ document.getElementById('goal-rows').appendChild(goalRowEl({},true)); }  // new goal starts expanded
 function removeGoalRow(btn){ const row=btn.closest('.goal-row'); if(row.dataset.gid) removedGoalIds.push(row.dataset.gid); row.remove(); }
 
+// ── Educational Materials (from the Wellness Portal Library) ───────────────────
+function renderEduItems(){
+  const host=document.getElementById('edu-items');
+  if(!eduItems.length){ host.innerHTML='<div style="font-size:.82rem;color:var(--gray-400);padding:4px 0;">No materials added.</div>'; return; }
+  host.innerHTML=eduItems.map((it,i)=>`<div class="edu-item">
+    <div>
+      <div style="font-weight:600;font-size:.85rem;">${esc(it.title)}</div>
+      <div style="font-size:.74rem;color:var(--gray-400);">${esc(it.category||'')}${it.url?` &middot; <a href="${esc(it.url)}" target="_blank" style="color:var(--teal);">open</a>`:''}</div>
+    </div>
+    <button type="button" class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="removeEduItem(${i})">Remove</button>
+  </div>`).join('');
+}
+function removeEduItem(i){ eduItems.splice(i,1); renderEduItems(); }
+async function openLibraryPicker(){
+  document.getElementById('lib-list').innerHTML='<div class="empty" style="padding:16px;">Loading…</div>';
+  document.getElementById('lib-modal').style.display='flex';
+  try{ libItems=await fetch('/api/content-library?status=published',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json()); }catch{ libItems=[]; }
+  if(!Array.isArray(libItems)) libItems=[];
+  const cats=[...new Set(libItems.map(x=>x.category).filter(Boolean))].sort();
+  document.getElementById('lib-cat').innerHTML='<option value="">All categories</option>'+cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  document.getElementById('lib-search').value='';
+  renderLibList();
+}
+function renderLibList(){
+  const cat=document.getElementById('lib-cat').value;
+  const q=(document.getElementById('lib-search').value||'').toLowerCase();
+  const rows=libItems.filter(x=>(!cat||x.category===cat)&&(!q||(x.title||'').toLowerCase().includes(q)));
+  const host=document.getElementById('lib-list');
+  if(!rows.length){ host.innerHTML='<div class="empty" style="padding:16px;">No matching resources.</div>'; return; }
+  const sel=new Set(eduItems.map(e=>e.id));
+  host.innerHTML=rows.map(x=>`<label class="lib-row">
+    <input type="checkbox" value="${x.id}" ${sel.has(x.id)?'checked':''}>
+    <div style="flex:1;">
+      <div style="font-weight:600;font-size:.85rem;">${esc(x.title)}</div>
+      <div style="font-size:.74rem;color:var(--gray-400);">${esc(x.category||'')}${x.resource_type?' &middot; '+esc(x.resource_type):''}</div>
+    </div>
+  </label>`).join('');
+}
+function addSelectedFromLibrary(){
+  const ids=[...document.querySelectorAll('#lib-list input[type=checkbox]:checked')].map(c=>parseInt(c.value,10));
+  ids.forEach(id=>{ if(!eduItems.some(e=>e.id===id)){ const it=libItems.find(x=>x.id===id); if(it) eduItems.push({id:it.id,title:it.title,category:it.category||null,url:it.url||null}); } });
+  renderEduItems(); closeModal('lib-modal');
+}
+
 async function saveNotes() {
   if(!selectedSession) return;
   const status=document.getElementById('nf-status').value;
@@ -394,7 +462,7 @@ async function saveNotes() {
   const hdr={'Content-Type':'application/json','Authorization':'Bearer '+authToken};
   try {
     // 1) session notes first (so a Completed status can email the saved notes)
-    await fetch('/api/notes',{method:'PUT',headers:hdr,body:JSON.stringify({ session_id:selectedSession.id, coach_id:myCoachId, session_notes:document.getElementById('nf-notes').value||null, educational_materials:document.getElementById('nf-edu').value||null })});
+    await fetch('/api/notes',{method:'PUT',headers:hdr,body:JSON.stringify({ session_id:selectedSession.id, coach_id:myCoachId, session_notes:document.getElementById('nf-notes').value||null, educational_materials:JSON.stringify(eduItems) })});
     // 2) status (marking Completed emails the participant a summary)
     await fetch('/api/sessions',{method:'PATCH',headers:hdr,body:JSON.stringify({id:selectedSession.id,status})});
     const idx=sessions.findIndex(s=>s.id===selectedSession.id);
