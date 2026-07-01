@@ -102,8 +102,31 @@
     </div>
 
     <div id="notfound" style="display:none;" class="card"><div class="empty">This registration link is not valid or the event was not found.</div></div>
+
+    <!-- Terminal view shown after an ineligible registrant acknowledges -->
+    <div id="exited" style="display:none;text-align:center;padding:50px 20px;">
+      <div style="font-size:3rem;margin-bottom:10px;">🚫</div>
+      <h2 style="color:#991b1b;margin:0 0 10px;">Registration Not Completed</h2>
+      <p style="color:var(--gray-600);max-width:440px;margin:0 auto;line-height:1.6;">You are not currently eligible to register for this screening. Please contact your HR department for assistance.</p>
+    </div>
   </div>
 </main>
+
+<!-- Eligibility result modal -->
+<div id="elig-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:14px;max-width:440px;width:100%;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.28);">
+    <div style="background:#991b1b;color:#fff;padding:16px 22px;font-weight:700;font-size:1.05rem;display:flex;align-items:center;gap:10px;"><span style="font-size:1.3rem;">⚠️</span> Not Currently Eligible</div>
+    <div style="padding:26px 24px 8px;text-align:center;">
+      <div style="font-size:2.6rem;margin-bottom:10px;">🚫</div>
+      <p style="font-size:1.02rem;line-height:1.6;color:#374151;margin:0 0 8px;">You are <strong>not currently eligible</strong> to register for this screening.</p>
+      <p style="font-size:.96rem;line-height:1.6;color:#374151;margin:0;">Please contact your <strong>HR department</strong> for assistance.</p>
+      <div id="elig-reason" style="font-size:.82rem;color:var(--gray-400);margin-top:10px;"></div>
+    </div>
+    <div style="padding:18px 24px 24px;text-align:center;">
+      <button class="btn btn-primary" style="min-width:130px;" onclick="exitRegistration()">OK</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <script>
 let STEPS=[['location','Location'],['datetime','Date & Time'],['details','Details'],['forms','Forms'],['confirm','Confirm']];
@@ -226,16 +249,24 @@ async function afterDetails(){
         body:JSON.stringify({slug, first_name:first, last_name:last, date_of_birth:dob, gender})}).then(r=>r.json());
       btn.disabled=false; btn.textContent=prev;
       if(res.eligible){
-        alert('You are eligible to register.');
+        showToast('✓ You are eligible to register.');
       } else {
-        alert('You are not currently eligible to register.\n\nPlease contact HR.'+(res.reason?'\n\n'+res.reason:''));
+        document.getElementById('elig-reason').textContent = res.reason || '';
+        document.getElementById('elig-modal').style.display='flex';
         return;   // stop the registration process
       }
-    }catch(e){ btn.disabled=false; btn.textContent=prev; alert('We could not verify your eligibility right now. Please try again in a moment.'); return; }
+    }catch(e){ btn.disabled=false; btn.textContent=prev; showToast('We could not verify your eligibility right now. Please try again.'); return; }
   }
 
   if(hasForms()){ renderForms(); goStep('forms'); }
   else { renderReview(); goStep('confirm'); }   // no forms → straight to review
+}
+// Ineligible registrant acknowledged → close the wizard and show a terminal message.
+function exitRegistration(){
+  document.getElementById('elig-modal').style.display='none';
+  document.getElementById('wizard').style.display='none';
+  document.getElementById('exited').style.display='';
+  window.scrollTo(0,0);
 }
 
 // ── Forms ──
