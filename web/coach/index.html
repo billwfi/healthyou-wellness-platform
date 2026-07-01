@@ -247,6 +247,7 @@ async function loadMonth(){
   try{
     sessions=await apiGet(`/api/sessions?coach_id=${coach.coach_id}&from=${from}&to=${to}`);
     if(!Array.isArray(sessions)) sessions=[];
+    sessions=sessions.filter(s=>s.status!=='cancelled');   // cancelled appts are hidden from the calendar
     renderCalendar();
   }catch(e){ if(e.message!=='Session expired') document.getElementById('cal-grid').innerHTML='<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--red);">Failed to load appointments.</div>'; }
 }
