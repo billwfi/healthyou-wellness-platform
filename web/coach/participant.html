@@ -58,8 +58,6 @@
     .bio-list-item { display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--gray-100);cursor:pointer; }
     .bio-list-item:last-child { border-bottom:none; }
     .bio-list-item:hover { background:var(--gray-50); }
-    #bio-report { display:none;position:fixed;inset:0;background:#fff;z-index:2000;overflow:auto;padding:24px; }
-    .rep-toolbar { max-width:720px;margin:0 auto 18px;display:flex;justify-content:space-between;gap:10px; }
     .rep-wrap { max-width:720px;margin:0 auto; }
     .rep-h2 { font-size:1rem;border-bottom:2px solid var(--teal);padding-bottom:4px;margin:0 0 14px;color:var(--teal); }
     .rep-metric { margin-bottom:14px; }
@@ -68,7 +66,6 @@
     .rep-fill { height:100%;border-radius:99px; }
     .rep-knob { position:absolute;top:-3px;width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid #0d9488;transform:translateX(-50%); }
     .rep-range { font-size:.72rem;color:var(--gray-400);margin-top:4px; }
-    @media print { body>*:not(#bio-report){display:none!important;} #bio-report{position:static;padding:0;display:block!important;} .no-print{display:none!important;} }
   </style>
 </head>
 <body>
@@ -180,9 +177,6 @@
     </div>
   </div>
 </main>
-
-<!-- Printable biometric report overlay -->
-<div id="bio-report"></div>
 
 <!-- Next Session Modal -->
 <div id="session-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'session-modal')">
@@ -498,27 +492,45 @@ function renderBiometrics() {
   if(!bio||!bio.length){ host.innerHTML='<div class="empty">No biometric data on file.</div>'; return; }
   host.innerHTML=`<div class="card" style="padding:0;overflow:hidden;">
     <div style="padding:14px 16px;font-weight:600;font-size:.9rem;border-bottom:1px solid var(--gray-100);">Completed Biometric Screenings (${bio.length})</div>
-    ${bio.map((b,i)=>`<div class="bio-list-item" onclick="openBioReport(${i})">
-      <div>
-        <div style="font-weight:600;font-size:.88rem;">${fmtDate(b.screened_at)}</div>
-        <div style="font-size:.76rem;color:var(--gray-400);">${[b.weight_lbs?b.weight_lbs+' lbs':'',b.bmi?'BMI '+Number(b.bmi).toFixed(1):'',b.systolic_bp?'BP '+b.systolic_bp+'/'+b.diastolic_bp:''].filter(Boolean).join(' · ')||'Screening'}</div>
+    ${bio.map((b,i)=>`<div class="bio-acc">
+      <div class="bio-list-item" onclick="toggleBioReport(${i},this)">
+        <div>
+          <div style="font-weight:600;font-size:.88rem;">${fmtDate(b.screened_at)}</div>
+          <div style="font-size:.76rem;color:var(--gray-400);">${[b.weight_lbs?b.weight_lbs+' lbs':'',b.bmi?'BMI '+Number(b.bmi).toFixed(1):'',b.systolic_bp?'BP '+b.systolic_bp+'/'+b.diastolic_bp:''].filter(Boolean).join(' · ')||'Screening'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          ${b.overall_risk?`<span class="badge badge-${b.overall_risk}">${esc(b.overall_risk)}</span>`:''}
+          <span class="bio-toggle" style="color:var(--teal);font-weight:600;font-size:.82rem;">Open &darr;</span>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        ${b.overall_risk?`<span class="badge badge-${b.overall_risk}">${esc(b.overall_risk)}</span>`:''}
-        <span style="color:var(--teal);font-weight:600;font-size:.82rem;">Open &rarr;</span>
-      </div>
+      <div class="bio-acc-body" id="bio-body-${i}" style="display:none;padding:4px 16px 18px;"></div>
     </div>`).join('')}
   </div>`;
 }
 
-// ── Full biometric report (printable / save to PDF) ───────────────────────────
-function openBioReport(i){
-  const b=participant.biometrics[i]; if(!b) return;
-  const el=document.getElementById('bio-report');
-  el.innerHTML=bioReportHtml(b); el.style.display='block'; window.scrollTo(0,0);
+// ── Full biometric report (expand inline; print opens a clean window) ──────────
+function toggleBioReport(i, head){
+  const body=document.getElementById('bio-body-'+i);
+  const tog=head.querySelector('.bio-toggle');
+  if(body.style.display!=='none'){ body.style.display='none'; body.innerHTML=''; if(tog) tog.innerHTML='Open &darr;'; return; }
+  body.innerHTML=`<div style="text-align:right;margin:4px 0 8px;"><button class="btn btn-ghost btn-sm" onclick="printBioReport(${i})">Print / Save PDF</button></div>`+bioReportHtml(participant.biometrics[i]);
+  body.style.display='block'; if(tog) tog.innerHTML='Close &uarr;';
 }
-function closeBioReport(){ document.getElementById('bio-report').style.display='none'; }
-function printBioReport(){ window.print(); }
+function printBioReport(i){
+  const b=participant.biometrics[i]; if(!b) return;
+  const w=window.open('','_blank','width=820,height=920'); if(!w){ showToast('Please allow pop-ups to print.'); return; }
+  w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Biometric Screening Report</title><style>'+REP_CSS+'</style></head><body>'+bioReportHtml(b)+'</body></html>');
+  w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print(); }catch(e){} }, 400);
+}
+const REP_CSS=`body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#1f2937;margin:0;padding:24px;}
+.rep-wrap{max-width:720px;margin:0 auto;}
+.rep-h2{font-size:1rem;border-bottom:2px solid #0d9488;padding-bottom:4px;margin:18px 0 14px;color:#0d9488;}
+.rep-metric{margin-bottom:14px;}.rep-metric-head{display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:6px;}
+.rep-bar{position:relative;height:8px;background:#eef2f5;border-radius:99px;}.rep-fill{height:100%;border-radius:99px;}
+.rep-knob{position:absolute;top:-3px;width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid #0d9488;transform:translateX(-50%);}
+.rep-range{font-size:.72rem;color:#9ca3af;margin-top:4px;}
+.badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.78rem;font-weight:600;background:#e6f5f3;color:#0f766e;}
+img{max-height:40px;}`;
 function repBar(value,min,max,riskCls){
   if(value==null||value===''||isNaN(Number(value))) return '<div class="rep-bar"></div>';
   const pct=Math.max(2,Math.min(98,((Number(value)-min)/(max-min))*100));
@@ -571,10 +583,6 @@ function bioReportHtml(b){
     repLife('Quality sleep',b.sleep_hours,'hrs',0,9),
   ].filter(Boolean).join('');
   return `
-    <div class="rep-toolbar no-print">
-      <button class="btn btn-ghost" onclick="closeBioReport()">&larr; Back</button>
-      <button class="btn btn-primary" onclick="printBioReport()">Print / Save PDF</button>
-    </div>
     <div class="rep-wrap">
       <div style="text-align:center;margin-bottom:22px;">
         <img src="/assets/img/hylogo.png" alt="HealthYou" style="height:40px;">
