@@ -76,7 +76,6 @@
           <div class="form-group">
             <label>Waist-to-Height Ratio <span style="font-size:.75rem;color:var(--teal);">(auto-calculated)</span></label>
             <input id="f-whr" type="text" readonly placeholder="—" style="background:var(--gray-100);cursor:default;"/>
-            <span id="f-whr-cat" style="font-size:.75rem;margin-top:2px;"></span>
           </div>
         </div>
         <div id="bmi-preview" class="result-preview">
@@ -446,16 +445,9 @@ function calcBmi() {
 function calcWhr() {
   const w=parseFloat(document.getElementById('f-waist').value);
   const h=parseFloat(document.getElementById('f-height').value);
-  const out=document.getElementById('f-whr'), cat=document.getElementById('f-whr-cat');
-  if(w>0 && h>0){
-    const ratio=w/h;
-    out.value=ratio.toFixed(2);
-    let label,color;
-    if(ratio<0.5){ label='Ideal'; color='var(--green)'; }
-    else if(ratio<0.6){ label='Borderline'; color='var(--amber)'; }
-    else { label='High'; color='var(--red)'; }
-    cat.innerHTML=`<span style="color:${color};font-weight:600;">${label}</span>`;
-  } else { out.value=''; cat.innerHTML=''; }
+  const out=document.getElementById('f-whr');
+  // Category/ranges are shown on the review page, not during entry.
+  out.value=(w>0 && h>0) ? (w/h).toFixed(2) : '';
 }
 
 function checkBp() {
