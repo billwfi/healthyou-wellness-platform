@@ -32,11 +32,11 @@ exports.handler = async (event, context) => {
   if (event.httpMethod === 'POST') {
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return badRequest('Invalid JSON'); }
     const { coach_id, group_id, first_name, last_name, email, phone, date_of_birth, gender,
-            scheduled_at, duration_minutes, intake_notes, org_slug } = b;
+            scheduled_at, duration_minutes, intake_notes, org_slug, booking_detail_id } = b;
     if (!first_name || !last_name || !email || !scheduled_at)
       return badRequest('first_name, last_name, email, and scheduled_at are required');
     if (!group_id && !coach_id) return badRequest('group_id or coach_id required');
-    const dur = duration_minutes || 30;
+    let dur = duration_minutes || 30;
     const date = scheduled_at.slice(0, 10);
     const time = scheduled_at.slice(11, 16);   // HH:MM
 
@@ -47,6 +47,14 @@ exports.handler = async (event, context) => {
         const { rows } = await db.query('SELECT id FROM iStrata.dbo.is_groups WHERE GroupId=$1', [org_slug]);
         if (rows.length) org_id = rows[0].id;
       }
+
+      // Booking Detail (config) drives duration + email support info + cancel policy.
+      let detail = null;
+      if (booking_detail_id) {
+        const d = await db.query('SELECT session_minutes, cancel_cutoff_hours, support_phone, support_email FROM booking_details WHERE id=$1', [booking_detail_id]);
+        detail = d.rows[0] || null;
+      }
+      if (detail) dur = detail.session_minutes;
 
       // Pick the coach: a specific one (verify still open) or, for "Anyone", a
       // random coach in the group who is free at this slot.
@@ -89,9 +97,9 @@ exports.handler = async (event, context) => {
       const manageToken = crypto.randomBytes(24).toString('hex');
       const { rows: sessionRows } = await db.query(
         `INSERT INTO coaching_sessions
-           (participant_id, coach_id, group_id, scheduled_at, duration_minutes, session_type, intake_notes, manage_token)
-         OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,'initial',$6,$7)`,
-        [participant_id, chosenCoachId, org_id, scheduled_at, dur, intake_notes || null, manageToken]
+           (participant_id, coach_id, group_id, scheduled_at, duration_minutes, session_type, intake_notes, manage_token, booking_detail_id)
+         OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,'initial',$6,$7,$8)`,
+        [participant_id, chosenCoachId, org_id, scheduled_at, dur, intake_notes || null, manageToken, booking_detail_id || null]
       );
 
       // Send confirmation email — booking succeeds even if email fails
@@ -102,6 +110,9 @@ exports.handler = async (event, context) => {
           firstName: first_name.trim(), lastName: last_name.trim(),
           coachName, phone: phone || null, scheduledAt: scheduled_at, durationMinutes: dur,
           manageUrl: `${baseUrl(event)}/book/?manage=${manageToken}`,
+          cutoffHours: detail ? detail.cancel_cutoff_hours : 48,
+          supportPhone: detail ? detail.support_phone : '719-314-3535',
+          supportEmail: detail ? detail.support_email : 'support@myhealthyou.com',
         });
       } catch (err) { emailError = err.message; console.error('Confirmation email failed:', err.message); }
 

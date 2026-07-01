@@ -815,3 +815,32 @@ GO
 -- Public cancel/reschedule link token for coaching sessions (emailed to bookers).
 IF COL_LENGTH('dbo.coaching_sessions','manage_token') IS NULL ALTER TABLE dbo.coaching_sessions ADD manage_token NVARCHAR(64) NULL;
 GO
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- Booking Details — admin-configurable booking configurations (Admin > Booking
+-- Setup). Each has its own settings + a booking link (/book/?b=slug) + QR code,
+-- and may optionally target a Group. One row is the default.
+-- ════════════════════════════════════════════════════════════════════════════
+IF OBJECT_ID('dbo.booking_details','U') IS NULL
+CREATE TABLE dbo.booking_details (
+  id                  INT IDENTITY(1,1) PRIMARY KEY,
+  name                NVARCHAR(255) NOT NULL,
+  slug                NVARCHAR(100) NOT NULL UNIQUE,
+  session_minutes     INT DEFAULT 30,
+  cancel_cutoff_hours INT DEFAULT 48,
+  booking_window_days INT DEFAULT 90,
+  support_phone       NVARCHAR(50),
+  support_email       NVARCHAR(255),
+  policy_text         NVARCHAR(MAX),
+  insurance_text      NVARCHAR(MAX),
+  group_id            INT NULL,          -- optional iStrata is_groups.id
+  is_default          BIT DEFAULT 0,
+  active              BIT DEFAULT 1,
+  created_at          DATETIME2(3) DEFAULT SYSUTCDATETIME(),
+  updated_at          DATETIME2(3) DEFAULT SYSUTCDATETIME()
+);
+GO
+-- The coaching session records which Booking Detail it was booked under (for
+-- cancel-cutoff + duration enforcement).
+IF COL_LENGTH('dbo.coaching_sessions','booking_detail_id') IS NULL ALTER TABLE dbo.coaching_sessions ADD booking_detail_id INT NULL;
+GO

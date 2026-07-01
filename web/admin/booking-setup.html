@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Booking Setup — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="/assets/auth.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo-white.png" alt="Healthyou"></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <span style="font-size:.75rem;opacity:.6;padding:2px 8px;border:1px solid rgba(255,255,255,.4);border-radius:99px;">Admin</span>
+    <button class="btn btn-ghost btn-sm" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.6);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <a href="/admin/groups.html" class="sidebar-item">Groups</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <a href="/admin/eligibility-search.html" class="sidebar-item">Eligibility Search</a>
+    <a href="/admin/booking-setup.html" class="sidebar-item active">Booking Setup</a>
+    <div class="sidebar-section" style="margin-top:12px;">Event Management</div>
+    <a href="/admin/events.html" class="sidebar-item">Events</a>
+    <a href="/admin/calendar.html" class="sidebar-item">Calendar</a>
+    <a href="/admin/appointment-search.html" class="sidebar-item">Appointment Search</a>
+    <a href="/admin/forms.html" class="sidebar-item">Forms</a>
+    <a href="/admin/emails.html" class="sidebar-item">Email Templates</a>
+    <div class="sidebar-section" style="margin-top:12px;">Wellness Portal</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+    <a href="/admin/umbraco.html" class="sidebar-item">Umbraco</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/users.html" class="sidebar-item">User Management</a>
+    <a href="/admin/release-notes.html" class="sidebar-item">Release Notes</a>
+    <div class="sidebar-section" style="margin-top:12px;">Portals</div>
+    <a href="/coach/" class="sidebar-item">Coach Portal →</a>
+    <a href="/screener/" class="sidebar-item">Screener Portal →</a>
+    <a href="/book/" class="sidebar-item">Booking Page →</a>
+  </nav>
+</aside>
+<main class="container has-sidebar">
+  <div id="login-wall" class="login-wall"><h2>Admin Portal</h2><p>Sign in to continue.</p><button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button></div>
+  <div id="content" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h1 class="page-title" style="margin-bottom:2px;">Booking Setup</h1>
+        <p style="color:var(--gray-400);font-size:.88rem;">Configure coaching-booking settings. Each Booking Detail has its own link and QR code.</p>
+      </div>
+      <button class="btn btn-primary" onclick="openModal()">+ New Booking Detail</button>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Group</th><th>Session</th><th>Cancel</th><th>Window</th><th>Booking Link</th><th style="width:170px;">Actions</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- Add/Edit modal -->
+<div id="modal-backdrop" class="modal-backdrop" style="display:none;" onclick="closeOuter(event)">
+  <div class="modal modal-lg">
+    <div class="modal-title" id="modal-title">New Booking Detail</div>
+    <div class="form-grid cols-2">
+      <div class="form-group"><label>Name *</label><input id="f-name" type="text" placeholder="e.g. City of Colorado Springs"/></div>
+      <div class="form-group"><label>Tied Group <span style="color:var(--gray-400);font-weight:400;">(optional)</span></label>
+        <select id="f-group"><option value="">— None (eligibility decides) —</option></select>
+      </div>
+      <div class="form-group"><label>Session length (minutes)</label><input id="f-session" type="number" min="5" max="240" step="5" value="30"/></div>
+      <div class="form-group"><label>Cancellation cutoff (hours)</label><input id="f-cutoff" type="number" min="0" max="720" value="48"/></div>
+      <div class="form-group"><label>Booking window (days out)</label><input id="f-window" type="number" min="1" max="365" value="90"/></div>
+      <div class="form-group"></div>
+      <div class="form-group"><label>Support phone</label><input id="f-phone" type="text" placeholder="719-314-3535"/></div>
+      <div class="form-group"><label>Support email</label><input id="f-email" type="email" placeholder="support@myhealthyou.com"/></div>
+    </div>
+    <div class="form-group"><label>Cancellation policy text (Step 2 checkbox)</label>
+      <textarea id="f-policy" rows="2" placeholder="HealthYou requires a 24 hour notice to cancel or reschedule an appointment. Call 719-314-3535 for assistance."></textarea>
+    </div>
+    <div class="form-group"><label>Insurance-card message (Step 1)</label>
+      <textarea id="f-insurance" rows="2" placeholder="Please enter the information below as it appears on your insurance card."></textarea>
+    </div>
+    <div style="display:flex;gap:24px;margin-top:6px;flex-wrap:wrap;">
+      <label style="display:flex;gap:8px;align-items:center;font-weight:400;"><input type="checkbox" id="f-default" style="width:auto;"> Default booking detail</label>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:400;"><input type="checkbox" id="f-active" style="width:auto;" checked> Active</label>
+    </div>
+    <div id="modal-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="save-btn" onclick="save()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- QR modal -->
+<div id="qr-backdrop" class="modal-backdrop" style="display:none;" onclick="if(event.target===this)this.style.display='none';">
+  <div class="modal" style="max-width:340px;text-align:center;">
+    <div class="modal-title" id="qr-title">Booking QR Code</div>
+    <div id="qr-box" style="display:flex;justify-content:center;padding:10px 0 14px;"></div>
+    <div id="qr-link" style="font-size:.8rem;color:var(--gray-500);word-break:break-all;margin-bottom:14px;"></div>
+    <div class="modal-footer" style="justify-content:center;">
+      <button class="btn btn-ghost" onclick="document.getElementById('qr-backdrop').style.display='none'">Close</button>
+      <button class="btn btn-primary" onclick="downloadQr()">Download PNG</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, details=[], groups=[], editId=null, qrName='';
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} else { location.href='/admin/login.html'; } });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ location.href='/admin/login.html'; });
+
+async function getToken(force){ try{ const u=netlifyIdentity.currentUser(); if(u){ const t=await u.jwt(force===true); if(t){ authToken=t; return t; } } }catch(e){} return authToken; }
+async function apiFetch(url, opts){
+  opts=opts||{}; const base=opts.headers||{};
+  let r=await fetch(url, Object.assign({}, opts, { headers: Object.assign({ Authorization:'Bearer '+(await getToken()) }, base) }));
+  if(r.status===401){ showToast('Session expired — sign in again'); setTimeout(()=>location.href='/admin/login.html',1200); }
+  return r;
+}
+async function boot(user){
+  document.getElementById('login-wall').style.display='none';
+  document.getElementById('content').style.display='';
+  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+  loadGroups(); load();
+}
+async function loadGroups(){
+  try{ const g=await apiFetch('/api/groups').then(r=>r.json()); groups=Array.isArray(g)?g.filter(x=>x.name):[]; }catch(e){ groups=[]; }
+  document.getElementById('f-group').innerHTML='<option value="">— None (eligibility decides) —</option>'+groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('');
+}
+async function load(){
+  try{
+    const r=await apiFetch('/api/booking-details'); const data=await r.json();
+    if(!r.ok) throw new Error(data.error||'Failed to load');
+    details=Array.isArray(data)?data:[];
+    render();
+  }catch(e){ document.getElementById('tbody').innerHTML='<tr><td colspan="7" class="empty">'+esc(e.message)+'</td></tr>'; }
+}
+function bookingUrl(d){ return location.origin+'/book/?b='+encodeURIComponent(d.slug); }
+function render(){
+  const tb=document.getElementById('tbody');
+  if(!details.length){ tb.innerHTML='<tr><td colspan="7" class="empty">No booking details yet.</td></tr>'; return; }
+  tb.innerHTML=details.map(d=>`<tr>
+    <td><strong>${esc(d.name)}</strong>${d.is_default?' <span class="badge badge-active">Default</span>':''}${d.active?'':' <span class="badge badge-inactive">Inactive</span>'}</td>
+    <td>${d.group_name?esc(d.group_name):'<span style="color:var(--gray-400);">—</span>'}</td>
+    <td>${d.session_minutes} min</td>
+    <td>${d.cancel_cutoff_hours} h</td>
+    <td>${d.booking_window_days} d</td>
+    <td style="font-size:.78rem;"><a href="${bookingUrl(d)}" target="_blank" style="color:var(--teal);">/book/?b=${esc(d.slug)}</a></td>
+    <td><div class="actions">
+      <button class="btn btn-ghost btn-sm" onclick="showQr(${d.id})">QR</button>
+      <button class="btn btn-ghost btn-sm" onclick="openModal(${d.id})">Edit</button>
+      <button class="btn btn-ghost btn-sm" style="color:#b91c1c;" onclick="del(${d.id})">Delete</button>
+    </div></td>
+  </tr>`).join('');
+}
+function openModal(id){
+  editId=id||null;
+  document.getElementById('modal-title').textContent=id?'Edit Booking Detail':'New Booking Detail';
+  document.getElementById('save-btn').textContent=id?'Save Changes':'Create';
+  document.getElementById('modal-err').style.display='none';
+  const d=id?details.find(x=>x.id===id):null;
+  document.getElementById('f-name').value=d?.name||'';
+  document.getElementById('f-group').value=d?.group_id||'';
+  document.getElementById('f-session').value=d?.session_minutes??30;
+  document.getElementById('f-cutoff').value=d?.cancel_cutoff_hours??48;
+  document.getElementById('f-window').value=d?.booking_window_days??90;
+  document.getElementById('f-phone').value=d?.support_phone||'';
+  document.getElementById('f-email').value=d?.support_email||'';
+  document.getElementById('f-policy').value=d?.policy_text||'';
+  document.getElementById('f-insurance').value=d?.insurance_text||'';
+  document.getElementById('f-default').checked=!!d?.is_default;
+  document.getElementById('f-active').checked=d?!!d.active:true;
+  document.getElementById('modal-backdrop').style.display='flex';
+}
+function closeModal(){ document.getElementById('modal-backdrop').style.display='none'; }
+function closeOuter(e){ if(e.target===document.getElementById('modal-backdrop')) closeModal(); }
+async function save(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){ showErr('Name is required.'); return; }
+  const body={ name,
+    group_id:document.getElementById('f-group').value||null,
+    session_minutes:document.getElementById('f-session').value,
+    cancel_cutoff_hours:document.getElementById('f-cutoff').value,
+    booking_window_days:document.getElementById('f-window').value,
+    support_phone:document.getElementById('f-phone').value.trim()||null,
+    support_email:document.getElementById('f-email').value.trim()||null,
+    policy_text:document.getElementById('f-policy').value,
+    insurance_text:document.getElementById('f-insurance').value,
+    is_default:document.getElementById('f-default').checked,
+    active:document.getElementById('f-active').checked };
+  if(editId) body.id=editId;
+  const btn=document.getElementById('save-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try{
+    const r=await apiFetch('/api/booking-details',{method:editId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok){ const j=await r.json().catch(()=>({})); showErr(j.error||'Save failed'); return; }
+    closeModal(); showToast(editId?'Saved':'Created'); load();
+  }catch(e){ showErr('Error: '+e.message); }
+  finally{ btn.disabled=false; btn.textContent=editId?'Save Changes':'Create'; }
+}
+async function del(id){
+  const d=details.find(x=>x.id===id); if(!d) return;
+  if(!confirm('Delete "'+(d.name||'')+'"?')) return;
+  try{ const r=await apiFetch('/api/booking-details?id='+id,{method:'DELETE'}); if(!r.ok) throw new Error('Delete failed'); showToast('Deleted'); load(); }
+  catch(e){ showToast('Error: '+e.message); }
+}
+// ── QR ────────────────────────────────────────────────────────────────────────
+function showQr(id){
+  const d=details.find(x=>x.id===id); if(!d) return;
+  qrName=d.name||'booking';
+  const url=bookingUrl(d);
+  document.getElementById('qr-title').textContent='QR — '+d.name;
+  document.getElementById('qr-link').textContent=url;
+  const box=document.getElementById('qr-box'); box.innerHTML='';
+  new QRCode(box, { text:url, width:220, height:220, correctLevel:QRCode.CorrectLevel.M });
+  document.getElementById('qr-backdrop').style.display='flex';
+}
+function downloadQr(){
+  const cv=document.querySelector('#qr-box canvas');
+  const img=document.querySelector('#qr-box img');
+  const dataUrl = cv ? cv.toDataURL('image/png') : (img?img.src:null);
+  if(!dataUrl) return;
+  const a=document.createElement('a'); a.href=dataUrl; a.download='booking-qr-'+qrName.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.png'; a.click();
+}
+function showErr(m){ const e=document.getElementById('modal-err'); e.textContent=m; e.style.display=''; }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s==null?'':s.toString()).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>

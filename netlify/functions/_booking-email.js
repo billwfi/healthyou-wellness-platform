@@ -1,7 +1,8 @@
 // Coaching-session confirmation email (shared by book.js and manage-session.js).
 const { sendEmail, mailEnabled } = require('./_mailer');
 
-async function sendConfirmation({ to, firstName, lastName, coachName, phone, scheduledAt, durationMinutes, manageUrl, subject }) {
+async function sendConfirmation({ to, firstName, lastName, coachName, phone, scheduledAt, durationMinutes, manageUrl, subject,
+                                  cutoffHours = 48, supportPhone = '719-314-3535', supportEmail = 'support@myhealthyou.com' }) {
   if (!mailEnabled()) return; // silently skip if no transport configured
   const dt = new Date(scheduledAt);
   const dateStr = dt.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -9,11 +10,11 @@ async function sendConfirmation({ to, firstName, lastName, coachName, phone, sch
   await sendEmail({
     to,
     subject: subject || `Your coaching session is confirmed — ${dateStr}`,
-    html: buildEmailHtml({ firstName, lastName, coachName, phone, dateStr, timeStr, durationMinutes, manageUrl }),
+    html: buildEmailHtml({ firstName, lastName, coachName, phone, dateStr, timeStr, durationMinutes, manageUrl, cutoffHours, supportPhone, supportEmail }),
   });
 }
 
-function buildEmailHtml({ firstName, lastName, coachName, phone, dateStr, timeStr, durationMinutes, manageUrl }) {
+function buildEmailHtml({ firstName, lastName, coachName, phone, dateStr, timeStr, durationMinutes, manageUrl, cutoffHours = 48, supportPhone = '719-314-3535', supportEmail = 'support@myhealthyou.com' }) {
   const row = (label, value) => `
     <tr>
       <td style="padding:12px 0;font-size:13px;color:#9ca3af;font-weight:500;width:90px;vertical-align:top;border-bottom:1px solid #f3f4f6;">${label}</td>
@@ -24,7 +25,7 @@ function buildEmailHtml({ firstName, lastName, coachName, phone, dateStr, timeSt
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:26px;">
             <tr><td align="center">
               <a href="${manageUrl}" style="display:inline-block;background:#0d9488;color:#fff;font-size:14px;font-weight:600;padding:12px 30px;border-radius:8px;text-decoration:none;">Reschedule or Cancel</a>
-              <p style="margin:12px 0 0;font-size:12px;color:#9ca3af;line-height:1.5;">You can reschedule or cancel up to 48 hours before your appointment.<br>Within 48 hours, please call 719-314-3535.</p>
+              <p style="margin:12px 0 0;font-size:12px;color:#9ca3af;line-height:1.5;">You can reschedule or cancel up to ${cutoffHours} hours before your appointment.<br>Within ${cutoffHours} hours, please call ${supportPhone}.</p>
             </td></tr>
           </table>` : '';
 
@@ -71,8 +72,8 @@ function buildEmailHtml({ firstName, lastName, coachName, phone, dateStr, timeSt
           <p style="margin:16px 0 0;font-size:13px;color:#6b7280;line-height:1.6;">
             <strong style="color:#374151;">Have Questions?</strong><br>
             Reach out to HealthYou Support at
-            <a href="mailto:support@myhealthyou.com" style="color:#0d9488;">support@myhealthyou.com</a>
-            or <a href="tel:+17193143535" style="color:#0d9488;">719-314-3535</a>.
+            <a href="mailto:${supportEmail}" style="color:#0d9488;">${supportEmail}</a>
+            or <a href="tel:${(supportPhone || '').replace(/[^0-9+]/g, '')}" style="color:#0d9488;">${supportPhone}</a>.
           </p>
         </td>
       </tr>

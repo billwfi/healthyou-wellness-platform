@@ -275,14 +275,29 @@ function setLang(l){ lang=l; applyLang();
 let details={}, groups=[], selectedGroup=null, groupCoaches=[], allCoaches=[], LINA_ID=null;
 let selectedCoachId=null, calYear, calMonth, avDows=new Set(), selectedDate=null, selectedSlot=null, lastCoachName='';
 let mode='book', manageToken=null, manageInfo=null;
-const MAX_DAYS=90;
+let MAX_DAYS=90, CONFIG=null;
 
 async function init(){
+  const params=new URLSearchParams(location.search);
+  // Load the Booking Detail config (by ?b=slug, else the default).
+  try{
+    const slug=params.get('b')||'';
+    const c=await fetch('/api/booking-details?slug='+encodeURIComponent(slug)).then(r=>r.json());
+    if(c && !c.error && c.id){ CONFIG=c; applyConfig(c); }
+  }catch{}
   applyLang();
   try{ allCoaches=await fetch('/api/coaches').then(r=>r.json()); const l=(allCoaches||[]).find(c=>/lina\s+sierra/i.test(c.name||'')); LINA_ID=l?l.id:null; }catch{}
-  const mt=new URLSearchParams(location.search).get('manage');
+  const mt=params.get('manage');
   if(mt){ mode='reschedule'; manageToken=mt; document.getElementById('step-bar').style.display='none'; enterManage(); }
 }
+function applyConfig(c){
+  if(c.booking_window_days) MAX_DAYS=c.booking_window_days;
+  if(c.insurance_text) STR.insuranceMsg.en=c.insurance_text;
+  if(c.policy_text) STR.noticeCheckbox.en=c.policy_text;
+  const n=c.session_minutes||30;
+  STR.minutes={en:n+' minutes', es:n+' minutos'};
+}
+function slotDuration(){ return (CONFIG&&CONFIG.session_minutes) || (manageInfo&&(manageInfo.session_minutes||manageInfo.duration_minutes)) || 30; }
 
 // ── Step 1 ────────────────────────────────────────────────────────────────────
 async function checkEligibility(){
@@ -298,6 +313,8 @@ async function checkEligibility(){
     btn.disabled=false; btn.textContent=lbl;
     if(!res.eligible||!res.groups||!res.groups.length){ document.getElementById('elig-modal').style.display='flex'; return; }
     groups=res.groups;
+    // If this booking detail is tied to a group the person is eligible in, use it.
+    if(CONFIG && CONFIG.group_id){ const g=groups.find(x=>String(x.id)===String(CONFIG.group_id)); if(g){ selectedGroup=g; enterStep2(); return; } }
     if(groups.length===1){ selectedGroup=groups[0]; enterStep2(); }
     else { renderGroupOptions(); document.getElementById('details-form').style.display='none'; document.getElementById('group-select').style.display=''; }
   }catch(e){ btn.disabled=false; btn.textContent=lbl; err('elig-err',t('checkFail')); }
@@ -375,7 +392,7 @@ async function selectDate(ds){
   hint.style.display='none'; sg.innerHTML=`<p style="color:var(--gray-400);">${esc(t('loading'))}</p>`;
   const q = selectedCoachId ? `coach_id=${selectedCoachId}` : `group_id=${selectedGroup.id}`;
   try{
-    const slots=await fetch(`/api/available-slots?${q}&date=${ds}`).then(r=>r.json());
+    const slots=await fetch(`/api/available-slots?${q}&date=${ds}&duration=${slotDuration()}`).then(r=>r.json());
     if(!Array.isArray(slots)||!slots.length){ sg.innerHTML=`<p style="color:var(--gray-600);grid-column:1/-1;">${esc(t('noTimes'))}</p>`; return; }
     sg.innerHTML=slots.map(s=>`<div class="slot-btn" onclick="selectSlot('${s}')">${fmtTime(s)}</div>`).join('');
   }catch(e){ sg.innerHTML='<p style="color:var(--red);grid-column:1/-1;">Error</p>'; }
@@ -404,9 +421,10 @@ async function submitBooking(){
   try{
     const res=await fetch('/api/book',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({ group_id:selectedGroup.id, coach_id:selectedCoachId||null,
+        booking_detail_id:CONFIG?CONFIG.id:null,
         first_name:details.first_name, last_name:details.last_name, email:details.email,
         phone:details.phone||null, date_of_birth:details.date_of_birth, gender:details.gender,
-        scheduled_at:`${selectedDate}T${selectedSlot}:00`, duration_minutes:30, intake_notes:v('b-notes')||null })});
+        scheduled_at:`${selectedDate}T${selectedSlot}:00`, duration_minutes:slotDuration(), intake_notes:v('b-notes')||null })});
     const data=await res.json();
     if(!res.ok){ err('book-err',data.error||t('bookFail')); btn.disabled=false; btn.textContent=t('confirmBtn'); return; }
     lastCoachName=data.coach_name||currentCoachLabel();
