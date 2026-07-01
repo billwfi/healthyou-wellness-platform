@@ -64,7 +64,7 @@
       </div>
       <div class="tabs" style="margin-bottom:0;border:none;gap:4px;">
         <button class="tab active" id="tab-calendar" onclick="switchView('calendar',this)">Calendar</button>
-        <button class="tab" id="tab-list" onclick="switchView('list',this)">Caseload</button>
+        <button class="tab" id="tab-list" onclick="switchView('list',this)">List View</button>
         <button class="tab" id="tab-schedule" onclick="switchView('schedule',this)">Schedule</button>
       </div>
     </div>
@@ -86,7 +86,7 @@
 
     <!-- Caseload list view -->
     <div id="view-list" style="display:none;margin-top:16px;">
-      <div class="search-bar" style="max-width:320px;margin-bottom:14px;"><input id="search" type="text" placeholder="Search participants…" oninput="renderList()"/></div>
+      <div class="search-bar" style="max-width:320px;margin-bottom:14px;"><input id="search" type="text" placeholder="Search by name…" oninput="renderList()"/></div>
       <div id="participant-list"></div>
     </div>
 
@@ -326,30 +326,38 @@ function switchView(view,el){
   document.getElementById('view-calendar').style.display=view==='calendar'?'':'none';
   document.getElementById('view-list').style.display=view==='list'?'':'none';
   document.getElementById('view-schedule').style.display=view==='schedule'?'':'none';
-  if(view==='list' && !listLoaded){ loadCaseload(); }
+  if(view==='list' && !listLoaded){ loadList(); }
   if(view==='schedule' && !scheduleLoaded){ loadSchedule(); }
 }
-async function loadCaseload(){
+let allSessions=[];
+async function loadList(){
   listLoaded=true;
   document.getElementById('participant-list').innerHTML='<div class="empty">Loading…</div>';
   try{
-    participants=await apiGet(`/api/participants?coach_id=${coach.coach_id}`);
-    if(!Array.isArray(participants)) participants=[];
+    allSessions=await apiGet(`/api/sessions?coach_id=${coach.coach_id}`);
+    if(!Array.isArray(allSessions)) allSessions=[];
     renderList();
-  }catch(e){ if(e.message!=='Session expired') document.getElementById('participant-list').innerHTML='<div class="empty">Failed to load caseload.</div>'; }
+  }catch(e){ if(e.message!=='Session expired') document.getElementById('participant-list').innerHTML='<div class="empty">Failed to load appointments.</div>'; }
 }
+function fmtDateTime(iso){ return new Date(iso).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric',year:'numeric'})+' · '+apptTime(iso); }
 function renderList(){
   const q=(document.getElementById('search').value||'').toLowerCase();
-  const rows=participants.filter(p=>{ if(!q) return true; return (`${p.first_name} ${p.last_name} ${p.email}`).toLowerCase().includes(q); });
+  const STATUS=[['scheduled','Scheduled'],['completed','Completed'],['no_show','No-Show'],['coach_missed','Coach Missed'],['cancelled','Cancelled']];
+  const rows=allSessions.filter(s=>{ if(!q) return true; return (`${s.first_name||''} ${s.last_name||''}`).toLowerCase().includes(q); });
   const el=document.getElementById('participant-list');
-  if(!rows.length){ el.innerHTML='<div class="empty">No participants found.</div>'; return; }
-  el.innerHTML=rows.map(p=>`<a href="/coach/participant.html?id=${p.id}" class="appt-row" style="display:grid;grid-template-columns:1fr auto;gap:12px;padding:14px 18px;text-decoration:none;color:inherit;">
-      <div>
-        <div style="font-weight:600;font-size:.95rem;">${esc(p.first_name)} ${esc(p.last_name)}</div>
-        <div style="font-size:.82rem;color:var(--gray-400);margin-top:2px;">${esc(p.email)}${p.org_name?' &bull; '+esc(p.org_name):''}</div>
-      </div>
-      <span style="color:var(--gray-400);align-self:center;">&#8250;</span>
-    </a>`).join('');
+  const html=STATUS.map(([st,label])=>{
+    const items=rows.filter(s=>(s.status||'scheduled')===st).sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
+    if(!items.length) return '';
+    return `<div style="margin-bottom:20px;">
+      <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gray-400);margin-bottom:8px;">${label} (${items.length})</div>
+      ${items.map(s=>`<a href="/coach/participant.html?id=${s.participant_id}" class="appt-row" style="display:grid;grid-template-columns:210px 1fr auto;gap:12px;align-items:center;padding:11px 16px;text-decoration:none;color:inherit;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px;">
+        <div style="font-size:.82rem;color:var(--gray-600);">${fmtDateTime(s.scheduled_at)}</div>
+        <div style="font-weight:600;font-size:.9rem;">${esc(s.first_name||'')} ${esc(s.last_name||'')}</div>
+        <span style="color:var(--gray-400);">&#8250;</span>
+      </a>`).join('')}
+    </div>`;
+  }).join('');
+  el.innerHTML=html||'<div class="empty">No appointments.</div>';
 }
 
 // ── Schedule editor ───────────────────────────────────────────────────────────

@@ -651,7 +651,7 @@ async function markAchieved(id) {
 function showGmErr(m){ const e=document.getElementById('gm-err'); e.textContent=m; e.style.display=''; }
 function closeModal(id){ document.getElementById(id).style.display='none'; }
 function closeOuter(e,id){ if(e.target===document.getElementById(id))closeModal(id); }
-function fmtDt(iso){ return new Date(iso).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }
+function fmtDt(iso){ return new Date(iso).toLocaleString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }
 function fmtDate(d){ return d?new Date(d.includes('T')?d:d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''; }
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
