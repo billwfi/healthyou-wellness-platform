@@ -30,10 +30,23 @@
     .goal-dot.paused    { background:var(--amber); }
     .goal-dot.abandoned { background:var(--red); }
     .goal-row { border:1px solid var(--gray-200); border-radius:10px; padding:14px; margin-bottom:12px; background:var(--gray-50); }
-    .smart-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    @media(max-width:640px){ .smart-grid { grid-template-columns:1fr; } }
+    .smart-grid { display:grid; grid-template-columns:1fr; gap:10px; }
     .goal-row textarea { min-height:38px; }
     .smart-lead { display:inline-flex;width:18px;height:18px;border-radius:4px;background:var(--teal);color:#fff;font-size:.7rem;font-weight:700;align-items:center;justify-content:center;margin-right:6px; }
+    .bio-list-item { display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--gray-100);cursor:pointer; }
+    .bio-list-item:last-child { border-bottom:none; }
+    .bio-list-item:hover { background:var(--gray-50); }
+    #bio-report { display:none;position:fixed;inset:0;background:#fff;z-index:2000;overflow:auto;padding:24px; }
+    .rep-toolbar { max-width:720px;margin:0 auto 18px;display:flex;justify-content:space-between;gap:10px; }
+    .rep-wrap { max-width:720px;margin:0 auto; }
+    .rep-h2 { font-size:1rem;border-bottom:2px solid var(--teal);padding-bottom:4px;margin:0 0 14px;color:var(--teal); }
+    .rep-metric { margin-bottom:14px; }
+    .rep-metric-head { display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:6px; }
+    .rep-bar { position:relative;height:8px;background:var(--gray-100);border-radius:99px; }
+    .rep-fill { height:100%;border-radius:99px; }
+    .rep-knob { position:absolute;top:-3px;width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid #0d9488;transform:translateX(-50%); }
+    .rep-range { font-size:.72rem;color:var(--gray-400);margin-top:4px; }
+    @media print { body>*:not(#bio-report){display:none!important;} #bio-report{position:static;padding:0;display:block!important;} .no-print{display:none!important;} }
   </style>
 </head>
 <body>
@@ -123,6 +136,13 @@
               <div id="goal-rows"></div>
             </div>
 
+            <div class="form-section">
+              <div class="form-section-title">Educational Materials &amp; Other Referrals</div>
+              <div class="form-group">
+                <textarea id="nf-edu" rows="3" placeholder="Handouts provided, referrals, resources shared…"></textarea>
+              </div>
+            </div>
+
             <div class="save-bar">
               <span id="notes-saved-msg" style="font-size:.82rem;color:var(--teal);display:none;">Saved</span>
               <button class="btn btn-primary" id="save-notes-btn" onclick="saveNotes()">Save Notes</button>
@@ -147,6 +167,9 @@
     </div>
   </div>
 </main>
+
+<!-- Printable biometric report overlay -->
+<div id="bio-report"></div>
 
 <!-- New Session Modal -->
 <div id="session-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event,'session-modal')">
@@ -189,6 +212,7 @@
   <div class="modal">
     <div class="modal-title" id="gm-title">Add Goal</div>
     <div class="form-grid full" style="gap:12px;">
+      <div class="form-group"><label>Goal</label><input id="gm-goal" type="text" placeholder="What is the goal?"/></div>
       <div class="form-group"><label>Stage of Change</label>
         <select id="gm-stage">
           <option value="">Select…</option>
@@ -313,6 +337,7 @@ async function selectSession(id) {
   document.getElementById('nf-session-meta').textContent=`${selectedSession.duration_minutes} min`;
   document.getElementById('nf-status').value=selectedSession.status||'';
   document.getElementById('nf-notes').value=notes?.session_notes||'';
+  document.getElementById('nf-edu').value=notes?.educational_materials||'';
   removedGoalIds=[];
   renderGoalRows(Array.isArray(sgoals)?sgoals:[]);
   document.getElementById('notes-saved-msg').style.display='none';
@@ -330,6 +355,7 @@ function goalRowEl(g){
       <strong style="font-size:.85rem;">SMART Goal</strong>
       <button type="button" class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="removeGoalRow(this)">Remove</button>
     </div>
+    <div class="form-group" style="margin-bottom:10px;"><label>Goal</label><input class="g-title" type="text" placeholder="What is the goal?"></div>
     <div class="form-group" style="margin-bottom:10px;"><label>Stage of Change</label>
       <select class="g-stage">${['<option value="">Select…</option>'].concat(STAGE_OPTS.map(s=>`<option value="${s}">${STAGE_LABEL[s]}</option>`)).join('')}</select>
     </div>
@@ -340,6 +366,7 @@ function goalRowEl(g){
       <div class="form-group"><label><span class="smart-lead">R</span>Relevant</label><textarea class="g-r" rows="1"></textarea></div>
       <div class="form-group"><label><span class="smart-lead">T</span>Time-bound</label><textarea class="g-t" rows="1"></textarea></div>
     </div>`;
+  div.querySelector('.g-title').value=g.title||'';
   div.querySelector('.g-stage').value=g.stage_of_change||'';
   div.querySelector('.g-s').value=g.smart_specific||'';
   div.querySelector('.g-m').value=g.smart_measurable||'';
@@ -367,17 +394,18 @@ async function saveNotes() {
     const idx=sessions.findIndex(s=>s.id===selectedSession.id);
     if(idx>=0){ sessions[idx].status=status; selectedSession.status=status; }
     // 2) session notes
-    await fetch('/api/notes',{method:'PUT',headers:hdr,body:JSON.stringify({ session_id:selectedSession.id, coach_id:myCoachId, session_notes:document.getElementById('nf-notes').value||null })});
+    await fetch('/api/notes',{method:'PUT',headers:hdr,body:JSON.stringify({ session_id:selectedSession.id, coach_id:myCoachId, session_notes:document.getElementById('nf-notes').value||null, educational_materials:document.getElementById('nf-edu').value||null })});
     // 3) goals (create/update each row; delete removed)
     for(const row of [...document.querySelectorAll('#goal-rows .goal-row')]){
-      const g={ stage_of_change:row.querySelector('.g-stage').value||null,
+      const g={ title:row.querySelector('.g-title').value.trim()||null,
+        stage_of_change:row.querySelector('.g-stage').value||null,
         smart_specific:row.querySelector('.g-s').value.trim()||null,
         smart_measurable:row.querySelector('.g-m').value.trim()||null,
         smart_achievable:row.querySelector('.g-a').value.trim()||null,
         smart_relevant:row.querySelector('.g-r').value.trim()||null,
         smart_time_bound:row.querySelector('.g-t').value.trim()||null };
       const gid=row.dataset.gid;
-      const empty=!g.stage_of_change&&!g.smart_specific&&!g.smart_measurable&&!g.smart_achievable&&!g.smart_relevant&&!g.smart_time_bound;
+      const empty=!g.title&&!g.stage_of_change&&!g.smart_specific&&!g.smart_measurable&&!g.smart_achievable&&!g.smart_relevant&&!g.smart_time_bound;
       if(gid){ await fetch('/api/goals',{method:'PUT',headers:hdr,body:JSON.stringify({id:parseInt(gid),...g})}); }
       else if(!empty){ await fetch('/api/goals',{method:'POST',headers:hdr,body:JSON.stringify({participant_id:parseInt(pid),coach_id:myCoachId,session_id:selectedSession.id,...g})}); }
     }
@@ -397,53 +425,101 @@ async function saveNotes() {
 
 function renderBiometrics() {
   const bio=participant.biometrics;
-  if(!bio||!bio.length){ document.getElementById('bio-content').innerHTML='<div class="empty">No biometric data on file.</div>'; return; }
-  const latest=bio[0];
-  const tiles=[
-    {label:'Height',value:latest.height_in?`${Math.floor(latest.height_in/12)}\'${latest.height_in%12}"`:null,risk:null},
-    {label:'Weight',value:latest.weight_lbs?latest.weight_lbs+' lbs':null,risk:null},
-    {label:'BMI',value:latest.bmi?Number(latest.bmi).toFixed(1):null,risk:riskClass(latest.bmi_category)},
-    {label:'Waist',value:latest.waist_circumference_in?latest.waist_circumference_in+'"':null,risk:null},
-    {label:'Blood Pressure',value:latest.systolic_bp?`${latest.systolic_bp}/${latest.diastolic_bp}`:null,risk:riskClass(latest.bp_risk)},
-    {label:'Heart Rate',value:latest.heart_rate?latest.heart_rate+' bpm':null,risk:null},
-    {label:'Total Cholesterol',value:latest.total_cholesterol?latest.total_cholesterol+' mg/dL':null,risk:riskClass(latest.cholesterol_risk)},
-    {label:'HDL',value:latest.hdl_cholesterol?latest.hdl_cholesterol+' mg/dL':null,risk:null},
-    {label:'LDL',value:latest.ldl_cholesterol?latest.ldl_cholesterol+' mg/dL':null,risk:null},
-    {label:'Triglycerides',value:latest.triglycerides?latest.triglycerides+' mg/dL':null,risk:null},
-    {label:'Blood Glucose',value:latest.blood_glucose?latest.blood_glucose+' mg/dL':null,risk:riskClass(latest.glucose_risk)},
-    {label:'HbA1c',value:latest.hba1c?latest.hba1c+'%':null,risk:null},
-  ].filter(t=>t.value);
-
-  const historyRows=bio.length>1?bio.slice(1).map(b=>`
-    <div class="bio-history-item">
+  const host=document.getElementById('bio-content');
+  if(!bio||!bio.length){ host.innerHTML='<div class="empty">No biometric data on file.</div>'; return; }
+  host.innerHTML=`<div class="card" style="padding:0;overflow:hidden;">
+    <div style="padding:14px 16px;font-weight:600;font-size:.9rem;border-bottom:1px solid var(--gray-100);">Completed Biometric Screenings (${bio.length})</div>
+    ${bio.map((b,i)=>`<div class="bio-list-item" onclick="openBioReport(${i})">
       <div>
-        <div style="font-size:.85rem;font-weight:500;">${fmtDate(b.screened_at)}</div>
-        <div style="font-size:.75rem;color:var(--gray-400);">${b.weight_lbs?b.weight_lbs+' lbs':''}${b.bmi?' · BMI '+Number(b.bmi).toFixed(1):''}${b.systolic_bp?' · BP '+b.systolic_bp+'/'+b.diastolic_bp:''}</div>
+        <div style="font-weight:600;font-size:.88rem;">${fmtDate(b.screened_at)}</div>
+        <div style="font-size:.76rem;color:var(--gray-400);">${[b.weight_lbs?b.weight_lbs+' lbs':'',b.bmi?'BMI '+Number(b.bmi).toFixed(1):'',b.systolic_bp?'BP '+b.systolic_bp+'/'+b.diastolic_bp:''].filter(Boolean).join(' · ')||'Screening'}</div>
       </div>
-      ${b.overall_risk?`<span class="badge badge-${b.overall_risk}">${b.overall_risk}</span>`:''}
-    </div>`).join(''):'';
+      <div style="display:flex;align-items:center;gap:10px;">
+        ${b.overall_risk?`<span class="badge badge-${b.overall_risk}">${esc(b.overall_risk)}</span>`:''}
+        <span style="color:var(--teal);font-weight:600;font-size:.82rem;">Open &rarr;</span>
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
 
-  document.getElementById('bio-content').innerHTML=`
-    <div class="card" style="margin-bottom:16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap;">
-        <div class="card-title" style="margin-bottom:0;">Latest Biometric Report</div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          ${latest.overall_risk?`<span class="badge badge-${latest.overall_risk}">${esc(latest.overall_risk)} risk</span>`:''}
-          <span style="font-size:.8rem;color:var(--gray-400);">${fmtDate(latest.screened_at)}</span>
-        </div>
-      </div>
-      <div class="bio-row">
-        ${tiles.map(t=>`<div class="bio-tile${t.risk?' '+t.risk:''}">
-          <div class="bio-tile-value">${esc(t.value)}</div>
-          <div class="bio-tile-label">${t.label}</div>
-        </div>`).join('')}
-      </div>
-      ${latest.notes?`<div style="margin-top:8px;font-size:.82rem;color:var(--gray-600);padding:10px;background:var(--gray-50);border-radius:6px;">${esc(latest.notes)}</div>`:''}
+// ── Full biometric report (printable / save to PDF) ───────────────────────────
+function openBioReport(i){
+  const b=participant.biometrics[i]; if(!b) return;
+  const el=document.getElementById('bio-report');
+  el.innerHTML=bioReportHtml(b); el.style.display='block'; window.scrollTo(0,0);
+}
+function closeBioReport(){ document.getElementById('bio-report').style.display='none'; }
+function printBioReport(){ window.print(); }
+function repBar(value,min,max,riskCls){
+  if(value==null||value===''||isNaN(Number(value))) return '<div class="rep-bar"></div>';
+  const pct=Math.max(2,Math.min(98,((Number(value)-min)/(max-min))*100));
+  const col=riskCls==='risk-high'?'#dc2626':riskCls==='risk-moderate'?'#f59e0b':'#0d9488';
+  return `<div class="rep-bar"><div class="rep-fill" style="width:${pct}%;background:${col};"></div><div class="rep-knob" style="left:${pct}%;border-color:${col};"></div></div>`;
+}
+function repMetric(label,val,unit,range,min,max,riskCls){
+  if(val==null||val==='') return '';
+  return `<div class="rep-metric">
+    <div class="rep-metric-head"><span>${label}</span><strong>${esc(val)}${unit?' '+unit:''}</strong></div>
+    ${min==null?'':repBar(val,min,max,riskCls)}
+    ${range?`<div class="rep-range">Normal: ${range}</div>`:''}
+  </div>`;
+}
+function repLife(label,val,unit,min,max){
+  if(val==null||val==='') return '';
+  const isYN=(val==='Yes'||val==='No');
+  return `<div class="rep-metric">
+    <div class="rep-metric-head"><span>${label}</span><strong>${esc(val)}${(unit&&!isYN)?' '+unit:''}</strong></div>
+    ${isYN?'':repBar(val,min,max,'life')}
+  </div>`;
+}
+function bioReportHtml(b){
+  const name=`${esc(participant.first_name||'')} ${esc(participant.last_name||'')}`.trim();
+  const bp=b.systolic_bp?`${b.systolic_bp}/${b.diastolic_bp}`:null;
+  const height=b.height_in?`${Math.floor(b.height_in/12)}'${b.height_in%12}"`:null;
+  const yn=v=>v==null?null:(v?'Yes':'No');
+  const meas=[
+    repMetric('Height',height,'','',null,null,null),
+    repMetric('Weight',b.weight_lbs,'lbs','',80,320,null),
+    repMetric('BMI',b.bmi?Number(b.bmi).toFixed(1):null,'','18.5–24.9',15,40,riskClass(b.bmi_category)),
+    repMetric('Waist',b.waist_circumference_in,'in','',24,60,null),
+    repMetric('Body Fat',b.body_fat_pct,'%','',5,50,null),
+    repMetric('Blood Pressure',bp,'mmHg','< 120/80',90,180,riskClass(b.bp_risk)),
+    repMetric('Heart Rate',b.heart_rate,'bpm','60–100',40,120,null),
+    repMetric('Total Cholesterol',b.total_cholesterol,'mg/dL','< 200',120,300,riskClass(b.cholesterol_risk)),
+    repMetric('HDL',b.hdl_cholesterol,'mg/dL','> 40',20,100,null),
+    repMetric('LDL',b.ldl_cholesterol,'mg/dL','< 100',50,220,null),
+    repMetric('Triglycerides',b.triglycerides,'mg/dL','< 150',50,400,null),
+    repMetric('Blood Glucose',b.blood_glucose,'mg/dL','70–99',60,200,riskClass(b.glucose_risk)),
+    repMetric('HbA1c',b.hba1c,'%','< 5.7',4,10,null),
+  ].filter(Boolean).join('');
+  const life=[
+    repLife('Fruits & vegetables',b.fruit_veg_servings,'servings/day',0,5),
+    repLife('Physical activity',b.activity_minutes,'min/week',0,300),
+    repLife('Muscle-strengthening (2+ days/wk)',yn(b.muscle_strengthening),'',0,1),
+    repLife('Stress level',b.stress_level,'/ 10',1,10),
+    repLife('Alcohol',b.alcohol_drinks,'drinks/week',0,15),
+    repLife('Tobacco / vaping / nicotine',yn(b.tobacco_use),'',0,1),
+    repLife('Quality sleep',b.sleep_hours,'hrs',0,9),
+  ].filter(Boolean).join('');
+  return `
+    <div class="rep-toolbar no-print">
+      <button class="btn btn-ghost" onclick="closeBioReport()">&larr; Back</button>
+      <button class="btn btn-primary" onclick="printBioReport()">Print / Save PDF</button>
     </div>
-    ${bio.length>1?`<div class="card" style="padding:0;overflow:hidden;">
-      <div style="padding:14px 16px;font-weight:600;font-size:.9rem;border-bottom:1px solid var(--gray-100);">Screening History</div>
-      ${historyRows}
-    </div>`:''}`;
+    <div class="rep-wrap">
+      <div style="text-align:center;margin-bottom:22px;">
+        <img src="/assets/img/hylogo.png" alt="HealthYou" style="height:40px;">
+        <h1 style="font-size:1.4rem;margin:12px 0 2px;">Biometric Screening Report</h1>
+        <div style="color:var(--gray-500);font-size:.9rem;">${name} &nbsp;&middot;&nbsp; ${fmtDate(b.screened_at)}</div>
+        ${b.overall_risk?`<div style="margin-top:8px;"><span class="badge badge-${b.overall_risk}">Overall Risk: ${esc(b.overall_risk)}</span></div>`:''}
+      </div>
+      <h2 class="rep-h2">Measurements</h2>
+      ${meas||'<p style="color:var(--gray-400);">No measurements recorded.</p>'}
+      <h2 class="rep-h2" style="margin-top:24px;">Lifestyle Risk Assessment</h2>
+      ${life||'<p style="color:var(--gray-400);">No lifestyle responses recorded.</p>'}
+      ${b.notes?`<h2 class="rep-h2" style="margin-top:24px;">Screener Notes</h2><p style="font-size:.86rem;color:var(--gray-700);">${esc(b.notes)}</p>`:''}
+      <p style="font-size:.72rem;color:var(--gray-400);font-style:italic;margin-top:24px;">These results are for education and are not a diagnosis. Please discuss with your healthcare provider.</p>
+    </div>`;
 }
 
 function riskClass(risk) {
@@ -464,7 +540,7 @@ function renderGoals() {
     return `<div class="goal-card">
       <div class="goal-dot ${statusColors[g.status]||'active'}"></div>
       <div style="flex:1;">
-        <div style="font-weight:600;font-size:.9rem;">${esc(g.smart_specific||g.title||'Goal')}</div>
+        <div style="font-weight:600;font-size:.9rem;">${esc(g.title||g.smart_specific||'Goal')}</div>
         ${smartHtml}
         <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span class="badge badge-${g.status==='active'?'active':g.status==='achieved'?'achieved':'inactive'}">${g.status}</span>
@@ -525,6 +601,7 @@ function openGoalModal(id) {
   document.getElementById('gm-btn').textContent=id?'Save Changes':'Add Goal';
   document.getElementById('gm-err').style.display='none';
   const g=id?goals.find(x=>x.id===id):null;
+  document.getElementById('gm-goal').value=g?.title||'';
   document.getElementById('gm-stage').value=g?.stage_of_change||'';
   document.getElementById('gm-s').value=g?.smart_specific||'';
   document.getElementById('gm-m').value=g?.smart_measurable||'';
@@ -536,6 +613,7 @@ function openGoalModal(id) {
 
 async function saveGoal() {
   const body={
+    title:document.getElementById('gm-goal').value.trim()||null,
     stage_of_change:document.getElementById('gm-stage').value||null,
     smart_specific:document.getElementById('gm-s').value.trim()||null,
     smart_measurable:document.getElementById('gm-m').value.trim()||null,
@@ -543,7 +621,7 @@ async function saveGoal() {
     smart_relevant:document.getElementById('gm-r').value.trim()||null,
     smart_time_bound:document.getElementById('gm-t').value.trim()||null,
   };
-  if(!body.smart_specific && !body.stage_of_change){ showGmErr('Enter at least the Specific goal or a stage.'); return; }
+  if(!body.title && !body.smart_specific && !body.stage_of_change){ showGmErr('Enter the goal, a stage, or at least the Specific field.'); return; }
   const btn=document.getElementById('gm-btn'); btn.disabled=true; btn.textContent='Saving…';
   try {
     let r;

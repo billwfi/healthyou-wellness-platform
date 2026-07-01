@@ -871,3 +871,7 @@ IF COL_LENGTH('dbo.goals','smart_relevant')   IS NULL ALTER TABLE dbo.goals ADD 
 GO
 IF COL_LENGTH('dbo.goals','smart_time_bound') IS NULL ALTER TABLE dbo.goals ADD smart_time_bound NVARCHAR(MAX);
 GO
+
+-- Coach session-notes: "Educational Materials & Other Referrals" free-text.
+IF COL_LENGTH('dbo.coaching_notes','educational_materials') IS NULL ALTER TABLE dbo.coaching_notes ADD educational_materials NVARCHAR(MAX);
+GO

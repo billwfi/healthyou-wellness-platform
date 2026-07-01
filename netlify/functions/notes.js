@@ -22,7 +22,7 @@ exports.handler = async (event, context) => {
     const {
       session_id, coach_id, stage_of_change, presenting_concern,
       client_goals, motivational_factors, barriers,
-      action_steps, follow_up_plan, session_notes
+      action_steps, follow_up_plan, session_notes, educational_materials
     } = b;
     if (!session_id) return badRequest('session_id required');
     try {
@@ -32,15 +32,15 @@ exports.handler = async (event, context) => {
          WHEN MATCHED THEN UPDATE SET
            stage_of_change=$3, presenting_concern=$4, client_goals=$5,
            motivational_factors=$6, barriers=$7, action_steps=$8,
-           follow_up_plan=$9, session_notes=$10, updated_at=SYSUTCDATETIME()
+           follow_up_plan=$9, session_notes=$10, educational_materials=$11, updated_at=SYSUTCDATETIME()
          WHEN NOT MATCHED THEN INSERT
            (session_id,coach_id,stage_of_change,presenting_concern,client_goals,
-            motivational_factors,barriers,action_steps,follow_up_plan,session_notes,updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,SYSUTCDATETIME())
+            motivational_factors,barriers,action_steps,follow_up_plan,session_notes,educational_materials,updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,SYSUTCDATETIME())
          OUTPUT INSERTED.*;`,
         [session_id, coach_id||null, stage_of_change||null, presenting_concern||null,
          client_goals||null, motivational_factors||null, barriers||null,
-         action_steps||null, follow_up_plan||null, session_notes||null]
+         action_steps||null, follow_up_plan||null, session_notes||null, educational_materials||null]
       );
       return ok(r.rows[0]);
     } catch (e) { return serverError(e); }
