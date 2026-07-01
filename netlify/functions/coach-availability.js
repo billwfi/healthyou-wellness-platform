@@ -1,5 +1,17 @@
 const { getPool } = require('./_db');
-const { getUser, ok, created, badRequest, unauthorized, notFound, serverError, options } = require('./_auth');
+const { getUser, ok, created, badRequest, unauthorized, notFound, serverError, options, CORS } = require('./_auth');
+const forbidden = () => ({ statusCode: 403, headers: CORS, body: JSON.stringify({ error: 'You can only manage your own schedule.' }) });
+
+// Coach tokens carry coach_id and may only touch their own rows; admins (no
+// coach_id on the token) may manage anyone.
+async function assertOwns(db, user, coachId) {
+  if (!user.coach_id) return true;
+  return String(user.coach_id) === String(coachId);
+}
+async function rowCoachId(db, id) {
+  const r = await db.query('SELECT coach_id FROM coach_availability WHERE id=$1', [id]);
+  return r.rows.length ? r.rows[0].coach_id : null;
+}
 
 exports.handler = async (event, context) => {
   if (event.httpMethod === 'OPTIONS') return options();
@@ -64,11 +76,14 @@ exports.handler = async (event, context) => {
 
   if (event.httpMethod === 'POST') {
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return badRequest('Invalid JSON'); }
-    const { coach_id, day_of_week, start_time, end_time, effective_from, effective_to } = b;
+    const { coach_id, day_of_week, start_time, end_time } = b;
     if (!coach_id || day_of_week == null || !start_time || !end_time)
       return badRequest('coach_id, day_of_week, start_time, end_time required');
-    if (!effective_from || !effective_to)
-      return badRequest('effective_from and effective_to are required (use first/last day of the month)');
+    if (!(await assertOwns(db, user, coach_id))) return forbidden();
+    // effective_from/to are optional. Omitted (null) = a recurring weekly block
+    // with no end. The admin monthly editor still passes month bounds.
+    const effective_from = b.effective_from || null;
+    const effective_to   = b.effective_to   || null;
     try {
       const r = await db.query(
         `INSERT INTO coach_availability
@@ -87,6 +102,7 @@ exports.handler = async (event, context) => {
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return badRequest('Invalid JSON'); }
     const { id, active, start_time, end_time } = b;
     if (!id) return badRequest('id required');
+    if (user.coach_id && !(await assertOwns(db, user, await rowCoachId(db, id)))) return forbidden();
     try {
       const r = await db.query(
         `UPDATE coach_availability
@@ -105,6 +121,7 @@ exports.handler = async (event, context) => {
   if (event.httpMethod === 'DELETE') {
     const { id } = qs;
     if (!id) return badRequest('id required');
+    if (user.coach_id && !(await assertOwns(db, user, await rowCoachId(db, id)))) return forbidden();
     try {
       await db.query('DELETE FROM coach_availability WHERE id=$1', [id]);
       return ok({ deleted: true });

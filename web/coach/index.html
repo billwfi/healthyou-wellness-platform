@@ -19,6 +19,15 @@
     .appt-chip:hover { filter:brightness(.97); }
     .cal-more { font-size:.7rem;color:var(--gray-400);padding:0 6px; }
     @media (max-width:640px){ .cal-cell{min-height:72px;} .appt-chip{font-size:.66rem;} }
+    .sched-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--gray-100);}
+    .sched-day{width:96px;font-weight:600;font-size:.86rem;padding-top:5px;flex-shrink:0;}
+    .sched-slots{flex:1;}
+    .sched-chips{display:flex;flex-wrap:wrap;gap:6px;min-height:26px;align-items:center;}
+    .sched-chip{display:inline-flex;align-items:center;gap:4px;background:#e6f5f3;color:#0f766e;border-radius:99px;padding:3px 10px;font-size:.82rem;}
+    .sched-chip button{background:none;border:none;cursor:pointer;color:#0f766e;font-size:1.05rem;line-height:1;padding:0 2px;}
+    .sched-add{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap;}
+    .sched-add input[type=time]{border:1px solid var(--gray-200);border-radius:6px;padding:5px 8px;font-size:.85rem;}
+    .exc-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray-100);}
   </style>
 </head>
 <body>
@@ -56,6 +65,7 @@
       <div class="tabs" style="margin-bottom:0;border:none;gap:4px;">
         <button class="tab active" id="tab-calendar" onclick="switchView('calendar',this)">Calendar</button>
         <button class="tab" id="tab-list" onclick="switchView('list',this)">Caseload</button>
+        <button class="tab" id="tab-schedule" onclick="switchView('schedule',this)">Schedule</button>
       </div>
     </div>
 
@@ -78,6 +88,66 @@
       <div class="search-bar" style="max-width:320px;margin-bottom:14px;"><input id="search" type="text" placeholder="Search participants…" oninput="renderList()"/></div>
       <div id="participant-list"></div>
     </div>
+
+    <!-- Schedule editor view -->
+    <div id="view-schedule" style="display:none;margin-top:16px;">
+      <div class="card" style="margin-bottom:16px;">
+        <h3 style="margin:0 0 2px;font-size:1rem;">Weekly hours</h3>
+        <p style="margin:0 0 14px;font-size:.84rem;color:var(--gray-400);">Your standing availability. These hours repeat every week; participants book open times within them.</p>
+        <div id="recurring-body"><div style="padding:12px;color:var(--gray-400);">Loading…</div></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+          <div>
+            <h3 style="margin:0 0 2px;font-size:1rem;">Exceptions</h3>
+            <p style="margin:0;font-size:.84rem;color:var(--gray-400);">Block or adjust specific occurrences — e.g. the first Monday of every month.</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="showExcForm()">+ Add exception</button>
+        </div>
+
+        <!-- Add-exception form -->
+        <div id="exc-form" style="display:none;margin-top:16px;padding:16px;border:1px solid var(--gray-200);border-radius:10px;background:var(--gray-50);">
+          <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">
+            <div class="form-group"><label>When</label>
+              <select id="exc-type" onchange="excTypeChange()">
+                <option value="monthly">Every month (ordinal weekday)</option>
+                <option value="single">A single date</option>
+              </select>
+            </div>
+            <div class="form-group exc-monthly"><label>Occurrence</label>
+              <select id="exc-ordinal">
+                <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option>
+                <option value="4">4th</option><option value="5">5th</option><option value="0">Last</option>
+              </select>
+            </div>
+            <div class="form-group exc-monthly"><label>Weekday</label>
+              <select id="exc-dow">
+                <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
+                <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
+              </select>
+            </div>
+            <div class="form-group exc-single" style="display:none;"><label>Date</label>
+              <input id="exc-date" type="date"/>
+            </div>
+            <div class="form-group"><label>Effect</label>
+              <select id="exc-kind" onchange="excKindChange()">
+                <option value="off">Unavailable (day off)</option>
+                <option value="custom">Custom hours</option>
+              </select>
+            </div>
+            <div class="form-group exc-custom" style="display:none;"><label>Start</label><input id="exc-start" type="time"/></div>
+            <div class="form-group exc-custom" style="display:none;"><label>End</label><input id="exc-end" type="time"/></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <button class="btn btn-primary btn-sm" onclick="saveException()">Save exception</button>
+            <button class="btn btn-ghost btn-sm" onclick="hideExcForm()">Cancel</button>
+          </div>
+        </div>
+
+        <div id="exceptions-list" style="margin-top:16px;"></div>
+      </div>
+    </div>
   </div>
 </main>
 
@@ -98,6 +168,9 @@
 <div class="toast" id="toast"></div>
 <script>
 let coach=null, sessions=[], participants=[], listLoaded=false;
+let recurring=[], exceptions=[], scheduleLoaded=false;
+const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const ORD={1:'1st',2:'2nd',3:'3rd',4:'4th',5:'5th',0:'Last'};
 let viewYear, viewMonth; // month currently shown (viewMonth: 0-11)
 
 // ── Boot / auth ───────────────────────────────────────────────────────────────
@@ -240,7 +313,9 @@ function switchView(view,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); el.classList.add('active');
   document.getElementById('view-calendar').style.display=view==='calendar'?'':'none';
   document.getElementById('view-list').style.display=view==='list'?'':'none';
+  document.getElementById('view-schedule').style.display=view==='schedule'?'':'none';
   if(view==='list' && !listLoaded){ loadCaseload(); }
+  if(view==='schedule' && !scheduleLoaded){ loadSchedule(); }
 }
 async function loadCaseload(){
   listLoaded=true;
@@ -263,6 +338,105 @@ function renderList(){
       </div>
       <span style="color:var(--gray-400);align-self:center;">&#8250;</span>
     </a>`).join('');
+}
+
+// ── Schedule editor ───────────────────────────────────────────────────────────
+async function apiSend(url, method, body){
+  const opts={ method, headers: Object.assign({}, authHdr(), body?{'Content-Type':'application/json'}:{}) };
+  if(body) opts.body=JSON.stringify(body);
+  const r=await fetch(url,opts);
+  if(r.status===401){ hyCoach.clearToken(); showLogin(); throw new Error('Session expired'); }
+  return r;
+}
+function fmtT(t){ if(!t) return ''; const p=String(t).split(':'); let hh=parseInt(p[0],10); const mm=p[1]||'00'; const ap=hh<12?'AM':'PM'; hh=hh%12||12; return `${hh}:${mm} ${ap}`; }
+function fmtDate(d){ return new Date(d+'T00:00:00Z').toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric',year:'numeric'}); }
+
+async function loadSchedule(){
+  scheduleLoaded=true;
+  document.getElementById('recurring-body').innerHTML='<div style="padding:12px;color:var(--gray-400);">Loading…</div>';
+  try{
+    const [rec, exc] = await Promise.all([
+      apiGet(`/api/coach-availability?admin=true&coach_id=${coach.coach_id}`),
+      apiGet(`/api/availability-exceptions?coach_id=${coach.coach_id}`)
+    ]);
+    // Recurring = blocks with no effective date range (the portal manages these).
+    recurring=(Array.isArray(rec)?rec:[]).filter(a=>!a.effective_from);
+    exceptions=Array.isArray(exc)?exc:[];
+    renderRecurring(); renderExceptions();
+  }catch(e){ if(e.message!=='Session expired'){ document.getElementById('recurring-body').innerHTML='<div style="padding:12px;color:var(--red);">Failed to load schedule.</div>'; } }
+}
+
+function renderRecurring(){
+  const byDow={};
+  recurring.forEach(a=>{ (byDow[a.day_of_week] ||= []).push(a); });
+  document.getElementById('recurring-body').innerHTML=DAYS.map((day,dow)=>{
+    const slots=(byDow[dow]||[]).slice().sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time)));
+    const chips=slots.map(s=>`<span class="sched-chip">${fmtT(s.start_time)}–${fmtT(s.end_time)}<button onclick="removeRecurring(${s.id})" title="Remove">&times;</button></span>`).join('');
+    return `<div class="sched-row">
+      <div class="sched-day">${day}</div>
+      <div class="sched-slots">
+        <div class="sched-chips">${chips||'<span style="color:var(--gray-400);font-size:.82rem;">No hours</span>'}</div>
+        <div class="sched-add" id="radd-${dow}" style="display:none;">
+          <input type="time" id="rs-${dow}"><span style="color:var(--gray-400);">to</span><input type="time" id="re-${dow}">
+          <button class="btn btn-primary btn-sm" onclick="addRecurring(${dow})">Add</button>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('radd-${dow}').style.display='none'">Cancel</button>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('radd-${dow}').style.display='flex';document.getElementById('rs-${dow}').focus();">+ Add</button>
+    </div>`;
+  }).join('');
+}
+async function addRecurring(dow){
+  const s=document.getElementById('rs-'+dow).value, e=document.getElementById('re-'+dow).value;
+  if(!s||!e){ showToast('Enter start and end time'); return; }
+  if(s>=e){ showToast('End time must be after start time'); return; }
+  try{
+    const r=await apiSend('/api/coach-availability','POST',{coach_id:coach.coach_id,day_of_week:dow,start_time:s,end_time:e});
+    if(!r.ok){ showToast((await r.json()).error||'Error'); return; }
+    await loadSchedule(); showToast('Hours added');
+  }catch(err){ if(err.message!=='Session expired') showToast('Error: '+err.message); }
+}
+async function removeRecurring(id){
+  try{ const r=await apiSend('/api/coach-availability?id='+id,'DELETE'); if(!r.ok){ showToast('Error'); return; } await loadSchedule(); showToast('Removed'); }
+  catch(err){ if(err.message!=='Session expired') showToast('Error'); }
+}
+
+function renderExceptions(){
+  const el=document.getElementById('exceptions-list');
+  if(!exceptions.length){ el.innerHTML='<div style="color:var(--gray-400);font-size:.85rem;padding:6px 0;">No exceptions set.</div>'; return; }
+  el.innerHTML=exceptions.map(x=>{
+    const when=x.exception_date ? fmtDate(x.exception_date) : `${ORD[x.week_of_month]||''} ${DAYS[x.day_of_week]||''} of each month`;
+    const effect=x.kind==='custom' ? `Custom hours ${fmtT(x.start_time)}–${fmtT(x.end_time)}` : 'Unavailable';
+    return `<div class="exc-item">
+      <div><strong>${esc(when)}</strong><div style="font-size:.8rem;color:var(--gray-400);">${esc(effect)}</div></div>
+      <button class="btn btn-ghost btn-sm" style="color:#b91c1c;" onclick="removeException(${x.id})">Remove</button>
+    </div>`;
+  }).join('');
+}
+function showExcForm(){ document.getElementById('exc-form').style.display=''; excTypeChange(); excKindChange(); }
+function hideExcForm(){ document.getElementById('exc-form').style.display='none'; }
+function excTypeChange(){ const t=document.getElementById('exc-type').value;
+  document.querySelectorAll('.exc-monthly').forEach(e=>e.style.display=t==='monthly'?'':'none');
+  document.querySelectorAll('.exc-single').forEach(e=>e.style.display=t==='single'?'':'none'); }
+function excKindChange(){ const k=document.getElementById('exc-kind').value;
+  document.querySelectorAll('.exc-custom').forEach(e=>e.style.display=k==='custom'?'':'none'); }
+async function saveException(){
+  const type=document.getElementById('exc-type').value, kind=document.getElementById('exc-kind').value;
+  const body={ coach_id:coach.coach_id, kind };
+  if(type==='single'){ const d=document.getElementById('exc-date').value; if(!d){ showToast('Pick a date'); return; } body.exception_date=d; }
+  else { body.week_of_month=parseInt(document.getElementById('exc-ordinal').value,10); body.day_of_week=parseInt(document.getElementById('exc-dow').value,10); }
+  if(kind==='custom'){ const s=document.getElementById('exc-start').value, e=document.getElementById('exc-end').value;
+    if(!s||!e){ showToast('Enter custom hours'); return; } if(s>=e){ showToast('End must be after start'); return; }
+    body.start_time=s; body.end_time=e; }
+  try{
+    const r=await apiSend('/api/availability-exceptions','POST',body);
+    if(!r.ok){ showToast((await r.json()).error||'Error'); return; }
+    hideExcForm(); await loadSchedule(); showToast('Exception added');
+  }catch(err){ if(err.message!=='Session expired') showToast('Error: '+err.message); }
+}
+async function removeException(id){
+  try{ const r=await apiSend('/api/availability-exceptions?id='+id,'DELETE'); if(!r.ok){ showToast('Error'); return; } await loadSchedule(); showToast('Removed'); }
+  catch(err){ if(err.message!=='Session expired') showToast('Error'); }
 }
 
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }

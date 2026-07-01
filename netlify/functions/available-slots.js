@@ -31,7 +31,42 @@ exports.handler = async (event, context) => {
        ORDER BY start_time`,
       [coach_id, dow, date]
     );
-    if (!windows.length) return ok([]);
+
+    // Exceptions that could apply to this date: an exact single date, or a
+    // monthly-ordinal rule on this weekday whose effective range covers the date.
+    const { rows: exceptions } = await db.query(
+      `SELECT kind, week_of_month,
+              CONVERT(varchar(10), exception_date, 23) AS exception_date,
+              CONVERT(varchar(8), start_time, 108) AS start_time,
+              CONVERT(varchar(8), end_time, 108)   AS end_time
+         FROM coach_availability_exceptions
+        WHERE coach_id=$1 AND active=1
+          AND ( exception_date = CAST($2 AS date)
+             OR ( day_of_week = $3
+                  AND (effective_from IS NULL OR effective_from <= CAST($2 AS date))
+                  AND (effective_to   IS NULL OR effective_to   >= CAST($2 AS date)) ) )`,
+      [coach_id, date, dow]
+    );
+
+    // Which of those actually apply to THIS date (ordinal / last-week math in JS).
+    const dayNum = parseInt(date.slice(8, 10), 10);
+    const yr = parseInt(date.slice(0, 4), 10), mo = parseInt(date.slice(5, 7), 10);
+    const ordinal = Math.floor((dayNum - 1) / 7) + 1;                 // 1..5
+    const daysInMonth = new Date(Date.UTC(yr, mo, 0)).getUTCDate();
+    const isLast = (dayNum + 7) > daysInMonth;
+    const applicable = exceptions.filter(ex => {
+      if (ex.exception_date) return ex.exception_date === date;       // single date
+      if (ex.week_of_month === 0) return isLast;                       // 0 = last
+      return ex.week_of_month === ordinal;                            // 1..5 = ordinal
+    });
+
+    // 'off' wins → unavailable. 'custom' replaces the day's windows.
+    if (applicable.some(ex => ex.kind === 'off')) return ok([]);
+    const customWindows = applicable
+      .filter(ex => ex.kind === 'custom')
+      .map(ex => ({ start_time: ex.start_time, end_time: ex.end_time }));
+    const effectiveWindows = customWindows.length ? customWindows : windows;
+    if (!effectiveWindows.length) return ok([]);
 
     // Already-booked sessions for this coach on this date
     const { rows: booked } = await db.query(
@@ -55,9 +90,9 @@ exports.handler = async (event, context) => {
       return bookedIntervals.some(([bS, bE]) => slotStart < bE && slotEnd > bS);
     }
 
-    // Generate available slots from each window
+    // Generate available slots from each effective window
     const slots = [];
-    for (const { start_time, end_time } of windows) {
+    for (const { start_time, end_time } of effectiveWindows) {
       const [sh, sm] = start_time.split(':').map(Number);
       const [eh, em] = end_time.split(':').map(Number);
       let cur = sh * 60 + sm;

@@ -767,3 +767,28 @@ GO
 -- Add password_hash to pre-existing app_users tables that predate password login.
 IF COL_LENGTH('dbo.app_users','password_hash') IS NULL ALTER TABLE dbo.app_users ADD password_hash NVARCHAR(MAX);
 GO
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- Coach availability EXCEPTIONS — overrides on top of the recurring weekly
+-- coach_availability blocks. An exception is either a single date (exception_date)
+-- or a monthly ordinal (day_of_week + week_of_month, e.g. the 1st Monday). Effect
+-- is 'off' (unavailable that occurrence) or 'custom' (use start_time/end_time
+-- instead). Consumed by functions/available-slots.js.
+--   week_of_month: 1..5 = that ordinal weekday; 0 = the LAST such weekday.
+-- ════════════════════════════════════════════════════════════════════════════
+IF OBJECT_ID('dbo.coach_availability_exceptions','U') IS NULL
+CREATE TABLE dbo.coach_availability_exceptions (
+  id             INT IDENTITY(1,1) PRIMARY KEY,
+  coach_id       INT NOT NULL,
+  exception_date DATE NULL,          -- single-date exception
+  day_of_week    INT NULL,           -- monthly-ordinal: 0=Sun..6=Sat
+  week_of_month  INT NULL,           -- 1..5 = ordinal, 0 = last
+  kind           NVARCHAR(10) NOT NULL DEFAULT 'off',  -- 'off' | 'custom'
+  start_time     TIME NULL,          -- for kind='custom'
+  end_time       TIME NULL,
+  effective_from DATE NULL,          -- optional bounds for a recurring exception
+  effective_to   DATE NULL,
+  active         BIT DEFAULT 1,
+  created_at     DATETIME2(3) DEFAULT SYSUTCDATETIME()
+);
+GO
