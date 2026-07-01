@@ -51,6 +51,27 @@
     <div id="rn-list"></div>
   </div>
 </main>
+
+<!-- Release detail modal -->
+<div id="rn-modal" class="modal-backdrop" style="display:none;" onclick="closeOuter(event)">
+  <div class="modal modal-lg" style="max-height:88vh;overflow:auto;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:6px;">
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span id="rn-m-version" class="modal-title" style="margin:0;"></span>
+          <span id="rn-m-latest"></span>
+        </div>
+        <div id="rn-m-date" style="font-size:.84rem;color:var(--gray-400);margin-top:2px;"></div>
+      </div>
+      <div id="rn-m-pdf" style="display:flex;gap:8px;"></div>
+    </div>
+    <p id="rn-m-summary" style="font-size:.9rem;color:var(--gray-600);line-height:1.6;margin:10px 0 14px;"></p>
+    <div id="rn-m-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeRelease()">Close</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <script>
 // Add new entries to the TOP of this array for each release.
@@ -58,21 +79,37 @@ const RELEASES = [
   {
     version: '2026.06.30',
     date: 'June 30, 2026',
-    pdf: '/assets/release-notes/HealYou-Release-Notes-2026-06-30.pdf',
-    summary: 'Email templates render exactly as designed and send from the support mailbox; appointment search across all events; reschedule to a different location; and the screener lists registrants on event select.',
-    highlights: [
-      'Email Templates: reliable HTML-source editor + Preview; a template is sent as the complete email (placeholders filled)',
-      'Manage Appointment: reschedule a multi-location event to a different location',
-      'New Event Management → Appointment Search (by group, name, phone, email) with one-click Resend',
-      'Edit an appointment on behalf of a registrant (from search results or the Participants Edit button); date/time chosen from real availability',
-      'Screener Portal: selecting an event lists everyone registered (no search needed); live filter',
-      'Screener: Pregnancy mode grays out non-applicable measurements (keeps BP, glucose/HbA1c, grip, lifestyle)',
-      'Screening risk model aligned to the HealthYou Biometric Ranges spec: per-measure Ideal/Borderline/High (sex/age/fasting/diabetic-aware), two critical tiers (Critical Risk follow-up + Medical Emergency/ER), and an overall risk score',
-      'Screening Report colors every measure green/yellow/red and adds a Measure Summary table',
-      'Screener: Diabetic checkbox added beside Pregnant',
-      'Branding: white HealthYou logo on the teal header across all pages',
-      'Daily registration digest email (6 AM MT): prior-day new registrations (counts by group/event/location) plus reschedules & cancellations, each with a review link',
-      'Outbound email now sends from support@myhealthyou.com (Microsoft 365)',
+    summary: 'Screening report redesign with graphical ranges and Critical-Risk flags; an Emergent Risk follow-up form emailed to registrants; PCP events with 30-day scheduling and eligibility verification; a new User Management area; and richer group eligibility.',
+    sections: [
+      { title: 'Screening Report & Results', items: [
+        'Screening Report redesigned — removed the Measure Summary and the "Understanding Your Results" panel; report now uses the full width',
+        'Every measure badge shows its Ideal range for quick comparison to the reading',
+        'New "Results vs. Ideal Ranges" graphic: each measure as a colored range bar with the result in a bubble/pointer, range-boundary notches, and a red Critical-Risk (CR) notch',
+        'Critical-Risk ⚠ indicator on the badge and graph for Blood Pressure, Glucose/HbA1c, LDL and Triglycerides when a reading is in the critical range',
+        'Lifestyle Risk Assessment always shown on the report (— when a question is unanswered)',
+        'Screener results now show the full report (badges, Metabolic Syndrome, Lifestyle, and the graphs) after entering results',
+        'Print / Save PDF outputs the report and the graphs, each on its own page',
+      ]},
+      { title: 'Emergent Risk Follow-up', items: [
+        'Screener "Save & Print Results" renamed to "Review Results"',
+        'Emergent Risk form pops up when a Critical Risk or Metabolic Syndrome (≥3 criteria) is found: it lists the risks, asks whether a medical provider should follow up (with preferred days/times), requires acknowledgement, and emails a copy to the registrant',
+      ]},
+      { title: 'Events & Registration', items: [
+        'New PCP event type; the Leprino PCP event set to PCP',
+        'PCP registration links only allow scheduling within the next 30 days',
+        'Event setup flags: "Requires eligibility verification" (on by default) and "Flu shots offered"',
+        'Registration verifies eligibility by last name, first name, DOB and gender against the iStrata eligibility file (Active) on the details step; ineligible registrants get a formatted message and the registration ends',
+        'Flu-shot question added to registration when the event offers it',
+        'Screener portal lists split into Registered vs Completed (grouped by location); completed screenings can be reopened to view/edit',
+        'Recent Screenings: Edit button opens the screening entry to update values',
+        'Participants: Add Screening button opens the screening form; attach documents (PCP results / blood work) to a screening record',
+      ]},
+      { title: 'Admin & Settings', items: [
+        'New Settings → User Management (replaces System Settings): add users with a role (Admin / User / Health Coach), assign left-nav categories, grant Health Coach & Screener portal access, and set a password',
+        'Group eligibility list: filter by Account Status and Department/Location (pick lists), plus DOB & Gender columns',
+        'Leprino & City of Colorado Springs eligibility now resolves (group-code fix)',
+        'Log Out button made clearly visible across all portals',
+      ]},
     ],
   },
   {
@@ -109,31 +146,43 @@ function boot(user){
   document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
   render();
 }
+// Count all bullet items whether the release uses grouped sections or a flat list.
+function itemCount(r){ return r.sections ? r.sections.reduce((n,s)=>n+s.items.length,0) : (r.highlights||[]).length; }
+
 function render(){
-  document.getElementById('rn-list').innerHTML = RELEASES.map((r,i)=>`
-    <div class="card">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;">
-        <div>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <span style="font-size:1.05rem;font-weight:700;color:var(--gray-800);">Version ${esc(r.version)}</span>
-            ${i===0?'<span class="badge badge-active">Latest</span>':''}
-          </div>
-          <div style="font-size:.84rem;color:var(--gray-400);margin-top:3px;">Released ${esc(r.date)}</div>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <a class="btn btn-ghost btn-sm" href="${esc(r.pdf)}" target="_blank" rel="noopener">View PDF</a>
-          <a class="btn btn-primary btn-sm" href="${esc(r.pdf)}" download>Download PDF</a>
-        </div>
-      </div>
-      <p style="font-size:.9rem;color:var(--gray-600);line-height:1.6;margin:12px 0 10px;">${esc(r.summary)}</p>
-      <ul style="margin:0 0 4px 18px;">
-        ${r.highlights.map(h=>`<li style="font-size:.86rem;color:var(--gray-600);line-height:1.55;margin-bottom:3px;">${esc(h)}</li>`).join('')}
-      </ul>
-      ${i===0?`<div style="margin-top:16px;border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;">
-        <embed src="${esc(r.pdf)}#toolbar=1" type="application/pdf" style="width:100%;height:640px;border:0;display:block;"/>
-      </div>`:''}
-    </div>`).join('');
+  document.getElementById('rn-list').innerHTML = `<div class="card" style="padding:0;overflow:hidden;">
+    <table class="data-table">
+      <thead><tr><th style="width:150px;">Version</th><th>Released</th><th>Summary</th><th style="width:90px;"></th></tr></thead>
+      <tbody>${RELEASES.map((r,i)=>`<tr>
+        <td><strong>${esc(r.version)}</strong> ${i===0?'<span class="badge badge-active">Latest</span>':''}</td>
+        <td style="white-space:nowrap;color:var(--gray-600);">${esc(r.date)}</td>
+        <td style="font-size:.86rem;color:var(--gray-600);">${esc(r.summary)}</td>
+        <td style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="openRelease(${i})">Open</button></td>
+      </tr>`).join('')}</tbody>
+    </table>
+  </div>`;
 }
+function openRelease(i){
+  const r=RELEASES[i]; if(!r) return;
+  document.getElementById('rn-m-version').textContent='Version '+r.version;
+  document.getElementById('rn-m-latest').innerHTML=(i===0)?'<span class="badge badge-active">Latest</span>':'';
+  document.getElementById('rn-m-date').textContent='Released '+r.date;
+  document.getElementById('rn-m-summary').textContent=r.summary||'';
+  document.getElementById('rn-m-pdf').innerHTML=r.pdf
+    ? `<a class="btn btn-ghost btn-sm" href="${esc(r.pdf)}" target="_blank" rel="noopener">View PDF</a>
+       <a class="btn btn-primary btn-sm" href="${esc(r.pdf)}" download>Download PDF</a>` : '';
+  const li=items=>`<ul style="margin:4px 0 0 18px;">${items.map(h=>`<li style="font-size:.88rem;color:var(--gray-600);line-height:1.55;margin-bottom:4px;">${esc(h)}</li>`).join('')}</ul>`;
+  let body;
+  if(r.sections){
+    body=r.sections.map(s=>`<div style="margin-bottom:16px;">
+      <div style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--teal);margin-bottom:2px;">${esc(s.title)}</div>
+      ${li(s.items)}</div>`).join('');
+  } else { body=li(r.highlights||[]); }
+  document.getElementById('rn-m-body').innerHTML=body;
+  document.getElementById('rn-modal').style.display='flex';
+}
+function closeRelease(){ document.getElementById('rn-modal').style.display='none'; }
+function closeOuter(e){ if(e.target===document.getElementById('rn-modal')) closeRelease(); }
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
 function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
