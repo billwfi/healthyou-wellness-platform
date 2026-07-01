@@ -806,3 +806,8 @@ CREATE TABLE dbo.coach_groups (
   CONSTRAINT pk_coach_groups PRIMARY KEY (coach_id, group_id)
 );
 GO
+
+-- Booking captures which group the session was booked under (coach is assigned
+-- to that group). Nullable; older sessions have none.
+IF COL_LENGTH('dbo.coaching_sessions','group_id') IS NULL ALTER TABLE dbo.coaching_sessions ADD group_id INT NULL;
+GO

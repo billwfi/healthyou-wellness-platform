@@ -15,10 +15,16 @@ exports.handler = async (event, context) => {
 
   // Public GET (booking page / dropdowns) — no auth required
   if (event.httpMethod === 'GET' && !event.queryStringParameters?.admin) {
+    const groupId = event.queryStringParameters?.group_id;
     try {
-      const r = await getPool().query(
-        'SELECT id,name,bio,specialty,avatar_url,phone FROM coaches WHERE active=1 ORDER BY name'
-      );
+      // ?group_id=N -> only coaches assigned to that group (booking step 2).
+      const r = groupId
+        ? await getPool().query(
+            `SELECT c.id,c.name,c.bio,c.specialty,c.avatar_url,c.phone
+               FROM coaches c JOIN coach_groups cg ON cg.coach_id = c.id
+              WHERE cg.group_id = $1 AND c.active = 1 ORDER BY c.name`, [groupId])
+        : await getPool().query(
+            'SELECT id,name,bio,specialty,avatar_url,phone FROM coaches WHERE active=1 ORDER BY name');
       return ok(r.rows);
     } catch (e) { return serverError(e); }
   }

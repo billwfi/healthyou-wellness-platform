@@ -2,343 +2,352 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>Book a Coaching Session — HealYou</title>
+  <title>Book a Coaching Session — HealthYou</title>
   <link rel="stylesheet" href="/assets/css/style.css">
   <style>
     body { background: linear-gradient(135deg,#0d9488 0%,#0f766e 100%); min-height:100vh; }
-    .wrap { max-width:700px; margin:0 auto; padding:32px 20px 60px; }
-    /* Header */
+    .wrap { max-width:820px; margin:0 auto; padding:32px 20px 60px; }
     .bk-header { text-align:center; margin-bottom:28px; }
-    .bk-header img { height:44px; background:#fff; padding:4px 14px; border-radius:8px; }
+    .bk-header img { height:44px; }
     .bk-header h1 { color:#fff; font-size:1.4rem; margin-top:14px; font-weight:600; }
     .bk-header p  { color:rgba(255,255,255,.75); font-size:.9rem; margin-top:4px; }
-    /* Step bar */
     .step-bar { display:flex; justify-content:center; align-items:center; margin-bottom:24px; }
-    .step-node { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; max-width:120px; }
-    .step-circle {
-      width:32px; height:32px; border-radius:50%; border:2px solid rgba(255,255,255,.35);
-      display:flex; align-items:center; justify-content:center;
-      font-size:.85rem; font-weight:700; color:rgba(255,255,255,.45); transition:all .2s;
-    }
+    .step-node { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; max-width:150px; }
+    .step-circle { width:32px; height:32px; border-radius:50%; border:2px solid rgba(255,255,255,.35); display:flex; align-items:center; justify-content:center; font-size:.85rem; font-weight:700; color:rgba(255,255,255,.45); transition:all .2s; }
     .step-circle.done   { background:#fff; color:var(--teal); border-color:#fff; }
     .step-circle.active { border-color:#fff; color:#fff; }
     .step-label { font-size:.72rem; color:rgba(255,255,255,.55); font-weight:500; }
     .step-label.active { color:#fff; }
-    .step-line { flex:1; height:2px; background:rgba(255,255,255,.25); max-width:50px; margin-bottom:18px; }
-    /* Card */
+    .step-line { flex:1; height:2px; background:rgba(255,255,255,.25); max-width:70px; margin-bottom:18px; }
     .bk-card { background:#fff; border-radius:12px; padding:32px; box-shadow:0 20px 40px rgba(0,0,0,.15); }
     .bk-card h2 { font-size:1.15rem; font-weight:700; margin-bottom:20px; color:var(--gray-800); }
-    /* Summary bar */
     .sum-bar { background:var(--teal-bg); border:1px solid var(--teal-light); border-radius:8px; padding:12px 16px; margin-bottom:20px; display:flex; flex-wrap:wrap; gap:16px; }
     .sum-item label { font-size:.68rem; font-weight:700; text-transform:uppercase; color:var(--teal); display:block; letter-spacing:.05em; }
     .sum-item span  { font-size:.88rem; font-weight:600; color:var(--gray-800); }
-    /* Coach cards */
-    .coach-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(185px,1fr)); gap:14px; }
-    .coach-card { border:2px solid var(--gray-200); border-radius:10px; padding:18px; cursor:pointer; transition:border-color .15s,box-shadow .15s; text-align:center; }
-    .coach-card:hover { border-color:var(--teal); box-shadow:0 4px 12px rgba(13,148,136,.15); }
-    .coach-initials { width:52px; height:52px; border-radius:50%; background:var(--teal-light); display:flex; align-items:center; justify-content:center; font-size:1.2rem; font-weight:700; color:var(--teal); margin:0 auto 12px; }
-    .coach-card h3 { font-size:.93rem; font-weight:700; margin-bottom:4px; }
-    .coach-card .spec { font-size:.78rem; color:var(--teal); margin-bottom:8px; }
-    .coach-card .bio  { font-size:.78rem; color:var(--gray-400); line-height:1.4; }
-    /* Calendar */
-    .cal-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+    /* Step 2 two-column (MS Bookings style) */
+    .bk2-grid { display:grid; grid-template-columns:1fr 1fr; gap:28px; align-items:start; }
+    @media (max-width:680px){ .bk2-grid { grid-template-columns:1fr; gap:20px; } }
+    .cal-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
     .cal-hdr h3 { font-size:.95rem; font-weight:700; }
     .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center; }
     .cal-dow  { font-size:.68rem; font-weight:700; color:var(--gray-400); padding-bottom:8px; text-transform:uppercase; }
-    .cal-day  { aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:8px; font-size:.88rem; font-weight:500; }
-    .cal-day.empty   { }
-    .cal-day.past    { color:var(--gray-200); }
-    .cal-day.unavail { color:var(--gray-300); }
-    .cal-day.avail   { background:var(--teal-bg); color:var(--teal); font-weight:700; cursor:pointer; }
-    .cal-day.avail:hover { background:var(--teal); color:#fff; }
-    .cal-day.is-today.avail { outline:2px solid var(--teal); outline-offset:1px; }
-    /* Time slots */
-    .slot-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:10px; }
-    .slot-btn { padding:12px 8px; border:2px solid var(--gray-200); border-radius:8px; font-size:.88rem; font-weight:600; cursor:pointer; background:#fff; transition:all .15s; color:var(--gray-800); }
+    .cal-day  { aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:50%; font-size:.9rem; font-weight:500; color:var(--gray-300); }
+    .cal-day.avail   { color:var(--gray-800); cursor:pointer; }
+    .cal-day.avail:hover { background:var(--teal-bg); color:var(--teal); font-weight:700; }
+    .cal-day.selected { background:var(--teal); color:#fff!important; font-weight:700; }
+    .slot-list { max-height:340px; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:10px; padding-right:4px; }
+    .slot-btn { padding:11px 8px; border:1px solid var(--gray-200); border-radius:8px; font-size:.86rem; font-weight:600; cursor:pointer; background:#fff; transition:all .15s; color:var(--gray-800); text-align:center; }
     .slot-btn:hover { border-color:var(--teal); color:var(--teal); background:var(--teal-bg); }
-    /* Confirmation */
-    .confirm-icon { text-align:center; font-size:3.5rem; margin-bottom:12px; }
+    .tz-note { font-size:.8rem; color:var(--gray-400); text-align:center; margin-top:18px; }
+    .grp-opt { display:flex; align-items:center; gap:12px; border:1px solid var(--gray-200); border-radius:10px; padding:14px 16px; margin-bottom:10px; cursor:pointer; }
+    .grp-opt:hover { border-color:var(--teal); }
+    .grp-opt input { width:auto; }
     .confirm-box { background:var(--gray-50); border-radius:8px; padding:20px; margin:16px 0; }
-    .confirm-box dl { display:grid; grid-template-columns:auto 1fr; gap:8px 20px; }
+    .confirm-box dl { display:grid; grid-template-columns:auto 1fr; gap:10px 20px; }
     .confirm-box dt { font-size:.8rem; color:var(--gray-400); font-weight:500; }
     .confirm-box dd { font-size:.9rem; font-weight:600; color:var(--gray-800); }
   </style>
 </head>
 <body>
 <div class="wrap">
-  <!-- Header -->
   <div class="bk-header">
-    <img src="/assets/img/hylogo.png" alt="HealYou">
+    <img src="/assets/img/hylogo-white.png" alt="HealthYou">
     <h1>Book a Coaching Session</h1>
     <p id="org-name"></p>
   </div>
 
-  <!-- Step bar -->
   <div class="step-bar" id="step-bar">
-    <div class="step-node">
-      <div class="step-circle active" id="sc-1">1</div>
-      <div class="step-label active" id="sl-1">Coach</div>
-    </div>
+    <div class="step-node"><div class="step-circle active" id="sc-1">1</div><div class="step-label active" id="sl-1">Your Details</div></div>
     <div class="step-line"></div>
-    <div class="step-node">
-      <div class="step-circle" id="sc-2">2</div>
-      <div class="step-label" id="sl-2">Date</div>
-    </div>
+    <div class="step-node"><div class="step-circle" id="sc-2">2</div><div class="step-label" id="sl-2">Date &amp; Time</div></div>
     <div class="step-line"></div>
-    <div class="step-node">
-      <div class="step-circle" id="sc-3">3</div>
-      <div class="step-label" id="sl-3">Time</div>
-    </div>
-    <div class="step-line"></div>
-    <div class="step-node">
-      <div class="step-circle" id="sc-4">4</div>
-      <div class="step-label" id="sl-4">Info</div>
-    </div>
+    <div class="step-node"><div class="step-circle" id="sc-3">3</div><div class="step-label" id="sl-3">Confirm</div></div>
   </div>
 
-  <!-- Booking card -->
   <div class="bk-card">
-
-    <!-- Summary bar (visible from step 2+) -->
     <div class="sum-bar" id="sum-bar" style="display:none;">
+      <div class="sum-item" id="sum-group" style="display:none;"><label>Group</label><span></span></div>
       <div class="sum-item" id="sum-coach" style="display:none;"><label>Coach</label><span></span></div>
       <div class="sum-item" id="sum-date"  style="display:none;"><label>Date</label><span></span></div>
       <div class="sum-item" id="sum-time"  style="display:none;"><label>Time</label><span></span></div>
     </div>
 
-    <!-- Step 1: Select Coach -->
+    <!-- Step 1: details + eligibility -->
     <div id="panel-1">
-      <h2>Choose a Coach</h2>
-      <div id="coach-list" class="coach-grid">
-        <p style="color:var(--gray-400);">Loading…</p>
+      <div id="details-form">
+        <h2>Your Information</h2>
+        <div class="form-grid" style="margin-bottom:16px;">
+          <div class="form-group"><label>First Name *</label><input id="b-fname" type="text" autocomplete="given-name"></div>
+          <div class="form-group"><label>Last Name *</label><input id="b-lname" type="text" autocomplete="family-name"></div>
+          <div class="form-group"><label>Email *</label><input id="b-email" type="email" autocomplete="email"></div>
+          <div class="form-group"><label>Phone</label><input id="b-phone" type="tel" autocomplete="tel"></div>
+          <div class="form-group"><label>Date of Birth *</label><input id="b-dob" type="date"></div>
+          <div class="form-group"><label>Gender *</label>
+            <select id="b-gender"><option value="">Select…</option><option value="Male">Male</option><option value="Female">Female</option></select>
+          </div>
+        </div>
+        <div id="elig-err" style="display:none;color:var(--red);font-size:.84rem;margin-bottom:12px;padding:8px 12px;background:var(--red-light);border-radius:6px;"></div>
+        <div style="display:flex;justify-content:flex-end;">
+          <button class="btn btn-primary" id="elig-btn" onclick="checkEligibility()">Check Eligibility &amp; Continue</button>
+        </div>
+      </div>
+
+      <!-- Group selection (only when eligible in 2+ groups) -->
+      <div id="group-select" style="display:none;">
+        <h2>Which group are you with?</h2>
+        <p style="color:var(--gray-500);font-size:.9rem;margin-top:-12px;margin-bottom:16px;">We found you in more than one group. Please choose the one you're booking under.</p>
+        <div id="group-options"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:16px;">
+          <button class="btn btn-ghost" onclick="backToDetails()">&#8592; Back</button>
+          <button class="btn btn-primary" onclick="chooseGroupContinue()">Continue</button>
+        </div>
       </div>
     </div>
 
-    <!-- Step 2: Select Date -->
+    <!-- Step 2: date / time / coach -->
     <div id="panel-2" style="display:none;">
-      <h2>Select a Date</h2>
-      <div class="cal-hdr">
-        <button class="btn btn-ghost btn-sm" onclick="prevMonth()">&#8592; Prev</button>
-        <h3 id="cal-label"></h3>
-        <button class="btn btn-ghost btn-sm" onclick="nextMonth()">Next &#8594;</button>
+      <h2>Select a Date &amp; Time</h2>
+      <div class="bk2-grid">
+        <div>
+          <div class="cal-hdr">
+            <button class="btn btn-ghost btn-sm" onclick="prevMonth()">&#8249;</button>
+            <h3 id="cal-label"></h3>
+            <button class="btn btn-ghost btn-sm" onclick="nextMonth()">&#8250;</button>
+          </div>
+          <div id="cal-grid" class="cal-grid"></div>
+        </div>
+        <div>
+          <label style="font-size:.82rem;font-weight:600;color:var(--gray-700);">Select coach (optional)</label>
+          <select id="coach-select" onchange="onCoachChange()" style="margin:6px 0 18px;">
+            <option value="">Anyone</option>
+          </select>
+          <div id="slot-hint" style="color:var(--gray-400);font-size:.88rem;">Select a date to see available times.</div>
+          <div id="slot-grid" class="slot-list"></div>
+        </div>
       </div>
-      <div id="cal-grid" class="cal-grid"></div>
-      <p style="font-size:.78rem;color:var(--gray-400);margin-top:12px;">Highlighted days have available time slots.</p>
-      <button class="btn btn-ghost" onclick="goToStep(1)" style="margin-top:16px;">&#8592; Back</button>
+      <p class="tz-note">&#128340; All times are shown in Mountain Time.</p>
+      <button class="btn btn-ghost" onclick="goToStep(1)" style="margin-top:8px;">&#8592; Back</button>
     </div>
 
-    <!-- Step 3: Select Time -->
+    <!-- Step 3: confirm -->
     <div id="panel-3" style="display:none;">
-      <h2 id="time-heading">Available Times</h2>
-      <div id="slot-grid" class="slot-grid"></div>
-      <button class="btn btn-ghost" onclick="goToStep(2)" style="margin-top:16px;">&#8592; Back</button>
-    </div>
-
-    <!-- Step 4: Your Info -->
-    <div id="panel-4" style="display:none;">
-      <h2>Your Information</h2>
-      <div class="form-grid" style="margin-bottom:16px;">
-        <div class="form-group"><label>First Name *</label><input id="b-fname" type="text" autocomplete="given-name"></div>
-        <div class="form-group"><label>Last Name *</label><input id="b-lname" type="text" autocomplete="family-name"></div>
-        <div class="form-group"><label>Email *</label><input id="b-email" type="email" autocomplete="email"></div>
-        <div class="form-group"><label>Phone</label><input id="b-phone" type="tel" autocomplete="tel"></div>
-        <div class="form-group span-2"><label>What would you like to work on? (optional)</label><textarea id="b-notes" rows="3" placeholder="Goals, concerns, or anything you'd like your coach to know ahead of time…"></textarea></div>
+      <h2>Confirm your booking</h2>
+      <div class="confirm-box"><dl id="review-dl"></dl></div>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label>What would you like to work on? (optional)</label>
+        <textarea id="b-notes" rows="3" placeholder="Goals, concerns, or anything you'd like your coach to know ahead of time…"></textarea>
       </div>
       <div id="book-err" style="display:none;color:var(--red);font-size:.84rem;margin-bottom:12px;padding:8px 12px;background:var(--red-light);border-radius:6px;"></div>
-      <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:4px;">
-        <button class="btn btn-ghost" onclick="goToStep(3)">&#8592; Back</button>
+      <div style="display:flex;justify-content:space-between;">
+        <button class="btn btn-ghost" onclick="goToStep(2)">&#8592; Back</button>
         <button class="btn btn-primary" id="book-btn" onclick="submitBooking()">Confirm Booking</button>
       </div>
     </div>
 
-    <!-- Confirmation -->
-    <div id="panel-5" style="display:none;">
-      <div class="confirm-icon">&#10003;&#65039;</div>
+    <!-- Success -->
+    <div id="panel-done" style="display:none;">
+      <div style="text-align:center;font-size:3.5rem;margin-bottom:8px;">&#10003;&#65039;</div>
       <h2 style="text-align:center;color:var(--teal);margin-bottom:6px;">You're booked!</h2>
-      <p style="text-align:center;color:var(--gray-400);margin-bottom:0;">A wellness coordinator will be in touch with connection details.</p>
-      <div class="confirm-box">
-        <dl id="confirm-dl"></dl>
-      </div>
-      <p style="font-size:.82rem;color:var(--gray-400);text-align:center;">Have questions? Contact your wellness coordinator.</p>
+      <p style="text-align:center;color:var(--gray-400);margin-bottom:0;">A confirmation has been sent to your email.</p>
+      <div class="confirm-box"><dl id="confirm-dl"></dl></div>
     </div>
+  </div>
 
-  </div><!-- /bk-card -->
-</div><!-- /wrap -->
+  <!-- Terminal view for ineligible -->
+  <div id="exited" style="display:none;" class="bk-card">
+    <div style="text-align:center;padding:30px 10px;">
+      <div style="font-size:3rem;margin-bottom:10px;">🚫</div>
+      <h2 style="color:#991b1b;margin:0 0 10px;">Booking Not Completed</h2>
+      <p style="color:var(--gray-600);max-width:440px;margin:0 auto;line-height:1.6;">You are not currently eligible to book a coaching session. Please contact your HR department for assistance.</p>
+    </div>
+  </div>
+</div>
 
+<!-- Eligibility result modal -->
+<div id="elig-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:14px;max-width:440px;width:100%;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.28);">
+    <div style="background:#991b1b;color:#fff;padding:16px 22px;font-weight:700;font-size:1.05rem;display:flex;align-items:center;gap:10px;"><span style="font-size:1.3rem;">⚠️</span> Not Currently Eligible</div>
+    <div style="padding:26px 24px 8px;text-align:center;">
+      <div style="font-size:2.6rem;margin-bottom:10px;">🚫</div>
+      <p style="font-size:1.02rem;line-height:1.6;color:#374151;margin:0 0 8px;">You are <strong>not currently eligible</strong> to book a coaching session.</p>
+      <p style="font-size:.96rem;line-height:1.6;color:#374151;margin:0;">Please contact your <strong>HR department</strong> for assistance.</p>
+    </div>
+    <div style="padding:18px 24px 24px;text-align:center;">
+      <button class="btn btn-primary" style="min-width:130px;" onclick="exitBooking()">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 <script>
-const orgSlug = new URLSearchParams(location.search).get('org') || '';
-let coaches=[], selectedCoach=null, avDows=new Set();
-let calYear, calMonth, selectedDate=null, selectedSlot=null;
-
+let details={}, groups=[], selectedGroup=null, groupCoaches=[];
+let selectedCoachId=null;  // null = Anyone
+let calYear, calMonth, avDows=new Set(), selectedDate=null, selectedSlot=null;
+let lastCoachName='';
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
-const DOW_ABBR=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DOW_ABBR=['S','M','T','W','T','F','S'];
 
-async function init(){
-  if(orgSlug){
-    try{
-      const org=await fetch('/api/book?org='+encodeURIComponent(orgSlug)).then(r=>r.json());
-      if(org.name) document.getElementById('org-name').textContent=org.name;
-    }catch{}
-  }
+// ── Step 1: details + eligibility ─────────────────────────────────────────────
+async function checkEligibility(){
+  clear('elig-err');
+  const first=v('b-fname'), last=v('b-lname'), email=v('b-email'), phone=v('b-phone'), dob=v('b-dob'), gender=v('b-gender');
+  if(!first||!last||!email||!dob||!gender){ err('elig-err','First name, last name, email, date of birth and gender are required.'); return; }
+  if(!email.includes('@')){ err('elig-err','Please enter a valid email address.'); return; }
+  details={ first_name:first, last_name:last, email, phone, date_of_birth:dob, gender };
+  const btn=document.getElementById('elig-btn'); btn.disabled=true; const t=btn.textContent; btn.textContent='Checking…';
   try{
-    coaches=await fetch('/api/coaches').then(r=>r.json());
-    renderCoaches();
-  }catch(e){
-    document.getElementById('coach-list').innerHTML='<p style="color:var(--red);">Error loading coaches. Please refresh and try again.</p>';
-  }
+    const res=await fetch('/api/booking-eligibility',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({first_name:first,last_name:last,date_of_birth:dob,gender})}).then(r=>r.json());
+    btn.disabled=false; btn.textContent=t;
+    if(!res.eligible || !res.groups || !res.groups.length){ document.getElementById('elig-modal').style.display='flex'; return; }
+    groups=res.groups;
+    if(groups.length===1){ selectedGroup=groups[0]; enterStep2(); }
+    else { renderGroupOptions(); document.getElementById('details-form').style.display='none'; document.getElementById('group-select').style.display=''; }
+  }catch(e){ btn.disabled=false; btn.textContent=t; err('elig-err','We could not verify your eligibility right now. Please try again.'); }
+}
+function renderGroupOptions(){
+  document.getElementById('group-options').innerHTML=groups.map((g,i)=>`
+    <label class="grp-opt"><input type="radio" name="grp" value="${g.id}" ${i===0?'checked':''}> <span style="font-weight:600;">${esc(g.name)}</span></label>`).join('');
+}
+function backToDetails(){ document.getElementById('group-select').style.display='none'; document.getElementById('details-form').style.display=''; }
+function chooseGroupContinue(){
+  const sel=document.querySelector('input[name="grp"]:checked');
+  selectedGroup=groups.find(g=>String(g.id)===String(sel&&sel.value))||groups[0];
+  enterStep2();
+}
+function exitBooking(){
+  document.getElementById('elig-modal').style.display='none';
+  document.querySelector('.bk-card').style.display='none';
+  document.getElementById('step-bar').style.display='none';
+  document.getElementById('exited').style.display='';
+  window.scrollTo(0,0);
 }
 
-function renderCoaches(){
-  if(!coaches.length){
-    document.getElementById('coach-list').innerHTML='<p style="color:var(--gray-400);">No coaches are currently available. Please check back soon.</p>';
-    return;
-  }
-  document.getElementById('coach-list').innerHTML=coaches.map(c=>`
-    <div class="coach-card" onclick="selectCoach(${c.id})">
-      <div class="coach-initials">${initials(c.name)}</div>
-      <h3>${esc(c.name)}</h3>
-      ${c.specialty?`<div class="spec">${esc(c.specialty)}</div>`:''}
-      ${c.bio?`<div class="bio">${esc(c.bio.slice(0,100))}${c.bio.length>100?'…':''}</div>`:''}
-    </div>`).join('');
-}
-
-async function selectCoach(id){
-  selectedCoach=coaches.find(c=>c.id===id);
-  avDows=new Set();
-  try{
-    const av=await fetch('/api/coach-availability?coach_id='+id).then(r=>r.json());
-    av.forEach(a=>avDows.add(a.day_of_week));
-  }catch{}
-  if(!avDows.size){
-    alert('This coach has not set their availability yet. Please choose another coach or check back soon.');
-    return;
+// ── Step 2: date / time / coach ───────────────────────────────────────────────
+async function enterStep2(){
+  setSummary('group', selectedGroup.name);
+  document.getElementById('coach-select').innerHTML='<option value="">Anyone</option>';
+  selectedCoachId=null; selectedDate=null; selectedSlot=null;
+  try{ groupCoaches=await fetch('/api/coaches?group_id='+selectedGroup.id).then(r=>r.json()); }catch{ groupCoaches=[]; }
+  if(Array.isArray(groupCoaches)){
+    document.getElementById('coach-select').innerHTML='<option value="">Anyone</option>'+
+      groupCoaches.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
   }
   const now=new Date(); calYear=now.getFullYear(); calMonth=now.getMonth();
-  setSummary('coach',selectedCoach.name);
+  await computeAvailDows();
   goToStep(2); renderCalendar();
+  document.getElementById('slot-grid').innerHTML='';
+  document.getElementById('slot-hint').style.display='';
 }
-
+async function onCoachChange(){
+  selectedCoachId=document.getElementById('coach-select').value ? parseInt(document.getElementById('coach-select').value,10) : null;
+  selectedDate=null; selectedSlot=null;
+  document.getElementById('slot-grid').innerHTML='';
+  document.getElementById('slot-hint').style.display='';
+  setSummary('coach', selectedCoachId ? (groupCoaches.find(c=>c.id===selectedCoachId)||{}).name : 'Anyone');
+  await computeAvailDows(); renderCalendar();
+}
+async function computeAvailDows(){
+  avDows=new Set();
+  const ids = selectedCoachId ? [selectedCoachId] : groupCoaches.map(c=>c.id);
+  const res=await Promise.all(ids.map(id=>fetch('/api/coach-availability?coach_id='+id).then(r=>r.json()).catch(()=>[])));
+  res.forEach(av=>{ (Array.isArray(av)?av:[]).forEach(a=>avDows.add(a.day_of_week)); });
+}
 function renderCalendar(){
   document.getElementById('cal-label').textContent=MONTHS[calMonth]+' '+calYear;
   const first=new Date(calYear,calMonth,1).getDay();
   const days=new Date(calYear,calMonth+1,0).getDate();
   const today=new Date(); today.setHours(0,0,0,0);
   let html=DOW_ABBR.map(d=>`<div class="cal-dow">${d}</div>`).join('');
-  for(let i=0;i<first;i++) html+='<div class="cal-day empty"></div>';
+  for(let i=0;i<first;i++) html+='<div class="cal-day"></div>';
   for(let d=1;d<=days;d++){
-    const dt=new Date(calYear,calMonth,d);
-    const dow=dt.getDay();
+    const dt=new Date(calYear,calMonth,d), dow=dt.getDay();
     const ds=`${calYear}-${pad(calMonth+1)}-${pad(d)}`;
-    const isPast=dt<today, isAvail=avDows.has(dow)&&!isPast, isToday=dt.getTime()===today.getTime();
-    let cls='cal-day'+(isPast?' past':(!avDows.has(dow)?' unavail':' avail'))+(isToday&&isAvail?' is-today':'');
-    html+=`<div class="${cls}"${isAvail?` onclick="selectDate('${ds}')"`:''} title="${isAvail?'Click to select':'Not available'}">${d}</div>`;
+    const avail=avDows.has(dow)&&dt>=today;
+    const sel=ds===selectedDate;
+    html+=`<div class="cal-day${avail?' avail':''}${sel?' selected':''}"${avail?` onclick="selectDate('${ds}')"`:''}>${d}</div>`;
   }
   document.getElementById('cal-grid').innerHTML=html;
 }
-
-function prevMonth(){
-  calMonth--; if(calMonth<0){calMonth=11;calYear--;}
-  const now=new Date();
-  if(calYear<now.getFullYear()||(calYear===now.getFullYear()&&calMonth<now.getMonth())){
-    calYear=now.getFullYear();calMonth=now.getMonth();
-  }
-  renderCalendar();
-}
+function prevMonth(){ calMonth--; if(calMonth<0){calMonth=11;calYear--;} const n=new Date(); if(calYear<n.getFullYear()||(calYear===n.getFullYear()&&calMonth<n.getMonth())){calYear=n.getFullYear();calMonth=n.getMonth();} renderCalendar(); }
 function nextMonth(){ calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCalendar(); }
-
 async function selectDate(ds){
-  selectedDate=ds;
-  setSummary('date',fmtDate(ds));
-  document.getElementById('time-heading').textContent='Available Times — '+fmtDate(ds);
-  const sg=document.getElementById('slot-grid');
-  sg.innerHTML='<p style="color:var(--gray-400);">Loading…</p>';
-  goToStep(3);
+  selectedDate=ds; selectedSlot=null; renderCalendar();
+  const sg=document.getElementById('slot-grid'); const hint=document.getElementById('slot-hint');
+  hint.style.display='none'; sg.innerHTML='<p style="color:var(--gray-400);">Loading…</p>';
+  const q = selectedCoachId ? `coach_id=${selectedCoachId}` : `group_id=${selectedGroup.id}`;
   try{
-    const slots=await fetch(`/api/available-slots?coach_id=${selectedCoach.id}&date=${ds}`).then(r=>r.json());
-    if(!slots.length){
-      sg.innerHTML='<p style="color:var(--gray-600);">No slots available on this date. Please go back and pick another day.</p>';
-    }else{
-      sg.innerHTML=slots.map(s=>`<div class="slot-btn" onclick="selectSlot('${s}')">${fmtTime(s)}</div>`).join('');
-    }
-  }catch(e){
-    sg.innerHTML='<p style="color:var(--red);">Error loading slots. Please try again.</p>';
-  }
+    const slots=await fetch(`/api/available-slots?${q}&date=${ds}`).then(r=>r.json());
+    if(!Array.isArray(slots)||!slots.length){ sg.innerHTML='<p style="color:var(--gray-600);grid-column:1/-1;">No times available on this date.</p>'; return; }
+    sg.innerHTML=slots.map(s=>`<div class="slot-btn" onclick="selectSlot('${s}')">${fmtTime(s)}</div>`).join('');
+  }catch(e){ sg.innerHTML='<p style="color:var(--red);grid-column:1/-1;">Error loading times.</p>'; }
+}
+function selectSlot(t){
+  selectedSlot=t;
+  setSummary('date', fmtDate(selectedDate)); setSummary('time', fmtTime(t));
+  renderReview(); goToStep(3);
 }
 
-function selectSlot(t){ selectedSlot=t; setSummary('time',fmtTime(t)); goToStep(4); }
-
-async function submitBooking(){
-  const fname=document.getElementById('b-fname').value.trim();
-  const lname=document.getElementById('b-lname').value.trim();
-  const email=document.getElementById('b-email').value.trim();
-  const notes=document.getElementById('b-notes').value.trim();
-  clearErr();
-  if(!fname||!lname||!email){showErr('First name, last name, and email are required.');return;}
-  if(!email.includes('@')){showErr('Please enter a valid email address.');return;}
-  const btn=document.getElementById('book-btn');
-  btn.disabled=true; btn.textContent='Booking…';
-  try{
-    const r=await fetch('/api/book',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        coach_id:selectedCoach.id, first_name:fname, last_name:lname, email,
-        scheduled_at:`${selectedDate}T${selectedSlot}:00`,
-        duration_minutes:60, intake_notes:notes||null, org_slug:orgSlug||null
-      })
-    });
-    if(!r.ok){showErr((await r.json()).error||'Booking failed. Please try again.');return;}
-    showConfirmation(fname,lname);
-  }catch(e){showErr('Error: '+e.message);}
-  finally{btn.disabled=false;btn.textContent='Confirm Booking';}
-}
-
-function showConfirmation(fname,lname){
-  document.getElementById('confirm-dl').innerHTML=`
-    <dt>Name</dt><dd>${esc(fname+' '+lname)}</dd>
-    <dt>Coach</dt><dd>${esc(selectedCoach.name)}</dd>
+// ── Step 3: confirm ───────────────────────────────────────────────────────────
+function renderReview(){
+  const coachTxt = selectedCoachId ? (groupCoaches.find(c=>c.id===selectedCoachId)||{}).name : 'Any available coach';
+  document.getElementById('review-dl').innerHTML=`
+    <dt>Name</dt><dd>${esc(details.first_name+' '+details.last_name)}</dd>
+    <dt>Group</dt><dd>${esc(selectedGroup.name)}</dd>
+    <dt>Coach</dt><dd>${esc(coachTxt)}</dd>
     <dt>Date</dt><dd>${fmtDate(selectedDate)}</dd>
-    <dt>Time</dt><dd>${fmtTime(selectedSlot)}</dd>
+    <dt>Time</dt><dd>${fmtTime(selectedSlot)} (Mountain Time)</dd>
+    <dt>Duration</dt><dd>60 minutes</dd>`;
+}
+async function submitBooking(){
+  clear('book-err');
+  const btn=document.getElementById('book-btn'); btn.disabled=true; btn.textContent='Booking…';
+  try{
+    const res=await fetch('/api/book',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        group_id:selectedGroup.id, coach_id:selectedCoachId||null,
+        first_name:details.first_name, last_name:details.last_name, email:details.email,
+        phone:details.phone||null, date_of_birth:details.date_of_birth, gender:details.gender,
+        scheduled_at:`${selectedDate}T${selectedSlot}:00`, duration_minutes:60,
+        intake_notes:v('b-notes')||null })});
+    const data=await res.json();
+    if(!res.ok){ err('book-err',data.error||'Booking failed. Please try again.'); btn.disabled=false; btn.textContent='Confirm Booking'; return; }
+    lastCoachName=data.coach_name||'Your coach';
+    showConfirmation();
+  }catch(e){ err('book-err','Error: '+e.message); btn.disabled=false; btn.textContent='Confirm Booking'; }
+}
+function showConfirmation(){
+  document.getElementById('confirm-dl').innerHTML=`
+    <dt>Name</dt><dd>${esc(details.first_name+' '+details.last_name)}</dd>
+    <dt>Group</dt><dd>${esc(selectedGroup.name)}</dd>
+    <dt>Coach</dt><dd>${esc(lastCoachName)}</dd>
+    <dt>Date</dt><dd>${fmtDate(selectedDate)}</dd>
+    <dt>Time</dt><dd>${fmtTime(selectedSlot)} (Mountain Time)</dd>
     <dt>Duration</dt><dd>60 minutes</dd>`;
   document.getElementById('step-bar').style.display='none';
   document.getElementById('sum-bar').style.display='none';
-  ['1','2','3','4'].forEach(n=>document.getElementById('panel-'+n).style.display='none');
-  document.getElementById('panel-5').style.display='';
+  ['1','2','3'].forEach(n=>document.getElementById('panel-'+n).style.display='none');
+  document.getElementById('panel-done').style.display='';
 }
 
+// ── Nav / helpers ─────────────────────────────────────────────────────────────
 function goToStep(n){
-  ['1','2','3','4'].forEach(i=>document.getElementById('panel-'+i).style.display=i==n?'':'none');
-  updateStepBar(n);
+  ['1','2','3'].forEach(i=>document.getElementById('panel-'+i).style.display=(''+i===''+n)?'':'none');
+  [1,2,3].forEach(k=>{ const c=document.getElementById('sc-'+k), l=document.getElementById('sl-'+k);
+    if(k<n){c.className='step-circle done';c.innerHTML='&#10003;';l.className='step-label';}
+    else if(k===n){c.className='step-circle active';c.textContent=k;l.className='step-label active';}
+    else{c.className='step-circle';c.textContent=k;l.className='step-label';} });
   document.getElementById('sum-bar').style.display=n>1?'flex':'none';
 }
-
-function updateStepBar(cur){
-  [1,2,3,4].forEach(n=>{
-    const c=document.getElementById('sc-'+n), l=document.getElementById('sl-'+n);
-    if(n<cur){c.className='step-circle done';c.innerHTML='&#10003;';l.className='step-label';}
-    else if(n===cur){c.className='step-circle active';c.textContent=n;l.className='step-label active';}
-    else{c.className='step-circle';c.textContent=n;l.className='step-label';}
-  });
-}
-
-function setSummary(key,val){
-  const map={coach:'sum-coach',date:'sum-date',time:'sum-time'};
-  const el=document.getElementById(map[key]);
-  el.style.display=''; el.querySelector('span').textContent=val;
-}
-
-function fmtDate(ds){
-  const[y,m,d]=ds.split('-').map(Number);
-  return new Date(y,m-1,d).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
-}
+function setSummary(key,val){ const map={group:'sum-group',coach:'sum-coach',date:'sum-date',time:'sum-time'};
+  const el=document.getElementById(map[key]); if(!el) return; el.style.display=''; el.querySelector('span').textContent=val||''; }
+function fmtDate(ds){ const[y,m,d]=ds.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
 function fmtTime(hm){ const[h,m]=hm.split(':').map(Number); return `${h%12||12}:${pad(m)} ${h>=12?'PM':'AM'}`; }
 function pad(n){ return String(n).padStart(2,'0'); }
-function initials(n){ return n.split(' ').filter(Boolean).map(w=>w[0].toUpperCase()).slice(0,2).join(''); }
-function showErr(m){ const e=document.getElementById('book-err'); e.textContent=m; e.style.display=''; }
-function clearErr(){ document.getElementById('book-err').style.display='none'; }
-function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-init();
+function v(id){ return (document.getElementById(id).value||'').trim(); }
+function err(id,m){ const e=document.getElementById(id); e.textContent=m; e.style.display=''; }
+function clear(id){ document.getElementById(id).style.display='none'; }
+function esc(s){ return (s==null?'':s.toString()).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 </body>
 </html>
