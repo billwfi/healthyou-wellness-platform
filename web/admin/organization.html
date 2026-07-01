@@ -164,14 +164,18 @@
       <!-- Records table -->
       <div class="section-header" style="margin-bottom:14px;">
         <h3>Records <span id="elig-count" style="font-size:.8rem;font-weight:400;color:var(--gray-400);"></span></h3>
-        <div class="search-bar" style="width:260px;">
-          <input id="elig-search" type="text" placeholder="Search name, email, ID…" oninput="debounceEligSearch()"/>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <select id="elig-status" onchange="loadEligibility(0)" style="min-width:150px;"><option value="">All Statuses</option></select>
+          <select id="elig-dept" onchange="loadEligibility(0)" style="min-width:180px;"><option value="">All Dept / Locations</option></select>
+          <div class="search-bar" style="width:220px;">
+            <input id="elig-search" type="text" placeholder="Search name, email, ID…" oninput="debounceEligSearch()"/>
+          </div>
         </div>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
         <table class="data-table">
-          <thead><tr><th>Emp ID</th><th>Name</th><th>Email</th><th>Dept / Location</th><th>Status</th><th>Coverage</th><th>Eff. Date</th></tr></thead>
-          <tbody id="elig-tbody"><tr><td colspan="7" class="empty">No eligibility records loaded.</td></tr></tbody>
+          <thead><tr><th>Emp ID</th><th>Name</th><th>Email</th><th>DOB</th><th>Gender</th><th>Dept / Location</th><th>Status</th><th>Coverage</th><th>Eff. Date</th></tr></thead>
+          <tbody id="elig-tbody"><tr><td colspan="9" class="empty">No eligibility records loaded.</td></tr></tbody>
         </table>
       </div>
       <div id="elig-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;font-size:.82rem;color:var(--gray-400);"></div>
@@ -686,13 +690,24 @@ async function clearEligibility() {
   } catch(e){showToast('Error: '+e.message);}
 }
 
+function fillEligFilter(id, values){
+  const sel=document.getElementById(id); if(!sel || sel.options.length>1) return; // populate once
+  (values||[]).forEach(v=>sel.add(new Option(v,v)));
+}
 async function loadEligibility(offset=0) {
   eligOffset=offset; eligLoaded=true;
   const search=(document.getElementById('elig-search')||{}).value||'';
-  const url=`/api/group-eligibility?group_id=${orgId}&limit=${ELIG_LIMIT}&offset=${offset}`+(search?'&search='+encodeURIComponent(search):'');
+  const status=(document.getElementById('elig-status')||{}).value||'';
+  const dept=(document.getElementById('elig-dept')||{}).value||'';
+  const url=`/api/group-eligibility?group_id=${orgId}&limit=${ELIG_LIMIT}&offset=${offset}`
+    +(search?'&search='+encodeURIComponent(search):'')
+    +(status?'&status='+encodeURIComponent(status):'')
+    +(dept?'&dept='+encodeURIComponent(dept):'');
   try {
     const data=await fetch(url,{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json());
     eligTotal=data.total;
+    fillEligFilter('elig-status', data.statuses);
+    fillEligFilter('elig-dept', data.departments);
     renderEligibility(data.records, data.total);
     updateEligStats(data.total, data.status_counts||{});
   } catch(e){showToast('Error loading eligibility');}
@@ -701,16 +716,21 @@ async function loadEligibility(offset=0) {
 function renderEligibility(records, total) {
   document.getElementById('elig-count').textContent=total?`(${total.toLocaleString()} records)`:'';
   const tbody=document.getElementById('elig-tbody');
-  if(!records.length){tbody.innerHTML='<tr><td colspan="7" class="empty">No eligibility records.</td></tr>'; document.getElementById('elig-pagination').innerHTML=''; return;}
-  tbody.innerHTML=records.map(r=>`<tr>
+  if(!records.length){tbody.innerHTML='<tr><td colspan="9" class="empty">No eligibility records.</td></tr>'; document.getElementById('elig-pagination').innerHTML=''; return;}
+  tbody.innerHTML=records.map(r=>{
+    const s=(r.status||'').toLowerCase();
+    const cls=s==='active'?'active':(s.indexOf('term')>=0?'cancelled':'inactive');
+    return `<tr>
     <td style="font-family:monospace;font-size:.82rem;">${esc(r.employee_id||'—')}</td>
     <td><strong>${esc([r.last_name,r.first_name].filter(Boolean).join(', '))}</strong></td>
     <td style="font-size:.84rem;">${esc(r.email||'—')}</td>
+    <td style="font-size:.82rem;">${r.date_of_birth?new Date(r.date_of_birth+'T00:00:00').toLocaleDateString():'—'}</td>
+    <td style="font-size:.82rem;">${esc(r.gender||'—')}</td>
     <td style="font-size:.82rem;">${esc([r.department,r.location].filter(Boolean).join(' / ')||'—')}</td>
-    <td><span class="badge badge-${r.status==='active'?'active':r.status==='terminated'?'cancelled':'inactive'}">${esc(r.status||'—')}</span></td>
+    <td><span class="badge badge-${cls}">${esc(r.status||'—')}</span></td>
     <td style="font-size:.82rem;">${esc(r.coverage_tier||'—')}</td>
     <td style="font-size:.82rem;">${r.effective_date?new Date(r.effective_date).toLocaleDateString():'—'}</td>
-  </tr>`).join('');
+  </tr>`;}).join('');
   const pages=Math.ceil(total/ELIG_LIMIT), page=Math.floor(eligOffset/ELIG_LIMIT)+1;
   const pg=document.getElementById('elig-pagination');
   if(pages<=1){pg.innerHTML='';return;}
@@ -724,9 +744,9 @@ function renderEligibility(records, total) {
 
 function updateEligStats(total, counts) {
   document.getElementById('elig-stat-total').textContent=total.toLocaleString();
-  document.getElementById('elig-stat-active').textContent=(counts['active']||0).toLocaleString();
-  const other=Object.entries(counts).filter(([k])=>k!=='active').reduce((s,[,v])=>s+parseInt(v),0);
-  document.getElementById('elig-stat-other').textContent=other.toLocaleString();
+  let active=0; Object.entries(counts).forEach(([k,v])=>{ if((k||'').toLowerCase()==='active') active+=parseInt(v); });
+  document.getElementById('elig-stat-active').textContent=active.toLocaleString();
+  document.getElementById('elig-stat-other').textContent=Math.max(0,total-active).toLocaleString();
   document.getElementById('elig-stat-date').textContent='iStrata';
 }
 

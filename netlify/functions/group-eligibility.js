@@ -25,36 +25,46 @@ exports.handler = async (event, context) => {
   const search = qs.search || '';
   const limit  = Math.min(parseInt(qs.limit) || 50, 200);
   const offset = parseInt(qs.offset) || 0;
-  const searchCond = search
-    ? `AND (e.[First Name] LIKE $2 OR e.[Last Name] LIKE $2 OR e.[Employee ID] LIKE $2
-            OR e.personalemailaddress LIKE $2 OR e.[Work Email] LIKE $2)`
-    : '';
-  const baseParams = search ? [qs.group_id, `%${search}%`] : [qs.group_id];
+
+  // Build filter conditions with numbered params (search + account status + dept/location).
+  const params = [qs.group_id];
+  let cond = '';
+  if (search) {
+    params.push(`%${search}%`); const p = `$${params.length}`;
+    cond += ` AND (e.[First Name] LIKE ${p} OR e.[Last Name] LIKE ${p} OR e.[Employee ID] LIKE ${p}
+                   OR e.personalemailaddress LIKE ${p} OR e.[Work Email] LIKE ${p})`;
+  }
+  if (qs.status) { params.push(qs.status); cond += ` AND e.[Account Status] = $${params.length}`; }
+  if (qs.dept)   { params.push(qs.dept);   cond += ` AND e.[Location] = $${params.length}`; }
 
   try {
-    const [countR, dataR, statsR] = await Promise.all([
-      db.query(`SELECT COUNT(*) AS count ${FROM} ${searchCond}`, baseParams),
+    const [countR, dataR, statsR, statusFacet, deptFacet] = await Promise.all([
+      db.query(`SELECT COUNT(*) AS count ${FROM} ${cond}`, params),
       db.query(
         `SELECT
             e.[Employee ID]                                   AS employee_id,
             e.[First Name]                                    AS first_name,
             e.[Last Name]                                     AS last_name,
             COALESCE(NULLIF(e.[Work Email],''), e.personalemailaddress) AS email,
+            CONVERT(varchar(10), TRY_CONVERT(date, e.[DOB]), 23) AS date_of_birth,
+            e.[Gender]                                        AS gender,
             e.[Location]                                      AS department,
             COALESCE(e.locationdesc, e.[Location])            AS location,
-            CASE WHEN e.[Termination Date] IS NOT NULL THEN 'terminated' ELSE 'active' END AS status,
+            e.[Account Status]                                AS status,
             COALESCE(e.plancodedesc, e.[Plan Code])           AS coverage_tier,
             CONVERT(varchar(10), e.[Initial Hire Date], 23)   AS effective_date
-           ${FROM} ${searchCond}
+           ${FROM} ${cond}
          ORDER BY e.[Last Name], e.[First Name]
-         OFFSET $${baseParams.length + 2} ROWS FETCH NEXT $${baseParams.length + 1} ROWS ONLY`,
-        [...baseParams, limit, offset]),
+         OFFSET $${params.length + 2} ROWS FETCH NEXT $${params.length + 1} ROWS ONLY`,
+        [...params, limit, offset]),
       db.query(
-        `SELECT CASE WHEN e.[Termination Date] IS NOT NULL THEN 'terminated' ELSE 'active' END AS status,
-                COUNT(*) AS cnt
-           ${FROM}
-          GROUP BY CASE WHEN e.[Termination Date] IS NOT NULL THEN 'terminated' ELSE 'active' END`,
-        [qs.group_id]),
+        `SELECT e.[Account Status] AS status, COUNT(*) AS cnt
+           ${FROM} ${cond}
+          GROUP BY e.[Account Status]`,
+        params),
+      // Distinct facet values across the whole group (unfiltered) for the pick lists.
+      db.query(`SELECT DISTINCT e.[Account Status] AS v ${FROM} AND e.[Account Status] IS NOT NULL AND e.[Account Status] <> '' ORDER BY e.[Account Status]`, [qs.group_id]),
+      db.query(`SELECT DISTINCT e.[Location] AS v ${FROM} AND e.[Location] IS NOT NULL AND e.[Location] <> '' ORDER BY e.[Location]`, [qs.group_id]),
     ]);
 
     const statusCounts = {};
@@ -63,6 +73,8 @@ exports.handler = async (event, context) => {
       total: parseInt(countR.rows[0].count),
       records: dataR.rows,
       status_counts: statusCounts,
+      statuses: statusFacet.rows.map(r => r.v).filter(Boolean),
+      departments: deptFacet.rows.map(r => r.v).filter(Boolean),
       source: 'iStrata',
     });
   } catch (e) { return serverError(e); }
