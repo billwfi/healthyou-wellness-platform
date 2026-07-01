@@ -811,3 +811,7 @@ GO
 -- to that group). Nullable; older sessions have none.
 IF COL_LENGTH('dbo.coaching_sessions','group_id') IS NULL ALTER TABLE dbo.coaching_sessions ADD group_id INT NULL;
 GO
+
+-- Public cancel/reschedule link token for coaching sessions (emailed to bookers).
+IF COL_LENGTH('dbo.coaching_sessions','manage_token') IS NULL ALTER TABLE dbo.coaching_sessions ADD manage_token NVARCHAR(64) NULL;
+GO
