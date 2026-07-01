@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Eligibility Record — HealYou Admin</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <script src="/assets/auth.js"></script>
+  <style>
+    .detail-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px 20px; }
+    .detail-grid .lbl { font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; color:var(--gray-400); font-weight:700; }
+    .detail-grid .val { font-size:.9rem; color:var(--gray-800); font-weight:600; margin-top:1px; }
+  </style>
+</head>
+<body>
+<header class="header">
+  <a class="header-logo" href="/admin/"><img src="/assets/img/hylogo-white.png" alt="Healthyou"></a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="header-name" style="font-size:.85rem;opacity:.8;"></span>
+    <span style="font-size:.75rem;opacity:.6;padding:2px 8px;border:1px solid rgba(255,255,255,.4);border-radius:99px;">Admin</span>
+    <button class="btn btn-ghost btn-sm" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.6);" onclick="netlifyIdentity.logout()">Log Out</button>
+  </div>
+</header>
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Admin Portal</div>
+    <a href="/admin/" class="sidebar-item">Control Panel</a>
+    <a href="/admin/groups.html" class="sidebar-item">Groups</a>
+    <a href="/admin/coaches.html" class="sidebar-item">Coaches</a>
+    <a href="/admin/eligibility-search.html" class="sidebar-item active">Eligibility Search</a>
+    <a href="/admin/booking-setup.html" class="sidebar-item">Booking Setup</a>
+    <div class="sidebar-section" style="margin-top:12px;">Event Management</div>
+    <a href="/admin/events.html" class="sidebar-item">Events</a>
+    <a href="/admin/calendar.html" class="sidebar-item">Calendar</a>
+    <a href="/admin/appointment-search.html" class="sidebar-item">Appointment Search</a>
+    <a href="/admin/forms.html" class="sidebar-item">Forms</a>
+    <a href="/admin/emails.html" class="sidebar-item">Email Templates</a>
+    <div class="sidebar-section" style="margin-top:12px;">Wellness Portal</div>
+    <a href="/admin/health-tips.html" class="sidebar-item">Health Tips</a>
+    <a href="/admin/testimonials.html" class="sidebar-item">Testimonials</a>
+    <a href="/admin/library.html" class="sidebar-item">Library</a>
+    <a href="/admin/umbraco.html" class="sidebar-item">Umbraco</a>
+    <div class="sidebar-section" style="margin-top:12px;">Reports</div>
+    <a href="/admin/reports.html" class="sidebar-item">Reports</a>
+    <div class="sidebar-section" style="margin-top:12px;">Settings</div>
+    <a href="/admin/users.html" class="sidebar-item">User Management</a>
+    <a href="/admin/release-notes.html" class="sidebar-item">Release Notes</a>
+    <div class="sidebar-section" style="margin-top:12px;">Portals</div>
+    <a href="/coach/" class="sidebar-item">Coach Portal →</a>
+    <a href="/screener/" class="sidebar-item">Screener Portal →</a>
+    <a href="/book/" class="sidebar-item">Booking Page →</a>
+  </nav>
+</aside>
+<main class="container has-sidebar">
+  <div id="login-wall" class="login-wall"><h2>Admin Portal</h2><p>Sign in to continue.</p><button class="btn btn-primary" onclick="netlifyIdentity.open()">Sign In</button></div>
+  <div id="content" style="display:none;">
+    <a href="/admin/eligibility-search.html" class="back-link" style="display:inline-block;margin-bottom:12px;">&#8592; Eligibility Search</a>
+    <div id="body"><div class="empty">Loading…</div></div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+let authToken=null, data=null;
+const P=new URLSearchParams(location.search);
+const STATUS=[['scheduled','Scheduled'],['completed','Completed'],['cancelled','Cancelled'],['no_show','No-Show'],['coach_missed','Coach Missed']];
+
+netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} else { location.href='/admin/login.html'; } });
+netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
+netlifyIdentity.on('logout',()=>{ location.href='/admin/login.html'; });
+
+async function getToken(){ try{ const u=netlifyIdentity.currentUser(); if(u){ const t=await u.jwt(); if(t){ authToken=t; return t; } } }catch(e){} return authToken; }
+async function apiFetch(url, opts){ opts=opts||{}; const base=opts.headers||{};
+  let r=await fetch(url, Object.assign({}, opts, { headers: Object.assign({ Authorization:'Bearer '+(await getToken()) }, base) }));
+  if(r.status===401){ showToast('Session expired'); setTimeout(()=>location.href='/admin/login.html',1200); } return r; }
+
+async function boot(user){
+  document.getElementById('login-wall').style.display='none';
+  document.getElementById('content').style.display='';
+  document.getElementById('header-name').textContent=user.user_metadata?.full_name||user.email;
+  load();
+}
+async function load(){
+  const q=new URLSearchParams({ group_id:P.get('group_id')||'', first:P.get('first')||'', last:P.get('last')||'', dob:P.get('dob')||'', gender:P.get('gender')||'' });
+  try{
+    const r=await apiFetch('/api/eligibility-record?'+q.toString());
+    data=await r.json();
+    if(!r.ok) throw new Error(data.error||'Failed to load record');
+    render();
+  }catch(e){ document.getElementById('body').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; }
+}
+function field(l,v){ return v?`<div><div class="lbl">${l}</div><div class="val">${esc(v)}</div></div>`:''; }
+function render(){
+  const rec=data.record||{};
+  const name=`${esc(rec.first_name||'')} ${esc(rec.last_name||'')}`.trim();
+  const details=`
+    <div class="card" style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+        <h1 class="page-title" style="margin:0;">${name||'Eligibility Record'}</h1>
+        <span class="badge badge-${(rec.account_status||'').toLowerCase()==='active'?'active':'inactive'}">${esc(rec.account_status||'—')}</span>
+      </div>
+      <div class="detail-grid">
+        ${field('Group',rec.group_name)}
+        ${field('Date of Birth',rec.dob)}
+        ${field('Gender',rec.gender)}
+        ${field('Account Type',rec.account_type)}
+        ${field('Employee ID',rec.employee_id)}
+        ${field('Customer Account #',rec.customer_account_number)}
+        ${field('Work Email',rec.work_email)}
+        ${field('Personal Email',rec.personal_email)}
+        ${field('Phone',rec.phone)}
+        ${field('Address',[rec.address1,rec.address2].filter(Boolean).join(', '))}
+        ${field('City/State/Zip',[rec.city,rec.state,rec.zip].filter(Boolean).join(', '))}
+        ${field('Initial Hire Date',rec.initial_hire_date)}
+        ${field('Currently Employed',rec.currently_employed)}
+        ${field('Termination Date',rec.termination_date)}
+        ${field('Registered',rec.is_registered)}
+        ${field('Plan',[rec.plan_code,rec.plan_desc].filter(Boolean).join(' — '))}
+        ${field('Location',[rec.location,rec.location_desc].filter(Boolean).join(' — '))}
+        ${field('Insurance',rec.insurance_name)}
+      </div>
+      ${data.participant_id?'':'<p style="margin-top:14px;font-size:.83rem;color:var(--gray-400);">No matching participant record found — this person has no biometric screenings or coaching appointments on file yet.</p>'}
+    </div>`;
+
+  const bio=data.biometrics||[];
+  const bioCard=`
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">
+      <div style="padding:14px 16px;font-weight:600;font-size:.9rem;border-bottom:1px solid var(--gray-100);">Biometric Screenings (${bio.length})</div>
+      ${bio.length?`<table class="data-table"><thead><tr><th>Date</th><th>BMI</th><th>Blood Pressure</th><th>Total Chol.</th><th>Glucose</th><th>Overall Risk</th></tr></thead><tbody>
+        ${bio.map(b=>`<tr>
+          <td>${fmtDate(b.screened_at)}</td>
+          <td>${b.bmi?Number(b.bmi).toFixed(1):'—'}</td>
+          <td>${b.systolic_bp?esc(b.systolic_bp+'/'+b.diastolic_bp):'—'}</td>
+          <td>${b.total_cholesterol?esc(b.total_cholesterol+' mg/dL'):'—'}</td>
+          <td>${b.blood_glucose?esc(b.blood_glucose+' mg/dL'):'—'}</td>
+          <td>${b.overall_risk?`<span class="badge badge-${b.overall_risk}">${esc(b.overall_risk)}</span>`:'—'}</td>
+        </tr>`).join('')}
+      </tbody></table>`:'<div class="empty" style="padding:16px;">No biometric screenings on file.</div>'}
+    </div>`;
+
+  const ses=data.sessions||[];
+  const sesCard=`
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:14px 16px;font-weight:600;font-size:.9rem;border-bottom:1px solid var(--gray-100);">Coaching Appointments (${ses.length})</div>
+      ${ses.length?`<table class="data-table"><thead><tr><th>Date &amp; Time</th><th>Coach</th><th>Type</th><th>Follow-up #</th><th style="width:180px;">Status</th></tr></thead><tbody>
+        ${ses.map(s=>`<tr>
+          <td>${fmtDateTime(s.scheduled_at)}</td>
+          <td>${esc(s.coach_name||'—')}</td>
+          <td>${esc((s.session_type||'').replace('_',' '))}</td>
+          <td>${s.followup_number?('#'+s.followup_number):'—'}</td>
+          <td><select class="sess-status" data-id="${s.id}" onchange="changeStatus(${s.id},this)" style="padding:5px 8px;font-size:.82rem;">
+            ${STATUS.map(([v,l])=>`<option value="${v}" ${s.status===v?'selected':''}>${l}</option>`).join('')}
+          </select></td>
+        </tr>`).join('')}
+      </tbody></table>`:'<div class="empty" style="padding:16px;">No coaching appointments on file.</div>'}
+    </div>`;
+
+  document.getElementById('body').innerHTML=details+bioCard+sesCard;
+}
+async function changeStatus(id, el){
+  const status=el.value; el.disabled=true;
+  try{
+    const r=await apiFetch('/api/sessions',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status})});
+    if(!r.ok) throw new Error((await r.json()).error||'Update failed');
+    const s=(data.sessions||[]).find(x=>x.id===id); if(s) s.status=status;
+    showToast('Status updated'+(status==='completed'?' — summary emailed to participant':''));
+  }catch(e){ showToast('Error: '+e.message); }
+  finally{ el.disabled=false; }
+}
+function fmtDate(iso){ if(!iso) return '—'; return new Date(iso).toLocaleDateString('en-US',{timeZone:'UTC',month:'short',day:'numeric',year:'numeric'}); }
+function fmtDateTime(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric',year:'numeric'})+' · '+d.toLocaleTimeString('en-US',{timeZone:'UTC',hour:'numeric',minute:'2-digit'}); }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function esc(s){ return (s==null?'':s.toString()).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body></html>

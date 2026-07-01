@@ -136,12 +136,14 @@ async function search(){
     renderRows(data.records||[], data.capped);
   }catch(e){ tb.innerHTML='<tr><td colspan="5" class="empty">'+esc(e.message)+'</td></tr>'; showToast('Error: '+e.message); }
 }
+let lastRows=[];
 function renderRows(rows, capped){
+  lastRows=rows;
   const tb=document.getElementById('tbody');
   if(!rows.length){ tb.innerHTML='<tr><td colspan="5" class="empty">No matching eligibility records.</td></tr>'; document.getElementById('count-label').textContent='0 records'; return; }
-  tb.innerHTML=rows.map(r=>{
+  tb.innerHTML=rows.map((r,i)=>{
     const st=(r.status||'').toLowerCase()==='active'?'badge-active':'badge-inactive';
-    return `<tr>
+    return `<tr style="cursor:pointer;" onclick="openRecord(${i})" title="View eligibility record">
       <td><strong>${esc(r.last_name||'')}</strong></td>
       <td>${esc(r.first_name||'')}</td>
       <td>${esc(r.dob||'—')}</td>
@@ -150,6 +152,12 @@ function renderRows(rows, capped){
     </tr>`;
   }).join('');
   document.getElementById('count-label').textContent=rows.length+' record'+(rows.length!==1?'s':'')+(capped?' (showing first 200 — refine your search)':'');
+}
+function openRecord(i){
+  const r=lastRows[i]; if(!r) return;
+  const gid=document.getElementById('f-group').value;
+  const q=new URLSearchParams({ group_id:gid, first:r.first_name||'', last:r.last_name||'', dob:r.dob||'', gender:r.gender||'' });
+  location.href='/admin/eligibility-record.html?'+q.toString();
 }
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
 function esc(s){ return (s==null?'':s.toString()).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
