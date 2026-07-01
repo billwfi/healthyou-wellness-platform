@@ -34,7 +34,20 @@ function clean(b) {
 exports.handler = async (event, context) => {
   if (event.httpMethod === 'OPTIONS') return options();
   const user = getUser(event, context);
-  if (!user) return unauthorized();
+  if (!user) {
+    // Diagnostic reason (no token contents leaked) to explain the 401.
+    const auth = (event.headers?.authorization || event.headers?.Authorization || '').trim();
+    const token = auth.replace(/^Bearer\s+/i, '');
+    let reason = 'no Authorization token received';
+    if (token) {
+      try {
+        const c = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+        reason = (c.exp && Date.now() / 1000 > c.exp) ? 'session token expired — please sign in again'
+               : (!c.email ? 'token has no email claim' : 'token rejected');
+      } catch (e) { reason = 'token could not be decoded'; }
+    }
+    return { statusCode: 401, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Unauthorized', reason }) };
+  }
   const db = getPool();
   const qs = event.queryStringParameters || {};
 

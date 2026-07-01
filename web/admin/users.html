@@ -126,11 +126,27 @@ netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} 
 netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
 netlifyIdentity.on('logout',()=>{ document.getElementById('content').style.display='none'; document.getElementById('login-wall').style.display=''; });
 
-// Always send a fresh JWT — currentUser().jwt() refreshes an expired token.
-async function authHdr(extra){
-  let t=authToken;
-  try{ const u=netlifyIdentity.currentUser(); if(u){ t=await u.jwt(); authToken=t; } }catch(e){}
-  return Object.assign({ Authorization:'Bearer '+t }, extra||{});
+// Get a valid JWT, forcing a refresh when asked. Falls back to the last token.
+async function getToken(force){
+  try{ const u=netlifyIdentity.currentUser(); if(u){ const t=await u.jwt(force===true); if(t){ authToken=t; return t; } } }catch(e){}
+  return authToken;
+}
+async function authHdr(extra, force){
+  return Object.assign({ Authorization:'Bearer '+(await getToken(force)) }, extra||{});
+}
+// Fetch with auth; on 401 force a refresh and retry once, then prompt re-login.
+async function apiFetch(url, opts){
+  opts=opts||{}; const base=opts.headers||{};
+  let r=await fetch(url, Object.assign({}, opts, { headers: await authHdr(base) }));
+  if(r.status===401){
+    r=await fetch(url, Object.assign({}, opts, { headers: await authHdr(base, true) }));
+    if(r.status===401){
+      let reason=''; try{ reason=(await r.clone().json()).reason||''; }catch(e){}
+      showToast('Session expired — please sign in again'+(reason?': '+reason:''));
+      try{ netlifyIdentity.open(); }catch(e){}
+    }
+  }
+  return r;
 }
 async function boot(user){
   document.getElementById('login-wall').style.display='none';
@@ -148,9 +164,9 @@ function renderNavChecklist(){
 }
 async function loadUsers(){
   try{
-    const r=await fetch('/api/users',{headers:await authHdr()});
+    const r=await apiFetch('/api/users');
     const data=await r.json();
-    if(!r.ok) throw new Error(data.error||'Failed to load users');
+    if(!r.ok) throw new Error((data.error||'Failed to load users')+(data.reason?' — '+data.reason:''));
     users=Array.isArray(data)?data:[];
     renderTable(users);
   }catch(e){ document.getElementById('tbody').innerHTML='<tr><td colspan="7" class="empty">'+esc(e.message)+'</td></tr>'; showToast('Error: '+e.message); }
@@ -223,8 +239,8 @@ async function save(){
   if(editId) body.id=editId;
   const btn=document.getElementById('save-btn'); btn.disabled=true; btn.textContent='Saving…';
   try{
-    const r=await fetch('/api/users',{method:editId?'PUT':'POST',headers:await authHdr({'Content-Type':'application/json'}),body:JSON.stringify(body)});
-    if(!r.ok){ showErr((await r.json()).error||'Save failed'); return; }
+    const r=await apiFetch('/api/users',{method:editId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok){ const j=await r.json().catch(()=>({})); showErr((j.error||'Save failed')+(j.reason?' — '+j.reason:'')); return; }
     closeModal(); showToast(editId?'User updated':'User added'); loadUsers();
   }catch(e){ showErr('Error: '+e.message); }
   finally{ btn.disabled=false; btn.textContent=editId?'Save Changes':'Add User'; }
@@ -233,7 +249,7 @@ async function del(id){
   const u=users.find(x=>x.id===id); if(!u) return;
   if(!confirm(`Delete user ${u.first_name||''} ${u.last_name||''}?`)) return;
   try{
-    const r=await fetch(`/api/users?id=${id}`,{method:'DELETE',headers:await authHdr()});
+    const r=await apiFetch(`/api/users?id=${id}`,{method:'DELETE'});
     if(!r.ok) throw new Error('Delete failed');
     showToast('User deleted'); loadUsers();
   }catch(e){ showToast('Error: '+e.message); }
