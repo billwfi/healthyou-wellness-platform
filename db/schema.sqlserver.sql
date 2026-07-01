@@ -792,3 +792,17 @@ CREATE TABLE dbo.coach_availability_exceptions (
   created_at     DATETIME2(3) DEFAULT SYSUTCDATETIME()
 );
 GO
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- Coach ↔ Group assignments (many-to-many). group_id references
+-- iStrata.dbo.is_groups(id) — a cross-database ref, so no FK (enforced in app,
+-- same as other iStrata references). Managed on Admin > Coaches (Edit).
+-- ════════════════════════════════════════════════════════════════════════════
+IF OBJECT_ID('dbo.coach_groups','U') IS NULL
+CREATE TABLE dbo.coach_groups (
+  coach_id   INT NOT NULL,
+  group_id   INT NOT NULL,
+  created_at DATETIME2(3) DEFAULT SYSUTCDATETIME(),
+  CONSTRAINT pk_coach_groups PRIMARY KEY (coach_id, group_id)
+);
+GO

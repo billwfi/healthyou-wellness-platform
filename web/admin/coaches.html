@@ -60,7 +60,7 @@
 
 <!-- ── Add / Edit Coach Modal ─────────────────────────────────────────────── -->
 <div id="modal-backdrop" class="modal-backdrop" style="display:none;" onclick="closeOuter(event)">
-  <div class="modal" style="max-width:560px;">
+  <div class="modal" style="max-width:760px;">
     <div class="modal-title" id="modal-title">Add Coach</div>
     <!-- Photo upload -->
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:18px;">
@@ -82,6 +82,18 @@
       <div class="form-group"><label>Specialty</label><input id="f-spec" type="text" placeholder="Nutrition, Fitness, Stress Management…"/></div>
       <div class="form-group full"><label>Bio</label><textarea id="f-bio" rows="3" placeholder="Certified health coach specializing in…"></textarea></div>
     </div>
+
+    <!-- Group assignments -->
+    <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--gray-200);">
+      <label style="font-size:.82rem;font-weight:600;color:var(--gray-700);">Assigned Groups</label>
+      <p style="font-size:.78rem;color:var(--gray-400);margin:2px 0 10px;">Assign this coach to one or more employer groups.</p>
+      <div id="coach-groups-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select id="group-picker" style="max-width:300px;"></select>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addGroupChip()">+ Add Group</button>
+      </div>
+    </div>
+
     <div id="modal-err" style="display:none;margin-top:10px;font-size:.84rem;color:var(--red);"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
@@ -137,13 +149,18 @@
 </style>
 
 <script>
-let authToken=null, coaches=[], editId=null, photoDataUrl=null;
+let authToken=null, coaches=[], editId=null, photoDataUrl=null, allGroups=[], selectedGroupIds=[];
 
 netlifyIdentity.on('init',  u=>{ if(u){authToken=u.token.access_token;boot(u);} else { location.href='/admin/login.html'; } });
 netlifyIdentity.on('login', u=>{ authToken=u.token.access_token;boot(u); });
 netlifyIdentity.on('logout',()=>{ location.href='/admin/login.html'; });
 
-async function boot(u){ document.getElementById('content').style.display=''; document.getElementById('header-name').textContent=u.user_metadata?.full_name||u.email; load(); }
+async function boot(u){ document.getElementById('content').style.display=''; document.getElementById('header-name').textContent=u.user_metadata?.full_name||u.email; loadGroups(); load(); }
+
+async function loadGroups(){
+  try{ const g=await fetch('/api/groups',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json()); allGroups=Array.isArray(g)?g.filter(x=>x.name):[]; }
+  catch(e){ allGroups=[]; }
+}
 
 // ── Table ────────────────────────────────────────────────────────────────────
 
@@ -154,7 +171,7 @@ async function load() {
       ?'<tr><td colspan="6" class="empty">No coaches yet.</td></tr>'
       :coaches.map(c=>`<tr>
           <td style="padding:8px 10px;">${avatarHtml(c,38)}</td>
-          <td><div style="font-weight:600">${esc(c.name)}</div>${c.bio?`<div style="font-size:.78rem;color:var(--gray-400)">${esc(c.bio.slice(0,50))}…</div>`:''}</td>
+          <td><div style="font-weight:600">${esc(c.name)}</div>${c.bio?`<div style="font-size:.78rem;color:var(--gray-400)">${esc(c.bio.slice(0,50))}…</div>`:''}${c.groups&&c.groups.length?`<div style="font-size:.72rem;color:var(--teal);margin-top:2px;">${c.groups.map(g=>esc(g.name)).join(', ')}</div>`:''}</td>
           <td style="color:var(--gray-600);">${esc(c.email)}${c.phone?`<div style="font-size:.78rem;color:var(--gray-400);">${esc(c.phone)}</div>`:''}</td>
           <td>${esc(c.specialty||'—')}</td>
           <td><span class="badge badge-${c.active?'active':'inactive'}">${c.active?'Active':'Inactive'}</span></td>
@@ -193,16 +210,42 @@ function openModal(id){
     document.getElementById('f-spec').value=c.specialty||'';
     document.getElementById('f-bio').value=c.bio||'';
     setPhotoPreview(c.avatar_url||null, c.name);
+    selectedGroupIds=(c.groups||[]).map(g=>g.id);
   } else {
     ['f-name','f-email','f-phone','f-spec','f-bio'].forEach(i=>document.getElementById(i).value='');
     setPhotoPreview(null, '');
+    selectedGroupIds=[];
   }
+  renderCoachGroups();
   document.getElementById('modal-backdrop').style.display='flex';
   document.getElementById('f-name').focus();
 }
 
 function closeModal(){ document.getElementById('modal-backdrop').style.display='none'; }
 function closeOuter(e){ if(e.target===document.getElementById('modal-backdrop'))closeModal(); }
+
+// ── Group assignment ─────────────────────────────────────────────────────────
+function groupName(id){ const g=allGroups.find(x=>String(x.id)===String(id)); return g?g.name:('Group #'+id); }
+function renderCoachGroups(){
+  const chips=document.getElementById('coach-groups-chips');
+  chips.innerHTML=selectedGroupIds.length
+    ? selectedGroupIds.map(id=>`<span style="display:inline-flex;align-items:center;gap:6px;background:#e6f5f3;color:#0f766e;border-radius:99px;padding:4px 12px;font-size:.84rem;">${esc(groupName(id))}<button type="button" onclick="removeGroupChip(${id})" style="background:none;border:none;cursor:pointer;color:#0f766e;font-size:1.05rem;line-height:1;padding:0 2px;">&times;</button></span>`).join('')
+    : '<span style="color:var(--gray-400);font-size:.83rem;">No groups assigned.</span>';
+  const picker=document.getElementById('group-picker');
+  const sel=selectedGroupIds.map(String);
+  const avail=allGroups.filter(g=>!sel.includes(String(g.id)));
+  picker.innerHTML=avail.length
+    ? '<option value="">Select a group…</option>'+avail.map(g=>`<option value="${g.id}">${esc(g.name)}${g.active?'':' (inactive)'}</option>`).join('')
+    : '<option value="">All groups assigned</option>';
+  picker.disabled=!avail.length;
+}
+function addGroupChip(){
+  const id=parseInt(document.getElementById('group-picker').value,10);
+  if(!id) return;
+  if(!selectedGroupIds.map(String).includes(String(id))) selectedGroupIds.push(id);
+  renderCoachGroups();
+}
+function removeGroupChip(id){ selectedGroupIds=selectedGroupIds.filter(x=>String(x)!==String(id)); renderCoachGroups(); }
 
 function setPhotoPreview(url, name){
   const preview=document.getElementById('photo-preview');
@@ -265,6 +308,7 @@ async function save(){
       phone:document.getElementById('f-phone').value.trim()||null,
       specialty:document.getElementById('f-spec').value||null,
       bio:document.getElementById('f-bio').value||null,
+      group_ids:selectedGroupIds,
     };
     if(editId){ body.id=editId; }
     // include avatar only if changed (new upload or explicit remove)

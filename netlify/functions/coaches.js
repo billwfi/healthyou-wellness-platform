@@ -1,6 +1,15 @@
 const { getPool } = require('./_db');
 const { getUser, ok, created, badRequest, unauthorized, notFound, serverError, options } = require('./_auth');
 
+// Replace a coach's group assignments with the given set of is_groups ids.
+async function setCoachGroups(db, coachId, groupIds) {
+  await db.query('DELETE FROM coach_groups WHERE coach_id=$1', [coachId]);
+  const ids = [...new Set((groupIds || []).map(n => parseInt(n, 10)).filter(Number.isInteger))];
+  for (const gid of ids) {
+    await db.query('INSERT INTO coach_groups (coach_id, group_id) VALUES ($1,$2)', [coachId, gid]);
+  }
+}
+
 exports.handler = async (event, context) => {
   if (event.httpMethod === 'OPTIONS') return options();
 
@@ -21,6 +30,13 @@ exports.handler = async (event, context) => {
   if (event.httpMethod === 'GET') {
     try {
       const r = await db.query('SELECT * FROM coaches ORDER BY active DESC,name');
+      // Attach assigned groups (name from the iStrata group table).
+      const cg = await db.query(
+        `SELECT cg.coach_id, cg.group_id, g.GroupName AS name
+           FROM coach_groups cg JOIN iStrata.dbo.is_groups g ON g.id = cg.group_id`);
+      const byCoach = {};
+      for (const row of cg.rows) (byCoach[row.coach_id] ||= []).push({ id: row.group_id, name: row.name });
+      for (const c of r.rows) c.groups = byCoach[c.id] || [];
       return ok(r.rows);
     } catch (e) { return serverError(e); }
   }
@@ -36,6 +52,7 @@ exports.handler = async (event, context) => {
          OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,$6)`,
         [name.trim(), email.trim().toLowerCase(), bio||null, specialty||null, phone||null, avatar_url||null]
       );
+      if (Array.isArray(b.group_ids)) await setCoachGroups(db, r.rows[0].id, b.group_ids);
       return created(r.rows[0]);
     } catch (e) {
       if (e.number===2627 || e.number===2601) return badRequest('Email already exists');
@@ -68,6 +85,7 @@ exports.handler = async (event, context) => {
         `UPDATE coaches SET ${sets.join(',')} OUTPUT INSERTED.* WHERE id=$1`, params
       );
       if (!r.rows.length) return notFound();
+      if (Array.isArray(b.group_ids)) await setCoachGroups(db, id, b.group_ids);
       return ok(r.rows[0]);
     } catch (e) { return serverError(e); }
   }
