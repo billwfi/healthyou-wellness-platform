@@ -132,7 +132,7 @@ CREATE TABLE dbo.coaching_sessions (
   participant_id    INT,
   coach_id          INT,
   scheduled_at      DATETIME2(3) NOT NULL,
-  duration_minutes  INT DEFAULT 60,
+  duration_minutes  INT DEFAULT 30,
   session_type      NVARCHAR(50) DEFAULT 'initial',
   status            NVARCHAR(50) DEFAULT 'scheduled',
   intake_notes      NVARCHAR(MAX),

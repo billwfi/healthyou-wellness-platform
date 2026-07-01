@@ -4,7 +4,7 @@ const { getPool } = require('./_db');
 
 // Available start times ('HH:MM') for one coach on one date, honoring recurring
 // availability, exceptions (off/custom), and already-booked sessions.
-async function coachSlots(db, coachId, date, durMins = 60) {
+async function coachSlots(db, coachId, date, durMins = 30) {
   const { rows: [{ dow }] } = await db.query(
     `SELECT DATEDIFF(day, '19000107', CAST($1 AS date)) % 7 AS dow`, [date]);
 
@@ -53,7 +53,7 @@ async function coachSlots(db, coachId, date, durMins = 60) {
   const bookedIntervals = booked.map(r => {
     const dt = new Date(r.scheduled_at);
     const start = dt.getUTCHours() * 60 + dt.getUTCMinutes();
-    return [start, start + (parseInt(r.duration_minutes, 10) || 60)];
+    return [start, start + (parseInt(r.duration_minutes, 10) || 30)];
   });
   const conflicts = s => bookedIntervals.some(([bS, bE]) => s < bE && (s + durMins) > bS);
 
@@ -80,7 +80,7 @@ async function groupCoachIds(db, groupId) {
 }
 
 // Union of available start times across all of a group's coaches on a date.
-async function groupSlots(db, groupId, date, durMins = 60) {
+async function groupSlots(db, groupId, date, durMins = 30) {
   const ids = await groupCoachIds(db, groupId);
   const set = new Set();
   for (const id of ids) (await coachSlots(db, id, date, durMins)).forEach(s => set.add(s));
@@ -88,7 +88,7 @@ async function groupSlots(db, groupId, date, durMins = 60) {
 }
 
 // Coach ids in a group that are free at a specific date+time.
-async function freeCoachesForSlot(db, groupId, date, time, durMins = 60) {
+async function freeCoachesForSlot(db, groupId, date, time, durMins = 30) {
   const ids = await groupCoachIds(db, groupId);
   const free = [];
   for (const id of ids) if ((await coachSlots(db, id, date, durMins)).includes(time)) free.push(id);

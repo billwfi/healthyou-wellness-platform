@@ -29,7 +29,7 @@ exports.handler = async (event, context) => {
     if (!first_name || !last_name || !email || !scheduled_at)
       return badRequest('first_name, last_name, email, and scheduled_at are required');
     if (!group_id && !coach_id) return badRequest('group_id or coach_id required');
-    const dur = duration_minutes || 60;
+    const dur = duration_minutes || 30;
     const date = scheduled_at.slice(0, 10);
     const time = scheduled_at.slice(11, 16);   // HH:MM
 

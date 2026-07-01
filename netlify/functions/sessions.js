@@ -44,7 +44,7 @@ exports.handler = async (event, context) => {
         `INSERT INTO coaching_sessions (participant_id,coach_id,scheduled_at,duration_minutes,session_type,intake_notes)
          OUTPUT INSERTED.* VALUES ($1,$2,$3,$4,$5,$6)`,
         [participant_id, coach_id||null, scheduled_at,
-         duration_minutes||60, session_type||'initial', intake_notes||null]
+         duration_minutes||30, session_type||'initial', intake_notes||null]
       );
       return created(r.rows[0]);
     } catch (e) { return serverError(e); }

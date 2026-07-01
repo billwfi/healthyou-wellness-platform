@@ -297,7 +297,7 @@ function renderReview(){
     <dt>Coach</dt><dd>${esc(coachTxt)}</dd>
     <dt>Date</dt><dd>${fmtDate(selectedDate)}</dd>
     <dt>Time</dt><dd>${fmtTime(selectedSlot)} (Mountain Time)</dd>
-    <dt>Duration</dt><dd>60 minutes</dd>`;
+    <dt>Duration</dt><dd>30 minutes</dd>`;
 }
 async function submitBooking(){
   clear('book-err');
@@ -308,7 +308,7 @@ async function submitBooking(){
         group_id:selectedGroup.id, coach_id:selectedCoachId||null,
         first_name:details.first_name, last_name:details.last_name, email:details.email,
         phone:details.phone||null, date_of_birth:details.date_of_birth, gender:details.gender,
-        scheduled_at:`${selectedDate}T${selectedSlot}:00`, duration_minutes:60,
+        scheduled_at:`${selectedDate}T${selectedSlot}:00`, duration_minutes:30,
         intake_notes:v('b-notes')||null })});
     const data=await res.json();
     if(!res.ok){ err('book-err',data.error||'Booking failed. Please try again.'); btn.disabled=false; btn.textContent='Confirm Booking'; return; }
@@ -323,7 +323,7 @@ function showConfirmation(){
     <dt>Coach</dt><dd>${esc(lastCoachName)}</dd>
     <dt>Date</dt><dd>${fmtDate(selectedDate)}</dd>
     <dt>Time</dt><dd>${fmtTime(selectedSlot)} (Mountain Time)</dd>
-    <dt>Duration</dt><dd>60 minutes</dd>`;
+    <dt>Duration</dt><dd>30 minutes</dd>`;
   document.getElementById('step-bar').style.display='none';
   document.getElementById('sum-bar').style.display='none';
   ['1','2','3'].forEach(n=>document.getElementById('panel-'+n).style.display='none');

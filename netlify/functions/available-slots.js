@@ -11,7 +11,7 @@ exports.handler = async (event) => {
 
   const qs = event.queryStringParameters || {};
   const { coach_id, group_id, date } = qs;
-  const durMins = parseInt(qs.duration || '60', 10);
+  const durMins = parseInt(qs.duration || '30', 10);
 
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return badRequest('date must be YYYY-MM-DD');
   if (!coach_id && !group_id) return badRequest('coach_id or group_id required');

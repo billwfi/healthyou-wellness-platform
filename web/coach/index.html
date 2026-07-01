@@ -296,7 +296,7 @@ function openAppt(i){
   document.getElementById('am-title').textContent=`${esc(s.first_name||'')} ${esc(s.last_name||'')}`.trim()||'Appointment';
   document.getElementById('am-body').innerHTML=
     row('Date',esc(dateStr))+
-    row('Time',esc(apptTime(s.scheduled_at))+' &middot; '+(s.duration_minutes||60)+' min')+
+    row('Time',esc(apptTime(s.scheduled_at))+' &middot; '+(s.duration_minutes||30)+' min')+
     row('Type',esc(s.session_type||'session'))+
     row('Status',esc(s.status||'scheduled'))+
     (s.participant_email?row('Email',esc(s.participant_email)):'');
