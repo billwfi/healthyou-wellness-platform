@@ -79,6 +79,7 @@ const RELEASES = [
   {
     version: '2026.06.30',
     date: 'June 30, 2026',
+    pdf: '/assets/release-notes/HealYou-Release-Notes-2026-06-30.pdf',
     summary: 'Screening report redesign with graphical ranges and Critical-Risk flags; an Emergent Risk follow-up form emailed to registrants; PCP events with 30-day scheduling and eligibility verification; a new User Management area; and richer group eligibility.',
     sections: [
       { title: 'Screening Report & Results', items: [
@@ -178,6 +179,14 @@ function openRelease(i){
       <div style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--teal);margin-bottom:2px;">${esc(s.title)}</div>
       ${li(s.items)}</div>`).join('');
   } else { body=li(r.highlights||[]); }
+  if(r.pdf){
+    body+=`<div style="margin-top:18px;">
+      <div style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--teal);margin-bottom:6px;">Full Notes &amp; Screenshots</div>
+      <div style="border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;">
+        <embed src="${esc(r.pdf)}#toolbar=1" type="application/pdf" style="width:100%;height:70vh;min-height:520px;border:0;display:block;"/>
+      </div>
+    </div>`;
+  }
   document.getElementById('rn-m-body').innerHTML=body;
   document.getElementById('rn-modal').style.display='flex';
 }
